@@ -1,6 +1,7 @@
 # Generated outputs
 *.csv
 insights_report.md
+outputs/
 
 # Python
 __pycache__/
