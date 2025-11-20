@@ -10,6 +10,14 @@ from collections import Counter
 from datetime import datetime
 from typing import Dict, List, Tuple, Optional
 
+# Try to import openpyxl for XLSX support
+try:
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment
+    OPENPYXL_AVAILABLE = True
+except ImportError:
+    OPENPYXL_AVAILABLE = False
+
 # Topic keyword definitions
 TOPIC_KEYWORDS = {
     "Code/Development": [
@@ -386,7 +394,7 @@ def generate_csv_files(recordings_data: List[Dict], output_dir: Path):
             writer.writerow(data)
     print(f"  ✓ {topic_file.name}")
 
-    return recordings_data
+    return daily_summary, hourly_data, word_freq, mode_data, topic_data, daily_summary, hourly_data, word_freq, mode_data, topic_data
 
 
 def generate_insights_report(recordings_data: List[Dict], output_dir: Path):
@@ -575,21 +583,339 @@ Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
     print(f"  ✓ {report_file.name}")
 
 
+def generate_xlsx_file(recordings_data: List[Dict], daily_summary: Dict, hourly_data: Dict,
+                       word_freq: Counter, mode_data: Dict, topic_data: Dict, output_dir: Path):
+    """Generate XLSX file with multiple sheets."""
+    if not OPENPYXL_AVAILABLE:
+        print("\n⚠ Skipping XLSX generation: openpyxl not installed")
+        print("  Install with: pip install openpyxl")
+        return
+
+    print("\nGenerating XLSX file...")
+
+    wb = Workbook()
+    wb.remove(wb.active)  # Remove default sheet
+
+    # Sheet 1: Recordings Detail
+    ws1 = wb.create_sheet("Recordings Detail")
+    detail_fields = [
+        "recording_id", "datetime", "date", "hour", "day_of_week",
+        "duration_seconds", "duration_ms", "has_transcript", "word_count",
+        "char_count", "words_per_minute", "mode_name", "model_name",
+        "app_version", "processing_time_ms", "segment_count", "folder_name",
+        "primary_topic", "secondary_topics"
+    ]
+    ws1.append(detail_fields)
+    # Style header
+    for cell in ws1[1]:
+        cell.font = Font(bold=True)
+        cell.alignment = Alignment(horizontal='center')
+    for rec in recordings_data:
+        ws1.append([rec.get(k, "") for k in detail_fields])
+
+    # Sheet 2: Daily Summary
+    ws2 = wb.create_sheet("Daily Summary")
+    ws2.append(["date", "recordings_count", "total_duration_seconds",
+                "total_duration_hours", "total_words", "total_characters",
+                "avg_duration_seconds", "avg_words_per_recording"])
+    for cell in ws2[1]:
+        cell.font = Font(bold=True)
+        cell.alignment = Alignment(horizontal='center')
+    for date in sorted(daily_summary.keys()):
+        data = daily_summary[date]
+        data["total_duration_hours"] = round(data["total_duration_seconds"] / 3600, 2)
+        data["avg_duration_seconds"] = round(
+            data["total_duration_seconds"] / data["recordings_count"], 2
+        ) if data["recordings_count"] > 0 else 0
+        data["avg_words_per_recording"] = round(
+            data["total_words"] / data["recordings_count"], 2
+        ) if data["recordings_count"] > 0 else 0
+        ws2.append([
+            data["date"], data["recordings_count"], data["total_duration_seconds"],
+            data["total_duration_hours"], data["total_words"], data["total_characters"],
+            data["avg_duration_seconds"], data["avg_words_per_recording"]
+        ])
+
+    # Sheet 3: Hourly Patterns
+    ws3 = wb.create_sheet("Hourly Patterns")
+    ws3.append(["hour", "recordings_count", "total_duration_seconds", "avg_duration_seconds"])
+    for cell in ws3[1]:
+        cell.font = Font(bold=True)
+        cell.alignment = Alignment(horizontal='center')
+    for hour in sorted(hourly_data.keys()):
+        data = hourly_data[hour]
+        data["avg_duration_seconds"] = round(
+            data["total_duration_seconds"] / data["recordings_count"], 2
+        ) if data["recordings_count"] > 0 else 0
+        ws3.append([data["hour"], data["recordings_count"],
+                   data["total_duration_seconds"], data["avg_duration_seconds"]])
+
+    # Sheet 4: Word Frequency
+    ws4 = wb.create_sheet("Word Frequency")
+    ws4.append(["word", "frequency", "percentage"])
+    for cell in ws4[1]:
+        cell.font = Font(bold=True)
+        cell.alignment = Alignment(horizontal='center')
+    total_words = sum(word_freq.values())
+    for word, freq in word_freq.most_common(500):
+        percentage = round((freq / total_words * 100), 4) if total_words > 0 else 0
+        ws4.append([word, freq, percentage])
+
+    # Sheet 5: Mode Usage
+    ws5 = wb.create_sheet("Mode Usage")
+    ws5.append(["mode_name", "count", "percentage", "total_duration_seconds"])
+    for cell in ws5[1]:
+        cell.font = Font(bold=True)
+        cell.alignment = Alignment(horizontal='center')
+    total_recordings = len(recordings_data)
+    for mode in sorted(mode_data.keys()):
+        data = mode_data[mode]
+        data["percentage"] = round((data["count"] / total_recordings * 100), 2) if total_recordings > 0 else 0
+        ws5.append([data["mode_name"], data["count"], data["percentage"], data["total_duration_seconds"]])
+
+    # Sheet 6: Topic Distribution
+    ws6 = wb.create_sheet("Topic Distribution")
+    ws6.append(["topic", "recording_count", "total_duration_seconds",
+                "percentage_of_recordings", "percentage_of_time"])
+    for cell in ws6[1]:
+        cell.font = Font(bold=True)
+        cell.alignment = Alignment(horizontal='center')
+    total_duration = sum(rec["duration_seconds"] for rec in recordings_data)
+    for topic in sorted(topic_data.keys(), key=lambda x: topic_data[x]["recording_count"], reverse=True):
+        data = topic_data[topic]
+        data["percentage_of_recordings"] = round(
+            (data["recording_count"] / total_recordings * 100), 2
+        ) if total_recordings > 0 else 0
+        data["percentage_of_time"] = round(
+            (data["total_duration_seconds"] / total_duration * 100), 2
+        ) if total_duration > 0 else 0
+        ws6.append([
+            data["topic"], data["recording_count"], data["total_duration_seconds"],
+            data["percentage_of_recordings"], data["percentage_of_time"]
+        ])
+
+    xlsx_file = output_dir / "analytics.xlsx"
+    wb.save(xlsx_file)
+    print(f"  ✓ {xlsx_file.name}")
+
+
+def generate_json_file(recordings_data: List[Dict], daily_summary: Dict, hourly_data: Dict,
+                       word_freq: Counter, mode_data: Dict, topic_data: Dict, output_dir: Path):
+    """Generate JSON file with structured data."""
+    print("\nGenerating JSON file...")
+
+    total_recordings = len(recordings_data)
+    recordings_with_transcripts = sum(1 for r in recordings_data if r["has_transcript"])
+    total_duration_seconds = sum(r["duration_seconds"] for r in recordings_data)
+    total_words = sum(r["word_count"] for r in recordings_data)
+    total_characters = sum(r["char_count"] for r in recordings_data)
+
+    dates = sorted(set(r["date"] for r in recordings_data))
+    first_date = dates[0] if dates else "Unknown"
+    last_date = dates[-1] if dates else "Unknown"
+
+    # Prepare recordings without transcript field
+    recordings_clean = []
+    for rec in recordings_data:
+        rec_copy = rec.copy()
+        rec_copy.pop("transcript", None)  # Remove transcript from JSON
+        recordings_clean.append(rec_copy)
+
+    # Prepare daily summary
+    daily_summary_list = []
+    for date in sorted(daily_summary.keys()):
+        data = daily_summary[date].copy()
+        data["total_duration_hours"] = round(data["total_duration_seconds"] / 3600, 2)
+        data["avg_duration_seconds"] = round(
+            data["total_duration_seconds"] / data["recordings_count"], 2
+        ) if data["recordings_count"] > 0 else 0
+        data["avg_words_per_recording"] = round(
+            data["total_words"] / data["recordings_count"], 2
+        ) if data["recordings_count"] > 0 else 0
+        daily_summary_list.append(data)
+
+    # Prepare hourly patterns
+    hourly_patterns_list = []
+    for hour in sorted(hourly_data.keys()):
+        data = hourly_data[hour].copy()
+        data["avg_duration_seconds"] = round(
+            data["total_duration_seconds"] / data["recordings_count"], 2
+        ) if data["recordings_count"] > 0 else 0
+        hourly_patterns_list.append(data)
+
+    # Prepare word frequency
+    total_words_count = sum(word_freq.values())
+    word_frequency_list = [
+        {"word": word, "frequency": freq, "percentage": round((freq / total_words_count * 100), 4)}
+        for word, freq in word_freq.most_common(500)
+    ]
+
+    # Prepare mode usage
+    mode_usage_list = []
+    for mode in sorted(mode_data.keys()):
+        data = mode_data[mode].copy()
+        data["percentage"] = round((data["count"] / total_recordings * 100), 2) if total_recordings > 0 else 0
+        mode_usage_list.append(data)
+
+    # Prepare topic distribution
+    total_duration = sum(rec["duration_seconds"] for rec in recordings_data)
+    topic_distribution_list = []
+    for topic in sorted(topic_data.keys(), key=lambda x: topic_data[x]["recording_count"], reverse=True):
+        data = topic_data[topic].copy()
+        data["percentage_of_recordings"] = round(
+            (data["recording_count"] / total_recordings * 100), 2
+        ) if total_recordings > 0 else 0
+        data["percentage_of_time"] = round(
+            (data["total_duration_seconds"] / total_duration * 100), 2
+        ) if total_duration > 0 else 0
+        topic_distribution_list.append(data)
+
+    json_data = {
+        "metadata": {
+            "generated_at": datetime.now().isoformat(),
+            "total_recordings": total_recordings,
+            "recordings_with_transcripts": recordings_with_transcripts,
+            "total_duration_seconds": round(total_duration_seconds, 2),
+            "total_duration_hours": round(total_duration_seconds / 3600, 2),
+            "total_words": total_words,
+            "total_characters": total_characters,
+            "date_range": {
+                "first_date": first_date,
+                "last_date": last_date,
+                "days_covered": len(dates)
+            }
+        },
+        "summary": {
+            "avg_recordings_per_day": round(total_recordings / len(dates), 2) if dates else 0,
+            "avg_duration_per_day_hours": round((total_duration_seconds / 3600) / len(dates), 2) if dates else 0,
+            "avg_words_per_recording": round(total_words / recordings_with_transcripts, 2) if recordings_with_transcripts > 0 else 0
+        },
+        "recordings": recordings_clean,
+        "daily_summary": daily_summary_list,
+        "hourly_patterns": hourly_patterns_list,
+        "word_frequency": word_frequency_list,
+        "mode_usage": mode_usage_list,
+        "topic_distribution": topic_distribution_list
+    }
+
+    json_file = output_dir / "analytics.json"
+    with open(json_file, 'w', encoding='utf-8') as f:
+        json.dump(json_data, f, indent=2, ensure_ascii=False)
+    print(f"  ✓ {json_file.name}")
+
+
+def generate_ai_prompt_file(output_dir: Path):
+    """Generate AI prompt file for insights generation."""
+    print("\nGenerating AI prompt file...")
+
+    prompt = """# AI Insights Generation Prompt
+
+You are analyzing Super Whisper recording analytics data. The following files are available in this directory:
+
+## Available Data Files
+
+1. **analytics.json** - Complete structured data with all metrics
+2. **analytics.xlsx** - Excel workbook with multiple sheets:
+   - Recordings Detail
+   - Daily Summary
+   - Hourly Patterns
+   - Word Frequency
+   - Mode Usage
+   - Topic Distribution
+3. **recordings_detail.csv** - Full detailed data for each recording
+4. **daily_summary.csv** - Aggregated daily statistics
+5. **hourly_patterns.csv** - Activity patterns by hour
+6. **word_frequency.csv** - Most common words (top 500)
+7. **mode_usage.csv** - Distribution across recording modes
+8. **topic_distribution.csv** - Topic classification statistics
+9. **insights_report.md** - Basic summary report (may need enhancement)
+
+## Analysis Tasks
+
+Please analyze the data and provide insights on:
+
+### 1. Time Patterns
+- Identify peak activity periods (hours, days of week)
+- Analyze trends over time (increasing/decreasing activity)
+- Identify any anomalies or unusual patterns
+- Correlate activity with day of week
+
+### 2. Content Analysis
+- Review word frequency for domain-specific terminology
+- Identify common themes from top words
+- Analyze topic distribution patterns
+- Look for correlations between topics and time patterns
+
+### 3. Usage Patterns
+- Analyze mode usage trends
+- Identify most common use cases
+- Review recording length distributions
+- Examine speech rate patterns
+
+### 4. Insights Generation
+- Provide actionable insights
+- Identify interesting patterns or anomalies
+- Suggest areas for further analysis
+- Highlight key findings
+
+## Output Format
+
+Please generate an enhanced insights report that includes:
+- Executive summary with key findings
+- Detailed analysis sections
+- Visualizations suggestions (if applicable)
+- Recommendations or observations
+- Any notable patterns or trends
+
+## Data Structure Notes
+
+- Recordings are identified by Unix timestamp folder names
+- Duration is in seconds (duration_ms / 1000)
+- Topics are classified using keyword matching
+- Word frequency excludes common stop words
+- All dates are in ISO format (YYYY-MM-DD)
+
+## Instructions
+
+1. Load and examine the JSON file first for overall structure
+2. Use CSV files for detailed analysis or specific queries
+3. Cross-reference data across different files
+4. Generate comprehensive insights beyond what's in the basic report
+5. Be specific with numbers and percentages
+6. Identify trends and patterns
+7. Provide context-aware analysis
+
+Begin your analysis now.
+"""
+
+    prompt_file = output_dir / "insights_prompt.md"
+    with open(prompt_file, 'w', encoding='utf-8') as f:
+        f.write(prompt)
+    print(f"  ✓ {prompt_file.name}")
+
+
 def main():
     """Main execution function."""
     script_dir = Path(__file__).parent
     workspace_root = script_dir.parent
     recordings_dir = workspace_root / "recordings"
-    output_dir = script_dir
 
     if not recordings_dir.exists():
         print(f"Error: {recordings_dir} does not exist")
         print(f"Expected recordings folder at: {recordings_dir}")
         sys.exit(1)
 
+    # Create timestamped output folder
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    outputs_base = script_dir / "outputs"
+    outputs_base.mkdir(exist_ok=True)
+    output_dir = outputs_base / timestamp
+    output_dir.mkdir(exist_ok=True)
+
     print("=" * 60)
     print("Super Whisper Recordings Analytics")
     print("=" * 60)
+    print(f"Output directory: {output_dir}")
 
     # Process recordings
     recordings_data = process_recordings(recordings_dir)
@@ -598,11 +924,20 @@ def main():
         print("No recordings data found!")
         sys.exit(1)
 
-    # Generate CSV files
-    generate_csv_files(recordings_data, output_dir)
+    # Generate CSV files (returns aggregated data)
+    daily_summary, hourly_data, word_freq, mode_data, topic_data = generate_csv_files(recordings_data, output_dir)
 
     # Generate insights report
     generate_insights_report(recordings_data, output_dir)
+
+    # Generate XLSX file
+    generate_xlsx_file(recordings_data, daily_summary, hourly_data, word_freq, mode_data, topic_data, output_dir)
+
+    # Generate JSON file
+    generate_json_file(recordings_data, daily_summary, hourly_data, word_freq, mode_data, topic_data, output_dir)
+
+    # Generate AI prompt file
+    generate_ai_prompt_file(output_dir)
 
     print("\n" + "=" * 60)
     print("Analytics generation complete!")
