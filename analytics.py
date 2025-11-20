@@ -394,7 +394,7 @@ def generate_csv_files(recordings_data: List[Dict], output_dir: Path):
             writer.writerow(data)
     print(f"  ✓ {topic_file.name}")
 
-    return daily_summary, hourly_data, word_freq, mode_data, topic_data, daily_summary, hourly_data, word_freq, mode_data, topic_data
+    return daily_summary, hourly_data, word_freq, mode_data, topic_data
 
 
 def generate_insights_report(recordings_data: List[Dict], output_dir: Path):
