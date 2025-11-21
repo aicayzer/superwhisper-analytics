@@ -75,6 +75,44 @@ STOP_WORDS = {
     "only", "own", "same", "so", "than", "too", "very", "just", "now"
 }
 
+# Filler words and phrases (multi-word phrases use regex patterns)
+FILLER_WORDS = {
+    # Single word fillers
+    'um': r'\bum+\b',
+    'uh': r'\buh+\b',
+    'er': r'\ber+\b',
+    'ah': r'\bah+\b',
+    'like': r'\blike\b',
+    'basically': r'\bbasically\b',
+    'literally': r'\bliterally\b',
+    'actually': r'\bactually\b',
+    'honestly': r'\bhonestly\b',
+    'seriously': r'\bseriously\b',
+    'totally': r'\btotally\b',
+    'right': r'\bright\b(?!\s+now)',  # Exclude "right now" which is meaningful
+    'okay': r'\bokay\b',
+    'ok': r'\bok\b',
+    'well': r'\bwell\b(?=\s+[,.]|\s+$)',  # Only filler when at end or before punctuation
+    'so': r'\bso\b(?=\s+[,.]|\s+$)',
+    'yeah': r'\byeah\b',
+    'yes': r'\byes\b(?=\s+[,.]|\s+$)',
+    
+    # Multi-word fillers
+    'you know': r'\byou\s+know\b',
+    'i mean': r'\bi\s+mean\b',
+    'you see': r'\byou\s+see\b',
+    'i think': r'\bi\s+think\b',
+    'you think': r'\byou\s+think\b',
+    'sort of': r'\bsort\s+of\b',
+    'kind of': r'\bkind\s+of\b',
+    'a bit': r'\ba\s+bit\b',
+    'a little': r'\ba\s+little\b',
+    'at the end of the day': r'\bat\s+the\s+end\s+of\s+the\s+day\b',
+    'to be honest': r'\bto\s+be\s+honest\b',
+    'if you will': r'\bif\s+you\s+will\b',
+    'as it were': r'\bas\s+it\s+were\b',
+}
+
 
 def parse_datetime(dt_str: Optional[str], folder_timestamp: str) -> datetime:
     """Parse datetime string, fallback to folder timestamp if needed."""
@@ -141,6 +179,28 @@ def extract_words(text: str) -> List[str]:
     """Extract words from text, excluding stop words."""
     words = clean_text(text).split()
     return [w for w in words if w and w not in STOP_WORDS and len(w) > 2]
+
+
+def count_filler_words(text: str) -> Tuple[int, Dict[str, int]]:
+    """Count filler words and phrases in text.
+    
+    Returns:
+        Tuple of (total_count, filler_breakdown)
+    """
+    if not text:
+        return 0, {}
+    
+    text_lower = text.lower()
+    filler_counts = {}
+    
+    # Count each filler word/phrase
+    for filler_name, pattern in FILLER_WORDS.items():
+        matches = re.findall(pattern, text_lower)
+        if matches:
+            filler_counts[filler_name] = len(matches)
+    
+    total_count = sum(filler_counts.values())
+    return total_count, filler_counts
 
 
 def filter_by_date(folder_name: str, date_filter: Optional[str], month_filter: Optional[str],
@@ -239,6 +299,10 @@ def process_recordings(recordings_dir: Path, date_filter: Optional[str] = None,
         word_count = len(result.split()) if result else 0
         char_count = len(result) if result else 0
         words_per_minute = (word_count / duration_seconds * 60) if duration_seconds > 0 else 0
+        
+        # Filler word analysis
+        filler_count, filler_breakdown = count_filler_words(result)
+        filler_percentage = (filler_count / word_count * 100) if word_count > 0 else 0
 
         # Topic classification
         primary_topic, secondary_topics = classify_topic(result)
@@ -264,6 +328,8 @@ def process_recordings(recordings_dir: Path, date_filter: Optional[str] = None,
             "word_count": word_count,
             "char_count": char_count,
             "words_per_minute": round(words_per_minute, 2),
+            "filler_word_count": filler_count,
+            "filler_word_percentage": round(filler_percentage, 2),
             "mode_name": mode_name,
             "model_name": model_name,
             "app_version": app_version,
@@ -272,7 +338,8 @@ def process_recordings(recordings_dir: Path, date_filter: Optional[str] = None,
             "folder_name": recording_id,
             "primary_topic": primary_topic,
             "secondary_topics": secondary_topics_str,
-            "transcript": result  # Keep for word frequency analysis
+            "transcript": result,  # Keep for word/phrase frequency analysis
+            "filler_breakdown": filler_breakdown  # Keep for aggregate analysis
         })
 
     print(f"\nProcessed {len(recordings_data)} recordings successfully.")
@@ -288,9 +355,9 @@ def generate_csv_files(recordings_data: List[Dict], output_dir: Path):
     detail_fields = [
         "recording_id", "datetime", "date", "hour", "day_of_week",
         "duration_seconds", "duration_ms", "has_transcript", "word_count",
-        "char_count", "words_per_minute", "mode_name", "model_name",
-        "app_version", "processing_time_ms", "segment_count", "folder_name",
-        "primary_topic", "secondary_topics"
+        "char_count", "words_per_minute", "filler_word_count", "filler_word_percentage",
+        "mode_name", "model_name", "app_version", "processing_time_ms", "segment_count",
+        "folder_name", "primary_topic", "secondary_topics"
     ]
 
     with open(detail_file, 'w', newline='', encoding='utf-8') as f:
@@ -439,8 +506,24 @@ def generate_csv_files(recordings_data: List[Dict], output_dir: Path):
             ) if total_duration > 0 else 0
             writer.writerow(data)
     print(f"  ✓ {topic_file.name}")
+    
+    # 7. Filler word analysis
+    all_fillers = Counter()
+    for rec in recordings_data:
+        if rec.get("filler_breakdown"):
+            all_fillers.update(rec["filler_breakdown"])
+    
+    total_fillers = sum(all_fillers.values())
+    filler_file = output_dir / "filler_word_analysis.csv"
+    with open(filler_file, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.DictWriter(f, fieldnames=["filler_phrase", "count", "percentage"])
+        writer.writeheader()
+        for filler, count in all_fillers.most_common():
+            percentage = round((count / total_fillers * 100), 2) if total_fillers > 0 else 0
+            writer.writerow({"filler_phrase": filler, "count": count, "percentage": percentage})
+    print(f"  ✓ {filler_file.name}")
 
-    return daily_summary, hourly_data, word_freq, mode_data, topic_data
+    return daily_summary, hourly_data, word_freq, mode_data, topic_data, all_fillers
 
 
 def generate_insights_report(recordings_data: List[Dict], output_dir: Path):
@@ -630,7 +713,7 @@ Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 
 
 def generate_xlsx_file(recordings_data: List[Dict], daily_summary: Dict, hourly_data: Dict,
-                       word_freq: Counter, mode_data: Dict, topic_data: Dict, output_dir: Path):
+                       word_freq: Counter, mode_data: Dict, topic_data: Dict, filler_data: Counter, output_dir: Path):
     """Generate XLSX file with multiple sheets."""
     if not OPENPYXL_AVAILABLE:
         print("\n⚠ Skipping XLSX generation: openpyxl not installed")
@@ -647,9 +730,9 @@ def generate_xlsx_file(recordings_data: List[Dict], daily_summary: Dict, hourly_
     detail_fields = [
         "recording_id", "datetime", "date", "hour", "day_of_week",
         "duration_seconds", "duration_ms", "has_transcript", "word_count",
-        "char_count", "words_per_minute", "mode_name", "model_name",
-        "app_version", "processing_time_ms", "segment_count", "folder_name",
-        "primary_topic", "secondary_topics"
+        "char_count", "words_per_minute", "filler_word_count", "filler_word_percentage",
+        "mode_name", "model_name", "app_version", "processing_time_ms", "segment_count",
+        "folder_name", "primary_topic", "secondary_topics"
     ]
     ws1.append(detail_fields)
     # Style header
@@ -739,6 +822,17 @@ def generate_xlsx_file(recordings_data: List[Dict], daily_summary: Dict, hourly_
             data["topic"], data["recording_count"], data["total_duration_seconds"],
             data["percentage_of_recordings"], data["percentage_of_time"]
         ])
+    
+    # Sheet 7: Filler Word Analysis
+    ws7 = wb.create_sheet("Filler Word Analysis")
+    ws7.append(["filler_phrase", "count", "percentage"])
+    for cell in ws7[1]:
+        cell.font = Font(bold=True)
+        cell.alignment = Alignment(horizontal='center')
+    total_fillers = sum(filler_data.values())
+    for filler, count in filler_data.most_common():
+        percentage = round((count / total_fillers * 100), 2) if total_fillers > 0 else 0
+        ws7.append([filler, count, percentage])
 
     xlsx_file = output_dir / "analytics.xlsx"
     wb.save(xlsx_file)
@@ -746,7 +840,7 @@ def generate_xlsx_file(recordings_data: List[Dict], daily_summary: Dict, hourly_
 
 
 def generate_json_file(recordings_data: List[Dict], daily_summary: Dict, hourly_data: Dict,
-                       word_freq: Counter, mode_data: Dict, topic_data: Dict, output_dir: Path):
+                       word_freq: Counter, mode_data: Dict, topic_data: Dict, filler_data: Counter, output_dir: Path):
     """Generate JSON file with structured data."""
     print("\nGenerating JSON file...")
 
@@ -760,11 +854,12 @@ def generate_json_file(recordings_data: List[Dict], daily_summary: Dict, hourly_
     first_date = dates[0] if dates else "Unknown"
     last_date = dates[-1] if dates else "Unknown"
 
-    # Prepare recordings without transcript field
+    # Prepare recordings without transcript and filler breakdown fields
     recordings_clean = []
     for rec in recordings_data:
         rec_copy = rec.copy()
         rec_copy.pop("transcript", None)  # Remove transcript from JSON
+        rec_copy.pop("filler_breakdown", None)  # Remove detailed breakdown
         recordings_clean.append(rec_copy)
 
     # Prepare daily summary
@@ -815,6 +910,13 @@ def generate_json_file(recordings_data: List[Dict], daily_summary: Dict, hourly_
             (data["total_duration_seconds"] / total_duration * 100), 2
         ) if total_duration > 0 else 0
         topic_distribution_list.append(data)
+    
+    # Prepare filler word analysis
+    total_fillers_count = sum(filler_data.values())
+    filler_analysis_list = [
+        {"filler_phrase": filler, "count": count, "percentage": round((count / total_fillers_count * 100), 2)}
+        for filler, count in filler_data.most_common()
+    ]
 
     json_data = {
         "metadata": {
@@ -841,7 +943,8 @@ def generate_json_file(recordings_data: List[Dict], daily_summary: Dict, hourly_
         "hourly_patterns": hourly_patterns_list,
         "word_frequency": word_frequency_list,
         "mode_usage": mode_usage_list,
-        "topic_distribution": topic_distribution_list
+        "topic_distribution": topic_distribution_list,
+        "filler_word_analysis": filler_analysis_list
     }
 
     json_file = output_dir / "analytics.json"
@@ -1116,16 +1219,16 @@ def main():
         sys.exit(1)
 
     # Generate CSV files (returns aggregated data)
-    daily_summary, hourly_data, word_freq, mode_data, topic_data = generate_csv_files(recordings_data, output_dir)
+    daily_summary, hourly_data, word_freq, mode_data, topic_data, filler_data = generate_csv_files(recordings_data, output_dir)
 
     # Generate insights report
     generate_insights_report(recordings_data, output_dir)
 
     # Generate XLSX file
-    generate_xlsx_file(recordings_data, daily_summary, hourly_data, word_freq, mode_data, topic_data, output_dir)
+    generate_xlsx_file(recordings_data, daily_summary, hourly_data, word_freq, mode_data, topic_data, filler_data, output_dir)
 
     # Generate JSON file
-    generate_json_file(recordings_data, daily_summary, hourly_data, word_freq, mode_data, topic_data, output_dir)
+    generate_json_file(recordings_data, daily_summary, hourly_data, word_freq, mode_data, topic_data, filler_data, output_dir)
 
     # Generate AI prompt file
     generate_ai_prompt_file(output_dir)
