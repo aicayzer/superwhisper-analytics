@@ -29,6 +29,7 @@ from lib.processing.recording_processor import (
     filter_by_date,
     process_recordings
 )
+from lib.processing.aggregators import create_analytics_summary
 
 # Try to import openpyxl for XLSX support
 try:
@@ -135,6 +136,18 @@ FILLER_WORDS = {
 def generate_csv_files(recordings_data: List[Dict], output_dir: Path):
     """Generate all CSV output files."""
     print("\nGenerating CSV files...")
+    
+    # CRITICAL: Run all aggregations ONCE using centralized aggregators
+    summary = create_analytics_summary(recordings_data)
+    daily_summary = summary.daily_summary
+    hourly_data = summary.hourly_data
+    word_freq = summary.word_freq
+    bigram_freq = summary.bigram_freq
+    trigram_freq = summary.trigram_freq
+    mode_data = summary.mode_data
+    topic_data = summary.topic_data
+    all_fillers = summary.filler_data
+    sentence_metrics_summary = summary.sentence_summary
 
     # 1. Recordings detail
     detail_file = output_dir / "recordings_detail.csv"
@@ -154,22 +167,7 @@ def generate_csv_files(recordings_data: List[Dict], output_dir: Path):
             writer.writerow({k: rec.get(k, "") for k in detail_fields})
     print(f"  ✓ {detail_file.name}")
 
-    # 2. Daily summary
-    daily_summary = {}
-    for rec in recordings_data:
-        date = rec["date"]
-        if date not in daily_summary:
-            daily_summary[date] = {
-                "date": date,
-                "recordings_count": 0,
-                "total_duration_seconds": 0,
-                "total_words": 0,
-                "total_characters": 0
-            }
-        daily_summary[date]["recordings_count"] += 1
-        daily_summary[date]["total_duration_seconds"] += rec["duration_seconds"]
-        daily_summary[date]["total_words"] += rec["word_count"]
-        daily_summary[date]["total_characters"] += rec["char_count"]
+    # 2. Daily summary (using aggregated data)
 
     daily_file = output_dir / "daily_summary.csv"
     with open(daily_file, 'w', newline='', encoding='utf-8') as f:
@@ -191,19 +189,7 @@ def generate_csv_files(recordings_data: List[Dict], output_dir: Path):
             writer.writerow(data)
     print(f"  ✓ {daily_file.name}")
 
-    # 3. Hourly patterns
-    hourly_data = {}
-    for rec in recordings_data:
-        hour = rec["hour"]
-        if hour not in hourly_data:
-            hourly_data[hour] = {
-                "hour": hour,
-                "recordings_count": 0,
-                "total_duration_seconds": 0
-            }
-        hourly_data[hour]["recordings_count"] += 1
-        hourly_data[hour]["total_duration_seconds"] += rec["duration_seconds"]
-
+    # 3. Hourly patterns (using aggregated data)
     hourly_file = output_dir / "hourly_patterns.csv"
     with open(hourly_file, 'w', newline='', encoding='utf-8') as f:
         writer = csv.DictWriter(f, fieldnames=[
@@ -218,15 +204,8 @@ def generate_csv_files(recordings_data: List[Dict], output_dir: Path):
             writer.writerow(data)
     print(f"  ✓ {hourly_file.name}")
 
-    # 4. Word frequency
-    all_words = []
-    for rec in recordings_data:
-        if rec["transcript"]:
-            all_words.extend(extract_words(rec["transcript"]))
-
-    word_freq = Counter(all_words)
+    # 4. Word frequency (using aggregated data)
     total_words = sum(word_freq.values())
-
     word_file = output_dir / "word_frequency.csv"
     with open(word_file, 'w', newline='', encoding='utf-8') as f:
         writer = csv.DictWriter(f, fieldnames=["word", "frequency", "percentage"])
@@ -236,17 +215,7 @@ def generate_csv_files(recordings_data: List[Dict], output_dir: Path):
             writer.writerow({"word": word, "frequency": freq, "percentage": percentage})
     print(f"  ✓ {word_file.name}")
 
-    # 4b. Phrase frequency (n-grams)
-    all_bigrams = []
-    all_trigrams = []
-    for rec in recordings_data:
-        if rec["transcript"]:
-            all_bigrams.extend(extract_ngrams(rec["transcript"], 2))
-            all_trigrams.extend(extract_ngrams(rec["transcript"], 3))
-
-    bigram_freq = Counter(all_bigrams)
-    trigram_freq = Counter(all_trigrams)
-
+    # 4b. Phrase frequency (using aggregated data)
     phrase_file = output_dir / "phrase_frequency.csv"
     with open(phrase_file, 'w', newline='', encoding='utf-8') as f:
         writer = csv.DictWriter(f, fieldnames=["phrase", "type", "frequency", "percentage"])
@@ -266,19 +235,7 @@ def generate_csv_files(recordings_data: List[Dict], output_dir: Path):
 
     print(f"  ✓ {phrase_file.name}")
 
-    # 5. Mode usage
-    mode_data = {}
-    for rec in recordings_data:
-        mode = rec["mode_name"]
-        if mode not in mode_data:
-            mode_data[mode] = {
-                "mode_name": mode,
-                "count": 0,
-                "total_duration_seconds": 0
-            }
-        mode_data[mode]["count"] += 1
-        mode_data[mode]["total_duration_seconds"] += rec["duration_seconds"]
-
+    # 5. Mode usage (using aggregated data)
     total_recordings = len(recordings_data)
     mode_file = output_dir / "mode_usage.csv"
     with open(mode_file, 'w', newline='', encoding='utf-8') as f:
@@ -292,19 +249,7 @@ def generate_csv_files(recordings_data: List[Dict], output_dir: Path):
             writer.writerow(data)
     print(f"  ✓ {mode_file.name}")
 
-    # 6. Topic distribution
-    topic_data = {}
-    for rec in recordings_data:
-        topic = rec["primary_topic"]
-        if topic not in topic_data:
-            topic_data[topic] = {
-                "topic": topic,
-                "recording_count": 0,
-                "total_duration_seconds": 0
-            }
-        topic_data[topic]["recording_count"] += 1
-        topic_data[topic]["total_duration_seconds"] += rec["duration_seconds"]
-
+    # 6. Topic distribution (using aggregated data)
     total_duration = sum(rec["duration_seconds"] for rec in recordings_data)
     topic_file = output_dir / "topic_distribution.csv"
     with open(topic_file, 'w', newline='', encoding='utf-8') as f:
@@ -324,12 +269,7 @@ def generate_csv_files(recordings_data: List[Dict], output_dir: Path):
             writer.writerow(data)
     print(f"  ✓ {topic_file.name}")
 
-    # 7. Filler word analysis
-    all_fillers = Counter()
-    for rec in recordings_data:
-        if rec.get("filler_breakdown"):
-            all_fillers.update(rec["filler_breakdown"])
-
+    # 7. Filler word analysis (using aggregated data)
     total_fillers = sum(all_fillers.values())
     filler_file = output_dir / "filler_word_analysis.csv"
     with open(filler_file, 'w', newline='', encoding='utf-8') as f:
@@ -340,46 +280,7 @@ def generate_csv_files(recordings_data: List[Dict], output_dir: Path):
             writer.writerow({"filler_phrase": filler, "count": count, "percentage": percentage})
     print(f"  ✓ {filler_file.name}")
 
-    # 8. Sentence metrics summary
-    recordings_with_sentences = [r for r in recordings_data if r.get("sentence_count", 0) > 0]
-
-    if recordings_with_sentences:
-        sentence_lengths = []
-        words_per_sentence_all = []
-        chars_per_sentence_all = []
-
-        for rec in recordings_with_sentences:
-            sentence_count = rec.get("sentence_count", 0)
-            if sentence_count > 0:
-                sentence_lengths.append(sentence_count)
-                words_per_sentence_all.append(rec.get("avg_words_per_sentence", 0))
-                chars_per_sentence_all.append(rec.get("avg_chars_per_sentence", 0))
-
-        # Calculate aggregate statistics
-        sentence_metrics_summary = {
-            "total_recordings_analyzed": len(recordings_with_sentences),
-            "total_sentences": sum(sentence_lengths),
-            "avg_sentences_per_recording": round(sum(sentence_lengths) / len(sentence_lengths), 2) if sentence_lengths else 0,
-            "min_sentences_per_recording": min(sentence_lengths) if sentence_lengths else 0,
-            "max_sentences_per_recording": max(sentence_lengths) if sentence_lengths else 0,
-            "avg_words_per_sentence": round(sum(words_per_sentence_all) / len(words_per_sentence_all), 2) if words_per_sentence_all else 0,
-            "min_words_per_sentence": round(min(words_per_sentence_all), 2) if words_per_sentence_all else 0,
-            "max_words_per_sentence": round(max(words_per_sentence_all), 2) if words_per_sentence_all else 0,
-            "avg_chars_per_sentence": round(sum(chars_per_sentence_all) / len(chars_per_sentence_all), 2) if chars_per_sentence_all else 0,
-        }
-    else:
-        sentence_metrics_summary = {
-            "total_recordings_analyzed": 0,
-            "total_sentences": 0,
-            "avg_sentences_per_recording": 0,
-            "min_sentences_per_recording": 0,
-            "max_sentences_per_recording": 0,
-            "avg_words_per_sentence": 0,
-            "min_words_per_sentence": 0,
-            "max_words_per_sentence": 0,
-            "avg_chars_per_sentence": 0,
-        }
-
+    # 8. Sentence metrics summary (using aggregated data)
     sentence_file = output_dir / "sentence_metrics.csv"
     with open(sentence_file, 'w', newline='', encoding='utf-8') as f:
         writer = csv.DictWriter(f, fieldnames=sentence_metrics_summary.keys())
