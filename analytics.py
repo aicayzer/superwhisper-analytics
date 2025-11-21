@@ -1240,6 +1240,120 @@ def resolve_path(path_str: str, script_dir: Path) -> Path:
         return (script_dir / path).resolve()
 
 
+def escape_mermaid_label(text: str) -> str:
+    """Escape special characters for Mermaid chart labels."""
+    # Replace problematic characters
+    text = str(text).replace('"', "'").replace('\n', ' ').replace('\r', ' ')
+    # Limit length to avoid chart rendering issues
+    if len(text) > 50:
+        text = text[:47] + "..."
+    return text
+
+
+def generate_mermaid_charts(recordings_data: List[Dict], daily_summary: Dict,
+                            word_freq: Counter, mode_data: Dict, topic_data: Dict, output_dir: Path):
+    """Generate Mermaid chart files for visualizations."""
+    print("\nGenerating Mermaid charts...")
+    
+    # 1. Daily Activity Timeline
+    if daily_summary:
+        dates = sorted(daily_summary.keys())
+        days_count = len(dates)
+        
+        # Auto-aggregate to weekly if more than 30 days
+        if days_count > 30:
+            # Aggregate by week
+            from datetime import datetime as dt_module
+            weekly_data = {}
+            for date_str in dates:
+                date_obj = dt_module.fromisoformat(date_str)
+                week_key = date_obj.strftime("%Y-W%W")  # Year-WeekNumber
+                if week_key not in weekly_data:
+                    weekly_data[week_key] = {"recordings": 0, "duration": 0}
+                weekly_data[week_key]["recordings"] += daily_summary[date_str]["recordings_count"]
+                weekly_data[week_key]["duration"] += daily_summary[date_str]["total_duration_seconds"] / 3600
+            
+            timeline_chart = "```mermaid\n---\nconfig:\n  xyChart:\n    width: 900\n    height: 400\n---\nxyChart-beta\n"
+            timeline_chart += "    title \"Weekly Recording Activity\"\n"
+            timeline_chart += "    x-axis [" + ", ".join([f'"{escape_mermaid_label(w)}"' for w in sorted(weekly_data.keys())]) + "]\n"
+            timeline_chart += "    y-axis \"Recordings Count\" 0 --> " + str(max(w["recordings"] for w in weekly_data.values()) + 5) + "\n"
+            timeline_chart += "    line [" + ", ".join([str(weekly_data[w]["recordings"]) for w in sorted(weekly_data.keys())]) + "]\n"
+            timeline_chart += "```\n"
+        else:
+            # Daily timeline
+            timeline_chart = "```mermaid\n---\nconfig:\n  xyChart:\n    width: 900\n    height: 400\n---\nxyChart-beta\n"
+            timeline_chart += "    title \"Daily Recording Activity\"\n"
+            timeline_chart += "    x-axis [" + ", ".join([f'"{escape_mermaid_label(d)}"' for d in dates]) + "]\n"
+            max_count = max(daily_summary[d]["recordings_count"] for d in dates)
+            timeline_chart += "    y-axis \"Recordings Count\" 0 --> " + str(max_count + 5) + "\n"
+            timeline_chart += "    line [" + ", ".join([str(daily_summary[d]["recordings_count"]) for d in dates]) + "]\n"
+            timeline_chart += "```\n"
+        
+        timeline_file = output_dir / "timeline_activity.mmd"
+        with open(timeline_file, 'w', encoding='utf-8') as f:
+            f.write(timeline_chart)
+        print(f"  ✓ {timeline_file.name}")
+    
+    # 2. Topic Distribution Over Time
+    if recordings_data and len(recordings_data) > 10:
+        # Group by date and topic
+        from datetime import datetime as dt_module
+        from collections import defaultdict
+        
+        date_topic_counts = defaultdict(lambda: defaultdict(int))
+        for rec in recordings_data:
+            date = rec["date"]
+            topic = rec["primary_topic"]
+            date_topic_counts[date][topic] += 1
+        
+        dates = sorted(date_topic_counts.keys())
+        all_topics = set()
+        for topics_dict in date_topic_counts.values():
+            all_topics.update(topics_dict.keys())
+        
+        # Get top 5 topics by total count
+        topic_totals = Counter()
+        for topics_dict in date_topic_counts.values():
+            topic_totals.update(topics_dict)
+        top_topics = [t for t, _ in topic_totals.most_common(5)]
+        
+        # Aggregate if more than 30 days
+        if len(dates) > 30:
+            weekly_topic_data = defaultdict(lambda: defaultdict(int))
+            for date_str in dates:
+                date_obj = dt_module.fromisoformat(date_str)
+                week_key = date_obj.strftime("%Y-W%W")
+                for topic, count in date_topic_counts[date_str].items():
+                    if topic in top_topics:
+                        weekly_topic_data[week_key][topic] += count
+            
+            weeks = sorted(weekly_topic_data.keys())
+            topic_timeline = "```mermaid\n---\nconfig:\n  xyChart:\n    width: 900\n    height: 500\n---\nxyChart-beta\n"
+            topic_timeline += "    title \"Weekly Topic Distribution\"\n"
+            topic_timeline += "    x-axis [" + ", ".join([f'"{escape_mermaid_label(w)}"' for w in weeks]) + "]\n"
+            topic_timeline += "    y-axis \"Recording Count\"\n"
+            
+            for topic in top_topics:
+                counts = [weekly_topic_data[w].get(topic, 0) for w in weeks]
+                topic_timeline += f"    line \"{escape_mermaid_label(topic)}\" [" + ", ".join([str(c) for c in counts]) + "]\n"
+            topic_timeline += "```\n"
+        else:
+            topic_timeline = "```mermaid\n---\nconfig:\n  xyChart:\n    width: 900\n    height: 500\n---\nxyChart-beta\n"
+            topic_timeline += "    title \"Daily Topic Distribution (Top 5)\"\n"
+            topic_timeline += "    x-axis [" + ", ".join([f'"{escape_mermaid_label(d)}"' for d in dates]) + "]\n"
+            topic_timeline += "    y-axis \"Recording Count\"\n"
+            
+            for topic in top_topics:
+                counts = [date_topic_counts[d].get(topic, 0) for d in dates]
+                topic_timeline += f"    line \"{escape_mermaid_label(topic)}\" [" + ", ".join([str(c) for c in counts]) + "]\n"
+            topic_timeline += "```\n"
+        
+        topic_timeline_file = output_dir / "timeline_topics.mmd"
+        with open(topic_timeline_file, 'w', encoding='utf-8') as f:
+            f.write(topic_timeline)
+        print(f"  ✓ {topic_timeline_file.name}")
+
+
 def generate_ai_prompt_file(output_dir: Path):
     """Generate AI prompt file for insights generation."""
     print("\nGenerating AI prompt file...")
@@ -1478,6 +1592,9 @@ def main():
 
     # Generate JSON file
     generate_json_file(recordings_data, daily_summary, hourly_data, word_freq, mode_data, topic_data, filler_data, bigram_freq, trigram_freq, sentence_summary, output_dir)
+    
+    # Generate Mermaid charts
+    generate_mermaid_charts(recordings_data, daily_summary, word_freq, mode_data, topic_data, output_dir)
 
     # Generate AI prompt file
     generate_ai_prompt_file(output_dir)
