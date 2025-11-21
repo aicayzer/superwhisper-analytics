@@ -1,5 +1,5 @@
-# Output directories
-outputs/
+# Output directories (generated data, not source code)
+/outputs/
 
 # Temporary files
 tmp/
