@@ -115,10 +115,10 @@ class TestValidateConfig:
         # validate_config checks if directories exist, so create them
         recordings_dir = tmp_path / "test" / "recordings"
         recordings_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Update config to use test directory
         valid_config.set("paths", "recordings_dir", str(recordings_dir))
-        
+
         # Should not raise any exception or exit
         try:
             validate_config(valid_config, tmp_path)
@@ -142,10 +142,10 @@ class TestValidateConfig:
         recordings_dir = tmp_path / "test" / "recordings"
         recordings_dir.mkdir(parents=True, exist_ok=True)
         valid_config.set("paths", "recordings_dir", str(recordings_dir))
-        
+
         # Set an integer value to non-integer
         valid_config.set("analysis", "default_top_words", "not_a_number")
-        
+
         # The validation may not check integer conversion immediately
         # This test documents that the config can be loaded even with invalid integers
         # The error would occur when trying to use the value
