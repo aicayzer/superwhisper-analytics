@@ -1240,6 +1240,165 @@ def resolve_path(path_str: str, script_dir: Path) -> Path:
         return (script_dir / path).resolve()
 
 
+def escape_mermaid_label(text: str) -> str:
+    """Escape special characters for Mermaid chart labels."""
+    # Replace problematic characters
+    text = str(text).replace('"', "'").replace('\n', ' ').replace('\r', ' ')
+    # Limit length to avoid chart rendering issues
+    if len(text) > 50:
+        text = text[:47] + "..."
+    return text
+
+
+def generate_mermaid_charts(recordings_data: List[Dict], daily_summary: Dict,
+                            word_freq: Counter, mode_data: Dict, topic_data: Dict, output_dir: Path):
+    """Generate Mermaid chart files for visualizations."""
+    print("\nGenerating Mermaid charts...")
+    
+    # 1. Daily Activity Timeline
+    if daily_summary:
+        dates = sorted(daily_summary.keys())
+        days_count = len(dates)
+        
+        # Auto-aggregate to weekly if more than 30 days
+        if days_count > 30:
+            # Aggregate by week
+            from datetime import datetime as dt_module
+            weekly_data = {}
+            for date_str in dates:
+                date_obj = dt_module.fromisoformat(date_str)
+                week_key = date_obj.strftime("%Y-W%W")  # Year-WeekNumber
+                if week_key not in weekly_data:
+                    weekly_data[week_key] = {"recordings": 0, "duration": 0}
+                weekly_data[week_key]["recordings"] += daily_summary[date_str]["recordings_count"]
+                weekly_data[week_key]["duration"] += daily_summary[date_str]["total_duration_seconds"] / 3600
+            
+            timeline_chart = "```mermaid\n---\nconfig:\n  xyChart:\n    width: 900\n    height: 400\n---\nxyChart-beta\n"
+            timeline_chart += "    title \"Weekly Recording Activity\"\n"
+            timeline_chart += "    x-axis [" + ", ".join([f'"{escape_mermaid_label(w)}"' for w in sorted(weekly_data.keys())]) + "]\n"
+            timeline_chart += "    y-axis \"Recordings Count\" 0 --> " + str(max(w["recordings"] for w in weekly_data.values()) + 5) + "\n"
+            timeline_chart += "    line [" + ", ".join([str(weekly_data[w]["recordings"]) for w in sorted(weekly_data.keys())]) + "]\n"
+            timeline_chart += "```\n"
+        else:
+            # Daily timeline
+            timeline_chart = "```mermaid\n---\nconfig:\n  xyChart:\n    width: 900\n    height: 400\n---\nxyChart-beta\n"
+            timeline_chart += "    title \"Daily Recording Activity\"\n"
+            timeline_chart += "    x-axis [" + ", ".join([f'"{escape_mermaid_label(d)}"' for d in dates]) + "]\n"
+            max_count = max(daily_summary[d]["recordings_count"] for d in dates)
+            timeline_chart += "    y-axis \"Recordings Count\" 0 --> " + str(max_count + 5) + "\n"
+            timeline_chart += "    line [" + ", ".join([str(daily_summary[d]["recordings_count"]) for d in dates]) + "]\n"
+            timeline_chart += "```\n"
+        
+        timeline_file = output_dir / "timeline_activity.mmd"
+        with open(timeline_file, 'w', encoding='utf-8') as f:
+            f.write(timeline_chart)
+        print(f"  ✓ {timeline_file.name}")
+    
+    # 2. Topic Distribution Over Time
+    if recordings_data and len(recordings_data) > 10:
+        # Group by date and topic
+        from datetime import datetime as dt_module
+        from collections import defaultdict
+        
+        date_topic_counts = defaultdict(lambda: defaultdict(int))
+        for rec in recordings_data:
+            date = rec["date"]
+            topic = rec["primary_topic"]
+            date_topic_counts[date][topic] += 1
+        
+        dates = sorted(date_topic_counts.keys())
+        all_topics = set()
+        for topics_dict in date_topic_counts.values():
+            all_topics.update(topics_dict.keys())
+        
+        # Get top 5 topics by total count
+        topic_totals = Counter()
+        for topics_dict in date_topic_counts.values():
+            topic_totals.update(topics_dict)
+        top_topics = [t for t, _ in topic_totals.most_common(5)]
+        
+        # Aggregate if more than 30 days
+        if len(dates) > 30:
+            weekly_topic_data = defaultdict(lambda: defaultdict(int))
+            for date_str in dates:
+                date_obj = dt_module.fromisoformat(date_str)
+                week_key = date_obj.strftime("%Y-W%W")
+                for topic, count in date_topic_counts[date_str].items():
+                    if topic in top_topics:
+                        weekly_topic_data[week_key][topic] += count
+            
+            weeks = sorted(weekly_topic_data.keys())
+            topic_timeline = "```mermaid\n---\nconfig:\n  xyChart:\n    width: 900\n    height: 500\n---\nxyChart-beta\n"
+            topic_timeline += "    title \"Weekly Topic Distribution\"\n"
+            topic_timeline += "    x-axis [" + ", ".join([f'"{escape_mermaid_label(w)}"' for w in weeks]) + "]\n"
+            topic_timeline += "    y-axis \"Recording Count\"\n"
+            
+            for topic in top_topics:
+                counts = [weekly_topic_data[w].get(topic, 0) for w in weeks]
+                topic_timeline += f"    line \"{escape_mermaid_label(topic)}\" [" + ", ".join([str(c) for c in counts]) + "]\n"
+            topic_timeline += "```\n"
+        else:
+            topic_timeline = "```mermaid\n---\nconfig:\n  xyChart:\n    width: 900\n    height: 500\n---\nxyChart-beta\n"
+            topic_timeline += "    title \"Daily Topic Distribution (Top 5)\"\n"
+            topic_timeline += "    x-axis [" + ", ".join([f'"{escape_mermaid_label(d)}"' for d in dates]) + "]\n"
+            topic_timeline += "    y-axis \"Recording Count\"\n"
+            
+            for topic in top_topics:
+                counts = [date_topic_counts[d].get(topic, 0) for d in dates]
+                topic_timeline += f"    line \"{escape_mermaid_label(topic)}\" [" + ", ".join([str(c) for c in counts]) + "]\n"
+            topic_timeline += "```\n"
+        
+        topic_timeline_file = output_dir / "timeline_topics.mmd"
+        with open(topic_timeline_file, 'w', encoding='utf-8') as f:
+            f.write(topic_timeline)
+        print(f"  ✓ {topic_timeline_file.name}")
+    
+    # 3. Top Words Bar Chart
+    if word_freq:
+        top_words = word_freq.most_common(20)
+        words_chart = "```mermaid\n---\nconfig:\n  xyChart:\n    width: 900\n    height: 600\n---\nxyChart-beta horizontal\n"
+        words_chart += "    title \"Top 20 Most Common Words\"\n"
+        words_chart += "    x-axis \"Frequency\"\n"
+        words_chart += "    y-axis [" + ", ".join([f'"{escape_mermaid_label(w)}"' for w, _ in top_words]) + "]\n"
+        words_chart += "    bar [" + ", ".join([str(c) for _, c in top_words]) + "]\n"
+        words_chart += "```\n"
+        
+        words_file = output_dir / "chart_top_words.mmd"
+        with open(words_file, 'w', encoding='utf-8') as f:
+            f.write(words_chart)
+        print(f"  ✓ {words_file.name}")
+    
+    # 4. Mode Usage Bar Chart
+    if mode_data:
+        sorted_modes = sorted(mode_data.items(), key=lambda x: x[1]["count"], reverse=True)
+        mode_chart = "```mermaid\n---\nconfig:\n  xyChart:\n    width: 900\n    height: 400\n---\nxyChart-beta horizontal\n"
+        mode_chart += "    title \"Recording Mode Usage\"\n"
+        mode_chart += "    x-axis \"Number of Recordings\"\n"
+        mode_chart += "    y-axis [" + ", ".join([f'"{escape_mermaid_label(mode)}"' for mode, _ in sorted_modes]) + "]\n"
+        mode_chart += "    bar [" + ", ".join([str(data["count"]) for _, data in sorted_modes]) + "]\n"
+        mode_chart += "```\n"
+        
+        mode_file = output_dir / "chart_mode_usage.mmd"
+        with open(mode_file, 'w', encoding='utf-8') as f:
+            f.write(mode_chart)
+        print(f"  ✓ {mode_file.name}")
+    
+    # 5. Topic Distribution Bar Chart
+    if topic_data:
+        sorted_topics = sorted(topic_data.items(), key=lambda x: x[1]["recording_count"], reverse=True)
+        topic_chart = "```mermaid\n---\nconfig:\n  xyChart:\n    width: 900\n    height: 500\n---\nxyChart-beta horizontal\n"
+        topic_chart += "    title \"Topic Distribution\"\n"
+        topic_chart += "    x-axis \"Number of Recordings\"\n"
+        topic_chart += "    y-axis [" + ", ".join([f'"{escape_mermaid_label(topic)}"' for topic, _ in sorted_topics]) + "]\n"
+        topic_chart += "    bar [" + ", ".join([str(data["recording_count"]) for _, data in sorted_topics]) + "]\n"
+        topic_chart += "```\n"
+        
+        topic_file = output_dir / "chart_topic_distribution.mmd"
+        with open(topic_file, 'w', encoding='utf-8') as f:
+            f.write(topic_chart)
+        print(f"  ✓ {topic_file.name}")
+
+
 def generate_ai_prompt_file(output_dir: Path):
     """Generate AI prompt file for insights generation."""
     print("\nGenerating AI prompt file...")
@@ -1250,21 +1409,39 @@ You are analyzing Super Whisper recording analytics data. The following files ar
 
 ## Available Data Files
 
-1. **analytics.json** - Complete structured data with all metrics
+### Structured Data
+1. **analytics.json** - Complete structured data with all metrics including new text analysis
 2. **analytics.xlsx** - Excel workbook with multiple sheets:
-   - Recordings Detail
+   - Recordings Detail (with filler words and sentence metrics)
    - Daily Summary
    - Hourly Patterns
    - Word Frequency
+   - Phrase Frequency (bigrams and trigrams)
+   - Filler Word Analysis
+   - Sentence Metrics
    - Mode Usage
    - Topic Distribution
+
+### CSV Files
 3. **recordings_detail.csv** - Full detailed data for each recording
 4. **daily_summary.csv** - Aggregated daily statistics
 5. **hourly_patterns.csv** - Activity patterns by hour
 6. **word_frequency.csv** - Most common words (top 500)
-7. **mode_usage.csv** - Distribution across recording modes
-8. **topic_distribution.csv** - Topic classification statistics
-9. **insights_report.md** - Basic summary report (may need enhancement)
+7. **phrase_frequency.csv** - Common 2-grams and 3-grams (top 150)
+8. **filler_word_analysis.csv** - Filler word/phrase usage breakdown
+9. **sentence_metrics.csv** - Aggregate sentence-level statistics
+10. **mode_usage.csv** - Distribution across recording modes
+11. **topic_distribution.csv** - Topic classification statistics
+
+### Visualisations
+12. **timeline_activity.mmd** - Daily/weekly recording activity timeline (Mermaid)
+13. **timeline_topics.mmd** - Topic distribution over time (Mermaid)
+14. **chart_top_words.mmd** - Top 20 words bar chart (Mermaid)
+15. **chart_mode_usage.mmd** - Mode usage bar chart (Mermaid)
+16. **chart_topic_distribution.mmd** - Topic distribution bar chart (Mermaid)
+
+### Reports
+17. **insights_report.md** - Basic summary report (may need enhancement)
 
 ## Analysis Tasks
 
@@ -1278,7 +1455,10 @@ Please analyze the data and provide insights on:
 
 ### 2. Content Analysis
 - Review word frequency for domain-specific terminology
-- Identify common themes from top words
+- Analyze phrase patterns (bigrams/trigrams) for common expressions
+- Identify filler word usage patterns and speaking habits
+- Examine sentence structure (length, complexity)
+- Identify common themes from top words and phrases
 - Analyze topic distribution patterns
 - Look for correlations between topics and time patterns
 
@@ -1287,12 +1467,21 @@ Please analyze the data and provide insights on:
 - Identify most common use cases
 - Review recording length distributions
 - Examine speech rate patterns
+- Compare filler word usage across different contexts
 
-### 4. Insights Generation
+### 4. Communication Insights
+- Analyze sentence structure trends (simple vs complex)
+- Identify speaking patterns from filler word analysis
+- Review phrase usage for common expressions or jargon
+- Examine how communication style varies by topic or time
+
+### 5. Insights Generation
 - Provide actionable insights
 - Identify interesting patterns or anomalies
 - Suggest areas for further analysis
 - Highlight key findings
+- Note any communication improvements (filler word reduction, clearer sentences)
+- Identify productivity patterns from timeline charts
 
 ## Output Format
 
@@ -1307,19 +1496,37 @@ Please generate an enhanced insights report that includes:
 
 - Recordings are identified by Unix timestamp folder names
 - Duration is in seconds (duration_ms / 1000)
-- Topics are classified using keyword matching
-- Word frequency excludes common stop words
+- Topics are classified using keyword matching (8 categories)
+- Word frequency excludes common stop words (70+ words)
+- Phrase frequency includes bigrams (2-word) and trigrams (3-word)
+- Filler words include 30+ patterns (single and multi-word phrases)
+- Sentence metrics calculated with abbreviation handling
 - All dates are in ISO format (YYYY-MM-DD)
+- Mermaid charts use xyChart-beta syntax
+- Timeline charts auto-aggregate to weekly when >30 days
 
 ## Instructions
 
 1. Load and examine the JSON file first for overall structure
 2. Use CSV files for detailed analysis or specific queries
-3. Cross-reference data across different files
-4. Generate comprehensive insights beyond what's in the basic report
-5. Be specific with numbers and percentages
-6. Identify trends and patterns
-7. Provide context-aware analysis
+3. Review Mermaid charts for visual patterns (view .mmd files in Markdown viewer)
+4. Cross-reference data across different files
+5. Generate comprehensive insights beyond what's in the basic report
+6. Be specific with numbers and percentages
+7. Identify trends and patterns
+8. Analyze text quality metrics (filler words, sentence structure)
+9. Look for correlations between different metrics
+10. Provide context-aware analysis
+
+## New Analytics Features
+
+This analysis includes enhanced text analysis:
+- **Filler Word Detection**: Identifies verbal fillers like "um", "uh", "you know", "I mean"
+- **Phrase Analysis**: Common 2-word and 3-word expressions
+- **Sentence Metrics**: Average sentence length, complexity indicators
+- **Timeline Visualisations**: Activity and topic trends over time
+
+Consider these new dimensions when generating insights.
 
 Begin your analysis now.
 """
@@ -1478,6 +1685,9 @@ def main():
 
     # Generate JSON file
     generate_json_file(recordings_data, daily_summary, hourly_data, word_freq, mode_data, topic_data, filler_data, bigram_freq, trigram_freq, sentence_summary, output_dir)
+    
+    # Generate Mermaid charts
+    generate_mermaid_charts(recordings_data, daily_summary, word_freq, mode_data, topic_data, output_dir)
 
     # Generate AI prompt file
     generate_ai_prompt_file(output_dir)
