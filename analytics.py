@@ -242,6 +242,77 @@ def extract_ngrams(text: str, n: int) -> List[str]:
     return ngrams
 
 
+def split_sentences(text: str) -> List[str]:
+    """Split text into sentences with improved handling of abbreviations.
+    
+    Returns:
+        List of sentence strings
+    """
+    if not text:
+        return []
+    
+    # Common abbreviations that shouldn't end sentences (protect them first)
+    protected = text
+    abbreviations = ['Mr.', 'Mrs.', 'Ms.', 'Dr.', 'Prof.', 'Sr.', 'Jr.', 'vs.', 'etc.', 'Inc.', 'Ltd.', 'Corp.', 'St.', 'Ave.', 'Rd.', 'Blvd.']
+    
+    # Temporarily replace abbreviations with placeholders
+    placeholders = {}
+    for i, abbr in enumerate(abbreviations):
+        placeholder = f'__ABBR{i}__'
+        placeholders[placeholder] = abbr
+        protected = protected.replace(abbr, placeholder)
+    
+    # Split on sentence endings followed by space and capital letter, or at end of string
+    sentence_pattern = r'[.!?]+\s+(?=[A-Z])|[.!?]+\s*$'
+    sentences = re.split(sentence_pattern, protected)
+    
+    # Restore abbreviations and clean up
+    restored_sentences = []
+    for sent in sentences:
+        if sent and sent.strip():
+            # Restore abbreviations
+            for placeholder, abbr in placeholders.items():
+                sent = sent.replace(placeholder, abbr)
+            restored_sentences.append(sent.strip())
+    
+    return restored_sentences
+
+
+def calculate_sentence_metrics(text: str) -> Dict[str, float]:
+    """Calculate sentence-level metrics for text.
+    
+    Returns:
+        Dict with sentence_count, avg_words_per_sentence, avg_chars_per_sentence
+    """
+    if not text:
+        return {
+            "sentence_count": 0,
+            "avg_words_per_sentence": 0.0,
+            "avg_chars_per_sentence": 0.0
+        }
+    
+    sentences = split_sentences(text)
+    sentence_count = len(sentences)
+    
+    if sentence_count == 0:
+        # Treat entire text as one sentence if no sentence boundaries found
+        return {
+            "sentence_count": 1,
+            "avg_words_per_sentence": float(len(text.split())),
+            "avg_chars_per_sentence": float(len(text))
+        }
+    
+    # Calculate metrics
+    total_words = sum(len(s.split()) for s in sentences)
+    total_chars = sum(len(s) for s in sentences)
+    
+    return {
+        "sentence_count": sentence_count,
+        "avg_words_per_sentence": round(total_words / sentence_count, 2) if sentence_count > 0 else 0.0,
+        "avg_chars_per_sentence": round(total_chars / sentence_count, 2) if sentence_count > 0 else 0.0
+    }
+
+
 def filter_by_date(folder_name: str, date_filter: Optional[str], month_filter: Optional[str],
                    date_from: Optional[str], date_to: Optional[str]) -> bool:
     """Filter recording folder by date criteria."""
@@ -342,6 +413,9 @@ def process_recordings(recordings_dir: Path, date_filter: Optional[str] = None,
         # Filler word analysis
         filler_count, filler_breakdown = count_filler_words(result)
         filler_percentage = (filler_count / word_count * 100) if word_count > 0 else 0
+        
+        # Sentence-level metrics
+        sentence_metrics = calculate_sentence_metrics(result)
 
         # Topic classification
         primary_topic, secondary_topics = classify_topic(result)
@@ -369,6 +443,9 @@ def process_recordings(recordings_dir: Path, date_filter: Optional[str] = None,
             "words_per_minute": round(words_per_minute, 2),
             "filler_word_count": filler_count,
             "filler_word_percentage": round(filler_percentage, 2),
+            "sentence_count": sentence_metrics["sentence_count"],
+            "avg_words_per_sentence": sentence_metrics["avg_words_per_sentence"],
+            "avg_chars_per_sentence": sentence_metrics["avg_chars_per_sentence"],
             "mode_name": mode_name,
             "model_name": model_name,
             "app_version": app_version,
@@ -395,6 +472,7 @@ def generate_csv_files(recordings_data: List[Dict], output_dir: Path):
         "recording_id", "datetime", "date", "hour", "day_of_week",
         "duration_seconds", "duration_ms", "has_transcript", "word_count",
         "char_count", "words_per_minute", "filler_word_count", "filler_word_percentage",
+        "sentence_count", "avg_words_per_sentence", "avg_chars_per_sentence",
         "mode_name", "model_name", "app_version", "processing_time_ms", "segment_count",
         "folder_name", "primary_topic", "secondary_topics"
     ]
@@ -591,8 +669,55 @@ def generate_csv_files(recordings_data: List[Dict], output_dir: Path):
             percentage = round((count / total_fillers * 100), 2) if total_fillers > 0 else 0
             writer.writerow({"filler_phrase": filler, "count": count, "percentage": percentage})
     print(f"  ✓ {filler_file.name}")
+    
+    # 8. Sentence metrics summary
+    recordings_with_sentences = [r for r in recordings_data if r.get("sentence_count", 0) > 0]
+    
+    if recordings_with_sentences:
+        sentence_lengths = []
+        words_per_sentence_all = []
+        chars_per_sentence_all = []
+        
+        for rec in recordings_with_sentences:
+            sentence_count = rec.get("sentence_count", 0)
+            if sentence_count > 0:
+                sentence_lengths.append(sentence_count)
+                words_per_sentence_all.append(rec.get("avg_words_per_sentence", 0))
+                chars_per_sentence_all.append(rec.get("avg_chars_per_sentence", 0))
+        
+        # Calculate aggregate statistics
+        sentence_metrics_summary = {
+            "total_recordings_analyzed": len(recordings_with_sentences),
+            "total_sentences": sum(sentence_lengths),
+            "avg_sentences_per_recording": round(sum(sentence_lengths) / len(sentence_lengths), 2) if sentence_lengths else 0,
+            "min_sentences_per_recording": min(sentence_lengths) if sentence_lengths else 0,
+            "max_sentences_per_recording": max(sentence_lengths) if sentence_lengths else 0,
+            "avg_words_per_sentence": round(sum(words_per_sentence_all) / len(words_per_sentence_all), 2) if words_per_sentence_all else 0,
+            "min_words_per_sentence": round(min(words_per_sentence_all), 2) if words_per_sentence_all else 0,
+            "max_words_per_sentence": round(max(words_per_sentence_all), 2) if words_per_sentence_all else 0,
+            "avg_chars_per_sentence": round(sum(chars_per_sentence_all) / len(chars_per_sentence_all), 2) if chars_per_sentence_all else 0,
+        }
+    else:
+        sentence_metrics_summary = {
+            "total_recordings_analyzed": 0,
+            "total_sentences": 0,
+            "avg_sentences_per_recording": 0,
+            "min_sentences_per_recording": 0,
+            "max_sentences_per_recording": 0,
+            "avg_words_per_sentence": 0,
+            "min_words_per_sentence": 0,
+            "max_words_per_sentence": 0,
+            "avg_chars_per_sentence": 0,
+        }
+    
+    sentence_file = output_dir / "sentence_metrics.csv"
+    with open(sentence_file, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.DictWriter(f, fieldnames=sentence_metrics_summary.keys())
+        writer.writeheader()
+        writer.writerow(sentence_metrics_summary)
+    print(f"  ✓ {sentence_file.name}")
 
-    return daily_summary, hourly_data, word_freq, mode_data, topic_data, all_fillers, bigram_freq, trigram_freq
+    return daily_summary, hourly_data, word_freq, mode_data, topic_data, all_fillers, bigram_freq, trigram_freq, sentence_metrics_summary
 
 
 def generate_insights_report(recordings_data: List[Dict], output_dir: Path):
@@ -783,7 +908,7 @@ Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 
 def generate_xlsx_file(recordings_data: List[Dict], daily_summary: Dict, hourly_data: Dict,
                        word_freq: Counter, mode_data: Dict, topic_data: Dict, filler_data: Counter,
-                       bigram_freq: Counter, trigram_freq: Counter, output_dir: Path):
+                       bigram_freq: Counter, trigram_freq: Counter, sentence_summary: Dict, output_dir: Path):
     """Generate XLSX file with multiple sheets."""
     if not OPENPYXL_AVAILABLE:
         print("\n⚠ Skipping XLSX generation: openpyxl not installed")
@@ -801,6 +926,7 @@ def generate_xlsx_file(recordings_data: List[Dict], daily_summary: Dict, hourly_
         "recording_id", "datetime", "date", "hour", "day_of_week",
         "duration_seconds", "duration_ms", "has_transcript", "word_count",
         "char_count", "words_per_minute", "filler_word_count", "filler_word_percentage",
+        "sentence_count", "avg_words_per_sentence", "avg_chars_per_sentence",
         "mode_name", "model_name", "app_version", "processing_time_ms", "segment_count",
         "folder_name", "primary_topic", "secondary_topics"
     ]
@@ -922,6 +1048,14 @@ def generate_xlsx_file(recordings_data: List[Dict], daily_summary: Dict, hourly_
     for phrase, freq in trigram_freq.most_common(50):
         percentage = round((freq / total_trigrams * 100), 4) if total_trigrams > 0 else 0
         ws8.append([phrase, "3-gram", freq, percentage])
+    
+    # Sheet 9: Sentence Metrics
+    ws9 = wb.create_sheet("Sentence Metrics")
+    ws9.append(list(sentence_summary.keys()))
+    for cell in ws9[1]:
+        cell.font = Font(bold=True)
+        cell.alignment = Alignment(horizontal='center')
+    ws9.append(list(sentence_summary.values()))
 
     xlsx_file = output_dir / "analytics.xlsx"
     wb.save(xlsx_file)
@@ -930,7 +1064,7 @@ def generate_xlsx_file(recordings_data: List[Dict], daily_summary: Dict, hourly_
 
 def generate_json_file(recordings_data: List[Dict], daily_summary: Dict, hourly_data: Dict,
                        word_freq: Counter, mode_data: Dict, topic_data: Dict, filler_data: Counter,
-                       bigram_freq: Counter, trigram_freq: Counter, output_dir: Path):
+                       bigram_freq: Counter, trigram_freq: Counter, sentence_summary: Dict, output_dir: Path):
     """Generate JSON file with structured data."""
     print("\nGenerating JSON file...")
 
@@ -1058,7 +1192,8 @@ def generate_json_file(recordings_data: List[Dict], daily_summary: Dict, hourly_
         "mode_usage": mode_usage_list,
         "topic_distribution": topic_distribution_list,
         "filler_word_analysis": filler_analysis_list,
-        "phrase_frequency": phrase_frequency_list
+        "phrase_frequency": phrase_frequency_list,
+        "sentence_metrics": sentence_summary
     }
 
     json_file = output_dir / "analytics.json"
@@ -1333,16 +1468,16 @@ def main():
         sys.exit(1)
 
     # Generate CSV files (returns aggregated data)
-    daily_summary, hourly_data, word_freq, mode_data, topic_data, filler_data, bigram_freq, trigram_freq = generate_csv_files(recordings_data, output_dir)
+    daily_summary, hourly_data, word_freq, mode_data, topic_data, filler_data, bigram_freq, trigram_freq, sentence_summary = generate_csv_files(recordings_data, output_dir)
 
     # Generate insights report
     generate_insights_report(recordings_data, output_dir)
 
     # Generate XLSX file
-    generate_xlsx_file(recordings_data, daily_summary, hourly_data, word_freq, mode_data, topic_data, filler_data, bigram_freq, trigram_freq, output_dir)
+    generate_xlsx_file(recordings_data, daily_summary, hourly_data, word_freq, mode_data, topic_data, filler_data, bigram_freq, trigram_freq, sentence_summary, output_dir)
 
     # Generate JSON file
-    generate_json_file(recordings_data, daily_summary, hourly_data, word_freq, mode_data, topic_data, filler_data, bigram_freq, trigram_freq, output_dir)
+    generate_json_file(recordings_data, daily_summary, hourly_data, word_freq, mode_data, topic_data, filler_data, bigram_freq, trigram_freq, sentence_summary, output_dir)
 
     # Generate AI prompt file
     generate_ai_prompt_file(output_dir)
