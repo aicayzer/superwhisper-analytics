@@ -30,10 +30,10 @@ The script uses configuration files for path management, making it portable acro
    [paths]
    # Path to your recordings directory
    recordings_dir = ../recordings
-   
+
    # Path for output files
    output_dir = ./outputs
-   
+
    [analysis]
    default_top_words = 500
    ```
@@ -173,14 +173,14 @@ outputs/
     sentence_metrics.csv
     mode_usage.csv
     topic_distribution.csv
-    
+
     # Mermaid Charts
     timeline_activity.mmd
     timeline_topics.mmd
     chart_top_words.mmd
     chart_mode_usage.mmd
     chart_topic_distribution.mmd
-    
+
     # Other Formats
     analytics.xlsx
     analytics.json
