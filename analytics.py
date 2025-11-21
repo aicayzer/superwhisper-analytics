@@ -12,6 +12,16 @@ from collections import Counter
 from datetime import datetime
 from typing import Dict, List, Tuple, Optional
 
+# Import from lib modules
+from lib.processing.text_analysis import (
+    clean_text,
+    extract_words,
+    extract_ngrams,
+    count_filler_words,
+    split_sentences,
+    calculate_sentence_metrics
+)
+
 # Try to import openpyxl for XLSX support
 try:
     from openpyxl import Workbook
@@ -166,151 +176,6 @@ def classify_topic(text: str) -> Tuple[str, List[str]]:
     ]
 
     return primary_topic, secondary_topics[:3]  # Limit to top 3 secondary topics
-
-
-def clean_text(text: str) -> str:
-    """Clean text for word frequency analysis."""
-    # Remove punctuation and convert to lowercase
-    text = re.sub(r'[^\w\s]', ' ', text.lower())
-    return text
-
-
-def extract_words(text: str) -> List[str]:
-    """Extract words from text, excluding stop words."""
-    words = clean_text(text).split()
-    return [w for w in words if w and w not in STOP_WORDS and len(w) > 2]
-
-
-def count_filler_words(text: str) -> Tuple[int, Dict[str, int]]:
-    """Count filler words and phrases in text.
-
-    Returns:
-        Tuple of (total_count, filler_breakdown)
-    """
-    if not text:
-        return 0, {}
-
-    text_lower = text.lower()
-    filler_counts = {}
-
-    # Count each filler word/phrase
-    for filler_name, pattern in FILLER_WORDS.items():
-        matches = re.findall(pattern, text_lower)
-        if matches:
-            filler_counts[filler_name] = len(matches)
-
-    total_count = sum(filler_counts.values())
-    return total_count, filler_counts
-
-
-def extract_ngrams(text: str, n: int) -> List[str]:
-    """Extract n-grams from text.
-
-    Args:
-        text: Input text
-        n: Size of n-gram (2 for bigrams, 3 for trigrams)
-
-    Returns:
-        List of n-gram strings
-    """
-    if not text:
-        return []
-
-    # Clean and tokenize
-    words = clean_text(text).split()
-    words = [w for w in words if w and len(w) > 1]  # Filter very short words
-
-    if len(words) < n:
-        return []
-
-    # Generate n-grams
-    ngrams = []
-    for i in range(len(words) - n + 1):
-        ngram_words = words[i:i+n]
-
-        # Skip if all words are stop words
-        if all(w in STOP_WORDS for w in ngram_words):
-            continue
-
-        # Skip if contains too many stop words (more than half)
-        stop_word_count = sum(1 for w in ngram_words if w in STOP_WORDS)
-        if stop_word_count > n / 2:
-            continue
-
-        ngrams.append(" ".join(ngram_words))
-
-    return ngrams
-
-
-def split_sentences(text: str) -> List[str]:
-    """Split text into sentences with improved handling of abbreviations.
-
-    Returns:
-        List of sentence strings
-    """
-    if not text:
-        return []
-
-    # Common abbreviations that shouldn't end sentences (protect them first)
-    protected = text
-    abbreviations = ['Mr.', 'Mrs.', 'Ms.', 'Dr.', 'Prof.', 'Sr.', 'Jr.', 'vs.', 'etc.', 'Inc.', 'Ltd.', 'Corp.', 'St.', 'Ave.', 'Rd.', 'Blvd.']
-
-    # Temporarily replace abbreviations with placeholders
-    placeholders = {}
-    for i, abbr in enumerate(abbreviations):
-        placeholder = f'__ABBR{i}__'
-        placeholders[placeholder] = abbr
-        protected = protected.replace(abbr, placeholder)
-
-    # Split on sentence endings followed by space and capital letter, or at end of string
-    sentence_pattern = r'[.!?]+\s+(?=[A-Z])|[.!?]+\s*$'
-    sentences = re.split(sentence_pattern, protected)
-
-    # Restore abbreviations and clean up
-    restored_sentences = []
-    for sent in sentences:
-        if sent and sent.strip():
-            # Restore abbreviations
-            for placeholder, abbr in placeholders.items():
-                sent = sent.replace(placeholder, abbr)
-            restored_sentences.append(sent.strip())
-
-    return restored_sentences
-
-
-def calculate_sentence_metrics(text: str) -> Dict[str, float]:
-    """Calculate sentence-level metrics for text.
-
-    Returns:
-        Dict with sentence_count, avg_words_per_sentence, avg_chars_per_sentence
-    """
-    if not text:
-        return {
-            "sentence_count": 0,
-            "avg_words_per_sentence": 0.0,
-            "avg_chars_per_sentence": 0.0
-        }
-
-    sentences = split_sentences(text)
-    sentence_count = len(sentences)
-
-    if sentence_count == 0:
-        # Treat entire text as one sentence if no sentence boundaries found
-        return {
-            "sentence_count": 1,
-            "avg_words_per_sentence": float(len(text.split())),
-            "avg_chars_per_sentence": float(len(text))
-        }
-
-    # Calculate metrics
-    total_words = sum(len(s.split()) for s in sentences)
-    total_chars = sum(len(s) for s in sentences)
-
-    return {
-        "sentence_count": sentence_count,
-        "avg_words_per_sentence": round(total_words / sentence_count, 2) if sentence_count > 0 else 0.0,
-        "avg_chars_per_sentence": round(total_chars / sentence_count, 2) if sentence_count > 0 else 0.0
-    }
 
 
 def filter_by_date(folder_name: str, date_filter: Optional[str], month_filter: Optional[str],
