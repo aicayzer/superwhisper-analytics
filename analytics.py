@@ -1409,21 +1409,39 @@ You are analyzing Super Whisper recording analytics data. The following files ar
 
 ## Available Data Files
 
-1. **analytics.json** - Complete structured data with all metrics
+### Structured Data
+1. **analytics.json** - Complete structured data with all metrics including new text analysis
 2. **analytics.xlsx** - Excel workbook with multiple sheets:
-   - Recordings Detail
+   - Recordings Detail (with filler words and sentence metrics)
    - Daily Summary
    - Hourly Patterns
    - Word Frequency
+   - Phrase Frequency (bigrams and trigrams)
+   - Filler Word Analysis
+   - Sentence Metrics
    - Mode Usage
    - Topic Distribution
+
+### CSV Files
 3. **recordings_detail.csv** - Full detailed data for each recording
 4. **daily_summary.csv** - Aggregated daily statistics
 5. **hourly_patterns.csv** - Activity patterns by hour
 6. **word_frequency.csv** - Most common words (top 500)
-7. **mode_usage.csv** - Distribution across recording modes
-8. **topic_distribution.csv** - Topic classification statistics
-9. **insights_report.md** - Basic summary report (may need enhancement)
+7. **phrase_frequency.csv** - Common 2-grams and 3-grams (top 150)
+8. **filler_word_analysis.csv** - Filler word/phrase usage breakdown
+9. **sentence_metrics.csv** - Aggregate sentence-level statistics
+10. **mode_usage.csv** - Distribution across recording modes
+11. **topic_distribution.csv** - Topic classification statistics
+
+### Visualisations
+12. **timeline_activity.mmd** - Daily/weekly recording activity timeline (Mermaid)
+13. **timeline_topics.mmd** - Topic distribution over time (Mermaid)
+14. **chart_top_words.mmd** - Top 20 words bar chart (Mermaid)
+15. **chart_mode_usage.mmd** - Mode usage bar chart (Mermaid)
+16. **chart_topic_distribution.mmd** - Topic distribution bar chart (Mermaid)
+
+### Reports
+17. **insights_report.md** - Basic summary report (may need enhancement)
 
 ## Analysis Tasks
 
@@ -1437,7 +1455,10 @@ Please analyze the data and provide insights on:
 
 ### 2. Content Analysis
 - Review word frequency for domain-specific terminology
-- Identify common themes from top words
+- Analyze phrase patterns (bigrams/trigrams) for common expressions
+- Identify filler word usage patterns and speaking habits
+- Examine sentence structure (length, complexity)
+- Identify common themes from top words and phrases
 - Analyze topic distribution patterns
 - Look for correlations between topics and time patterns
 
@@ -1446,12 +1467,21 @@ Please analyze the data and provide insights on:
 - Identify most common use cases
 - Review recording length distributions
 - Examine speech rate patterns
+- Compare filler word usage across different contexts
 
-### 4. Insights Generation
+### 4. Communication Insights
+- Analyze sentence structure trends (simple vs complex)
+- Identify speaking patterns from filler word analysis
+- Review phrase usage for common expressions or jargon
+- Examine how communication style varies by topic or time
+
+### 5. Insights Generation
 - Provide actionable insights
 - Identify interesting patterns or anomalies
 - Suggest areas for further analysis
 - Highlight key findings
+- Note any communication improvements (filler word reduction, clearer sentences)
+- Identify productivity patterns from timeline charts
 
 ## Output Format
 
@@ -1466,19 +1496,37 @@ Please generate an enhanced insights report that includes:
 
 - Recordings are identified by Unix timestamp folder names
 - Duration is in seconds (duration_ms / 1000)
-- Topics are classified using keyword matching
-- Word frequency excludes common stop words
+- Topics are classified using keyword matching (8 categories)
+- Word frequency excludes common stop words (70+ words)
+- Phrase frequency includes bigrams (2-word) and trigrams (3-word)
+- Filler words include 30+ patterns (single and multi-word phrases)
+- Sentence metrics calculated with abbreviation handling
 - All dates are in ISO format (YYYY-MM-DD)
+- Mermaid charts use xyChart-beta syntax
+- Timeline charts auto-aggregate to weekly when >30 days
 
 ## Instructions
 
 1. Load and examine the JSON file first for overall structure
 2. Use CSV files for detailed analysis or specific queries
-3. Cross-reference data across different files
-4. Generate comprehensive insights beyond what's in the basic report
-5. Be specific with numbers and percentages
-6. Identify trends and patterns
-7. Provide context-aware analysis
+3. Review Mermaid charts for visual patterns (view .mmd files in Markdown viewer)
+4. Cross-reference data across different files
+5. Generate comprehensive insights beyond what's in the basic report
+6. Be specific with numbers and percentages
+7. Identify trends and patterns
+8. Analyze text quality metrics (filler words, sentence structure)
+9. Look for correlations between different metrics
+10. Provide context-aware analysis
+
+## New Analytics Features
+
+This analysis includes enhanced text analysis:
+- **Filler Word Detection**: Identifies verbal fillers like "um", "uh", "you know", "I mean"
+- **Phrase Analysis**: Common 2-word and 3-word expressions
+- **Sentence Metrics**: Average sentence length, complexity indicators
+- **Timeline Visualisations**: Activity and topic trends over time
+
+Consider these new dimensions when generating insights.
 
 Begin your analysis now.
 """
