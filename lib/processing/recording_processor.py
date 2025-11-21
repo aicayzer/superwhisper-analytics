@@ -5,15 +5,14 @@ applying date filters, and the main recording processing loop.
 """
 
 import json
-import wave
 import sys
-from pathlib import Path
+import wave
 from datetime import datetime
-from typing import List, Tuple, Optional, Dict
+from pathlib import Path
+from typing import Optional
 
 from lib.core.constants import TOPIC_KEYWORDS
-from lib.core.models import Recording, FilterCriteria
-from lib.processing.text_analysis import count_filler_words, calculate_sentence_metrics
+from lib.processing.text_analysis import calculate_sentence_metrics, count_filler_words
 
 
 def parse_datetime(dt_str: Optional[str], folder_timestamp: str) -> datetime:
@@ -57,7 +56,7 @@ def get_wav_duration(filepath: Path) -> Optional[float]:
         return None
 
 
-def classify_topic(text: str) -> Tuple[str, List[str]]:
+def classify_topic(text: str) -> tuple[str, list[str]]:
     """Classify recording into primary and secondary topics
 
     Uses keyword matching against predefined topic categories.
@@ -72,7 +71,7 @@ def classify_topic(text: str) -> Tuple[str, List[str]]:
         return "Unknown", []
 
     text_lower = text.lower()
-    scores = {topic: 0 for topic in TOPIC_KEYWORDS.keys()}
+    scores = dict.fromkeys(TOPIC_KEYWORDS.keys(), 0)
 
     for topic, keywords in TOPIC_KEYWORDS.items():
         for keyword in keywords:
@@ -127,10 +126,7 @@ def filter_by_date(folder_name: str, date_filter: Optional[str], month_filter: O
         # Check date range
         if date_from and recording_date_str < date_from:
             return False
-        if date_to and recording_date_str > date_to:
-            return False
-
-        return True
+        return not (date_to and recording_date_str > date_to)
     except (ValueError, OSError):
         # Invalid timestamp, exclude from results
         return False
@@ -138,7 +134,7 @@ def filter_by_date(folder_name: str, date_filter: Optional[str], month_filter: O
 
 def process_recordings(recordings_dir: Path, date_filter: Optional[str] = None,
                       month_filter: Optional[str] = None, date_from: Optional[str] = None,
-                      date_to: Optional[str] = None) -> List[Dict]:
+                      date_to: Optional[str] = None) -> list[dict]:
     """Process all recordings and extract data, optionally filtering by date
 
     Main processing loop that:
@@ -185,7 +181,7 @@ def process_recordings(recordings_dir: Path, date_filter: Optional[str] = None,
             continue
 
         try:
-            with open(meta_file, 'r', encoding='utf-8') as f:
+            with open(meta_file, encoding='utf-8') as f:
                 meta = json.load(f)
         except Exception as e:
             print(f"\nError reading {meta_file}: {e}", file=sys.stderr)

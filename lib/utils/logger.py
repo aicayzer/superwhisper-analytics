@@ -4,13 +4,12 @@ Provides structured logging with colour coding, progress tracking, and rich form
 """
 
 import logging
-import sys
 from pathlib import Path
 from typing import Optional
+
 from rich.console import Console
 from rich.logging import RichHandler
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn, TimeRemainingColumn
-
+from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn, TextColumn, TimeRemainingColumn
 
 # Global console for rich output
 console = Console()

@@ -4,10 +4,8 @@ Generates Mermaid chart files for data visualization.
 """
 
 import configparser
+from collections import Counter
 from pathlib import Path
-from typing import List, Dict
-from collections import Counter, defaultdict
-from datetime import datetime
 
 
 def escape_mermaid_label(text: str) -> str:
@@ -23,7 +21,7 @@ def escape_mermaid_label(text: str) -> str:
     return text
 
 
-def format_date_for_chart(date_str: str, format_type: str, all_dates: List[str], config: configparser.ConfigParser) -> str:
+def format_date_for_chart(date_str: str, format_type: str, all_dates: list[str], config: configparser.ConfigParser) -> str:
     """Format date based on chart type and config settings.
 
     Args:
@@ -52,10 +50,7 @@ def format_date_for_chart(date_str: str, format_type: str, all_dates: List[str],
     for d in all_dates:
         try:
             # Handle both YYYY-MM-DD and YYYY-WXX formats
-            if '-W' in d:
-                year = int(d.split('-')[0])
-            else:
-                year = dt_module.fromisoformat(d).year
+            year = int(d.split('-')[0]) if '-W' in d else dt_module.fromisoformat(d).year
             years.add(year)
         except (ValueError, AttributeError):
             continue
@@ -76,10 +71,10 @@ def format_date_for_chart(date_str: str, format_type: str, all_dates: List[str],
         return date_str
 
 
-def generate_mermaid_charts(recordings_data: List[Dict], daily_summary: Dict,
-                            word_freq: Counter, mode_data: Dict, topic_data: Dict,
+def generate_mermaid_charts(recordings_data: list[dict], daily_summary: dict,
+                            word_freq: Counter, mode_data: dict, topic_data: dict,
                             output_dir: Path, config: configparser.ConfigParser,
-                            hourly_data: Dict = None, filler_data: Counter = None):
+                            hourly_data: dict = None, filler_data: Counter = None):
     """Generate Mermaid chart files for visualizations.
 
     Args:
@@ -148,8 +143,8 @@ def generate_mermaid_charts(recordings_data: List[Dict], daily_summary: Dict,
     # 2. Topic Distribution Over Time
     if recordings_data and len(recordings_data) > 10:
         # Group by date and topic
-        from datetime import datetime as dt_module
         from collections import defaultdict
+        from datetime import datetime as dt_module
 
         date_topic_counts = defaultdict(lambda: defaultdict(int))
         for rec in recordings_data:

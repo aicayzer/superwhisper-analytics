@@ -3,10 +3,9 @@
 Contains topic keywords, stop words, and filler word patterns used throughout the analytics.
 """
 
-from typing import Dict, List, Set
 
 # Topic keyword definitions
-TOPIC_KEYWORDS: Dict[str, List[str]] = {
+TOPIC_KEYWORDS: dict[str, list[str]] = {
     "Code/Development": [
         "code", "repository", "repo", "github", "git", "commit", "function", "class",
         "python", "javascript", "typescript", "error", "bug", "fix", "implement",
@@ -49,19 +48,19 @@ TOPIC_KEYWORDS: Dict[str, List[str]] = {
 }
 
 # Common English stop words
-STOP_WORDS: Set[str] = {
+STOP_WORDS: set[str] = {
     "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with",
     "by", "from", "as", "is", "was", "are", "were", "been", "be", "have", "has", "had",
     "do", "does", "did", "will", "would", "should", "could", "may", "might", "must",
     "can", "this", "that", "these", "those", "i", "you", "he", "she", "it", "we", "they",
-    "me", "him", "her", "us", "them", "my", "your", "his", "her", "its", "our", "their",
+    "me", "him", "her", "us", "them", "my", "your", "his", "its", "our", "their",
     "what", "which", "who", "whom", "whose", "where", "when", "why", "how", "all", "each",
     "every", "both", "few", "more", "most", "other", "some", "such", "no", "nor", "not",
     "only", "own", "same", "so", "than", "too", "very", "just", "now"
 }
 
 # Filler words and phrases (multi-word phrases use regex patterns)
-FILLER_WORDS: Dict[str, str] = {
+FILLER_WORDS: dict[str, str] = {
     # Single word fillers
     'um': r'\bum+\b',
     'uh': r'\buh+\b',

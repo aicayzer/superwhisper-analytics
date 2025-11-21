@@ -3,7 +3,7 @@
 Defines TypedDict structures for recordings, summaries, and filter criteria.
 """
 
-from typing import TypedDict, Optional, Dict, Any
+from typing import Optional, TypedDict
 
 
 class FilterCriteria(TypedDict, total=False):
@@ -41,7 +41,7 @@ class Recording(TypedDict):
     primary_topic: str
     secondary_topics: str
     transcript: str
-    filler_breakdown: Dict[str, int]
+    filler_breakdown: dict[str, int]
 
 
 class DailySummary(TypedDict):

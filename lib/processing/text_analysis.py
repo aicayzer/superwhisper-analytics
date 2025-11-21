@@ -5,8 +5,8 @@ sentence splitting, and metrics calculation.
 """
 
 import re
-from typing import List, Tuple, Dict
-from lib.core.constants import STOP_WORDS, FILLER_WORDS
+
+from lib.core.constants import FILLER_WORDS, STOP_WORDS
 
 
 def clean_text(text: str) -> str:
@@ -25,7 +25,7 @@ def clean_text(text: str) -> str:
     return text
 
 
-def extract_words(text: str) -> List[str]:
+def extract_words(text: str) -> list[str]:
     """Extract words from text, excluding stop words
 
     Cleans text, splits into words, and filters out:
@@ -42,7 +42,7 @@ def extract_words(text: str) -> List[str]:
     return [w for w in words if w and w not in STOP_WORDS and len(w) > 2]
 
 
-def extract_ngrams(text: str, n: int) -> List[str]:
+def extract_ngrams(text: str, n: int) -> list[str]:
     """Extract n-grams from text
 
     Generates n-word sequences from text, filtering out sequences with
@@ -84,7 +84,7 @@ def extract_ngrams(text: str, n: int) -> List[str]:
     return ngrams
 
 
-def count_filler_words(text: str) -> Tuple[int, Dict[str, int]]:
+def count_filler_words(text: str) -> tuple[int, dict[str, int]]:
     """Count filler words and phrases in text
 
     Detects both single-word fillers (um, uh, like) and multi-word phrases
@@ -114,7 +114,7 @@ def count_filler_words(text: str) -> Tuple[int, Dict[str, int]]:
     return total_count, filler_counts
 
 
-def split_sentences(text: str) -> List[str]:
+def split_sentences(text: str) -> list[str]:
     """Split text into sentences with improved handling of abbreviations
 
     Protects common abbreviations from being treated as sentence endings.
@@ -158,7 +158,7 @@ def split_sentences(text: str) -> List[str]:
     return restored_sentences
 
 
-def calculate_sentence_metrics(text: str) -> Dict[str, float]:
+def calculate_sentence_metrics(text: str) -> dict[str, float]:
     """Calculate sentence-level metrics for text
 
     Computes:

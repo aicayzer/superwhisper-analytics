@@ -3,11 +3,12 @@
 Centralized validation for dates, paths, and recording metadata.
 """
 
-import sys
 import json
-from pathlib import Path
+import sys
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
+
 from lib.core.models import FilterCriteria
 from lib.utils.logger import get_logger
 
@@ -69,7 +70,7 @@ def validate_meta_json(meta_file: Path) -> Optional[dict]:
         return None
 
     try:
-        with open(meta_file, 'r', encoding='utf-8') as f:
+        with open(meta_file, encoding='utf-8') as f:
             meta = json.load(f)
         return meta
     except json.JSONDecodeError as e:

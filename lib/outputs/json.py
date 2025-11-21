@@ -4,22 +4,21 @@ Generates JSON files with complete analytics data.
 """
 
 import json
-from pathlib import Path
-from typing import List, Dict
 from collections import Counter
+from pathlib import Path
 
 
 def generate_json_file(
-    recordings_data: List[Dict],
-    daily_summary: Dict,
-    hourly_data: Dict,
+    recordings_data: list[dict],
+    daily_summary: dict,
+    hourly_data: dict,
     word_freq: Counter,
-    mode_data: Dict,
-    topic_data: Dict,
+    mode_data: dict,
+    topic_data: dict,
     filler_data: Counter,
     bigram_freq: Counter,
     trigram_freq: Counter,
-    sentence_summary: Dict,
+    sentence_summary: dict,
     output_dir: Path,
 ):
     """Generate JSON file with all analytics data."""

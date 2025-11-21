@@ -89,9 +89,9 @@ def validate_config(config: configparser.ConfigParser, script_dir: Path) -> None
 
     if not recordings_dir.exists():
         print(f"Error: Recordings directory does not exist: {recordings_dir}")
-        print(f"\nPlease check your configuration:")
-        print(f"  - config.local.ini (if it exists)")
-        print(f"  - config.ini")
+        print("\nPlease check your configuration:")
+        print("  - config.local.ini (if it exists)")
+        print("  - config.ini")
         print(f"\nExpected recordings directory at: {recordings_dir}")
         sys.exit(1)
 

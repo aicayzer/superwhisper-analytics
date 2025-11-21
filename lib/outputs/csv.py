@@ -5,12 +5,11 @@ Generates detailed recordings data and various aggregated CSV files.
 
 import csv
 from pathlib import Path
-from typing import List, Dict
 
 from lib.core.analytics_summary import AnalyticsSummary
 
 
-def generate_csv_files(recordings_data: List[Dict], summary: AnalyticsSummary, output_dir: Path) -> None:
+def generate_csv_files(recordings_data: list[dict], summary: AnalyticsSummary, output_dir: Path) -> None:
     """Generate all CSV output files
 
     Args:

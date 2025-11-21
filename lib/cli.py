@@ -3,8 +3,8 @@
 Modern CLI with beautiful help, progress bars, and rich formatting.
 """
 
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
 import typer
@@ -12,15 +12,15 @@ from rich.console import Console
 from rich.table import Table
 
 from lib.core.config import load_config, resolve_path, validate_config
-from lib.processing.validators import validate_filter_criteria
-from lib.processing.recording_processor import process_recordings
-from lib.processing.aggregators import create_analytics_summary
 from lib.outputs.csv import generate_csv_files
-from lib.outputs.markdown import generate_insights_report, generate_ai_prompt_file
-from lib.outputs.xlsx import generate_xlsx_file
 from lib.outputs.json import generate_json_file
+from lib.outputs.markdown import generate_ai_prompt_file, generate_insights_report
 from lib.outputs.mermaid import generate_mermaid_charts
-from lib.utils.logger import print_header, print_success, print_info, create_progress
+from lib.outputs.xlsx import generate_xlsx_file
+from lib.processing.aggregators import create_analytics_summary
+from lib.processing.recording_processor import process_recordings
+from lib.processing.validators import validate_filter_criteria
+from lib.utils.logger import create_progress, print_header, print_success
 
 app = typer.Typer(
     name="analytics",
@@ -179,7 +179,7 @@ def main(
         generate_ai_prompt_file(output_dir)
     except Exception as e:
         console.print(f"\n[red]✗ Error generating outputs: {e}[/red]")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
     # Summary table
     console.print()

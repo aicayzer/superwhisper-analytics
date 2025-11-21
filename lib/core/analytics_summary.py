@@ -3,9 +3,9 @@
 Replaces tuple returns with a structured object containing all aggregation results.
 """
 
-from dataclasses import dataclass
-from typing import Dict, Any
 from collections import Counter
+from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass
@@ -17,10 +17,10 @@ class AnalyticsSummary:
     """
 
     # Daily aggregations
-    daily_summary: Dict[str, Dict[str, Any]]
+    daily_summary: dict[str, dict[str, Any]]
 
     # Hourly patterns
-    hourly_data: Dict[int, Dict[str, Any]]
+    hourly_data: dict[int, dict[str, Any]]
 
     # Word and phrase frequency
     word_freq: Counter
@@ -28,16 +28,16 @@ class AnalyticsSummary:
     trigram_freq: Counter
 
     # Mode usage
-    mode_data: Dict[str, Dict[str, Any]]
+    mode_data: dict[str, dict[str, Any]]
 
     # Topic distribution
-    topic_data: Dict[str, Dict[str, Any]]
+    topic_data: dict[str, dict[str, Any]]
 
     # Filler words
     filler_data: Counter
 
     # Sentence metrics
-    sentence_summary: Dict[str, float]
+    sentence_summary: dict[str, float]
 
     def __repr__(self) -> str:
         """Readable representation of summary"""

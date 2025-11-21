@@ -3,12 +3,11 @@
 Generates insights reports and AI analysis prompts in Markdown format.
 """
 
-from pathlib import Path
-from typing import List, Dict
 from datetime import datetime
+from pathlib import Path
 
 
-def generate_insights_report(recordings_data: List[Dict], output_dir: Path):
+def generate_insights_report(recordings_data: list[dict], output_dir: Path):
     """Generate markdown insights report."""
     print("\nGenerating insights report...")
 
@@ -29,7 +28,7 @@ def generate_insights_report(recordings_data: List[Dict], output_dir: Path):
     )
 
     # Date range
-    dates = sorted(set(r["date"] for r in recordings_data))
+    dates = sorted({r["date"] for r in recordings_data})
     first_date = dates[0] if dates else "Unknown"
     last_date = dates[-1] if dates else "Unknown"
 

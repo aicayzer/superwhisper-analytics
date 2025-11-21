@@ -3,29 +3,28 @@
 Generates Excel files with multiple sheets containing analytics data.
 """
 
-from pathlib import Path
-from typing import List, Dict
 from collections import Counter
+from pathlib import Path
 
 try:
     from openpyxl import Workbook
-    from openpyxl.styles import Font, Alignment
+    from openpyxl.styles import Alignment, Font
     OPENPYXL_AVAILABLE = True
 except ImportError:
     OPENPYXL_AVAILABLE = False
 
 
 def generate_xlsx_file(
-    recordings_data: List[Dict],
-    daily_summary: Dict,
-    hourly_data: Dict,
+    recordings_data: list[dict],
+    daily_summary: dict,
+    hourly_data: dict,
     word_freq: Counter,
-    mode_data: Dict,
-    topic_data: Dict,
+    mode_data: dict,
+    topic_data: dict,
     filler_data: Counter,
     bigram_freq: Counter,
     trigram_freq: Counter,
-    sentence_summary: Dict,
+    sentence_summary: dict,
     output_dir: Path,
 ):
     """Generate XLSX file with multiple sheets."""

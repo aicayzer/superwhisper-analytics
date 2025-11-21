@@ -4,14 +4,14 @@ Centralizes ALL aggregation logic to eliminate duplication across output generat
 Pure functions with no I/O - compute once, reuse across all output formats.
 """
 
-from typing import List, Dict, Any
 from collections import Counter
+from typing import Any
 
 from lib.core.analytics_summary import AnalyticsSummary
-from lib.processing.text_analysis import extract_words, extract_ngrams
+from lib.processing.text_analysis import extract_ngrams, extract_words
 
 
-def aggregate_daily_summary(recordings: List[Dict]) -> Dict[str, Dict[str, Any]]:
+def aggregate_daily_summary(recordings: list[dict]) -> dict[str, dict[str, Any]]:
     """Aggregate recordings by date
 
     Args:
@@ -52,7 +52,7 @@ def aggregate_daily_summary(recordings: List[Dict]) -> Dict[str, Dict[str, Any]]
     return daily_summary
 
 
-def aggregate_hourly_patterns(recordings: List[Dict]) -> Dict[int, Dict[str, Any]]:
+def aggregate_hourly_patterns(recordings: list[dict]) -> dict[int, dict[str, Any]]:
     """Aggregate recordings by hour of day
 
     Args:
@@ -83,7 +83,7 @@ def aggregate_hourly_patterns(recordings: List[Dict]) -> Dict[int, Dict[str, Any
     return hourly_data
 
 
-def aggregate_word_frequency(recordings: List[Dict], top_n: int = 500) -> Counter:
+def aggregate_word_frequency(recordings: list[dict], top_n: int = 500) -> Counter:
     """Aggregate word frequency across all recordings
 
     Args:
@@ -101,7 +101,7 @@ def aggregate_word_frequency(recordings: List[Dict], top_n: int = 500) -> Counte
     return Counter(all_words)
 
 
-def aggregate_phrase_frequency(recordings: List[Dict]) -> tuple[Counter, Counter]:
+def aggregate_phrase_frequency(recordings: list[dict]) -> tuple[Counter, Counter]:
     """Aggregate phrase frequency (bigrams and trigrams)
 
     Args:
@@ -121,7 +121,7 @@ def aggregate_phrase_frequency(recordings: List[Dict]) -> tuple[Counter, Counter
     return Counter(all_bigrams), Counter(all_trigrams)
 
 
-def aggregate_mode_usage(recordings: List[Dict]) -> Dict[str, Dict[str, Any]]:
+def aggregate_mode_usage(recordings: list[dict]) -> dict[str, dict[str, Any]]:
     """Aggregate recording mode usage statistics
 
     Args:
@@ -152,7 +152,7 @@ def aggregate_mode_usage(recordings: List[Dict]) -> Dict[str, Dict[str, Any]]:
     return mode_data
 
 
-def aggregate_topic_distribution(recordings: List[Dict]) -> Dict[str, Dict[str, Any]]:
+def aggregate_topic_distribution(recordings: list[dict]) -> dict[str, dict[str, Any]]:
     """Aggregate topic distribution statistics
 
     Args:
@@ -188,7 +188,7 @@ def aggregate_topic_distribution(recordings: List[Dict]) -> Dict[str, Dict[str, 
     return topic_data
 
 
-def aggregate_filler_words(recordings: List[Dict]) -> Counter:
+def aggregate_filler_words(recordings: list[dict]) -> Counter:
     """Aggregate filler word usage across all recordings
 
     Args:
@@ -205,7 +205,7 @@ def aggregate_filler_words(recordings: List[Dict]) -> Counter:
     return all_fillers
 
 
-def aggregate_sentence_metrics(recordings: List[Dict]) -> Dict[str, float]:
+def aggregate_sentence_metrics(recordings: list[dict]) -> dict[str, float]:
     """Aggregate sentence-level metrics across all recordings
 
     Args:
@@ -254,7 +254,7 @@ def aggregate_sentence_metrics(recordings: List[Dict]) -> Dict[str, float]:
         }
 
 
-def create_analytics_summary(recordings: List[Dict]) -> AnalyticsSummary:
+def create_analytics_summary(recordings: list[dict]) -> AnalyticsSummary:
     """Create complete analytics summary from recordings
 
     Wrapper function that runs all aggregations and returns clean summary object.
