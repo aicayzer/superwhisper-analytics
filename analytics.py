@@ -1352,6 +1352,51 @@ def generate_mermaid_charts(recordings_data: List[Dict], daily_summary: Dict,
         with open(topic_timeline_file, 'w', encoding='utf-8') as f:
             f.write(topic_timeline)
         print(f"  ✓ {topic_timeline_file.name}")
+    
+    # 3. Top Words Bar Chart
+    if word_freq:
+        top_words = word_freq.most_common(20)
+        words_chart = "```mermaid\n---\nconfig:\n  xyChart:\n    width: 900\n    height: 600\n---\nxyChart-beta horizontal\n"
+        words_chart += "    title \"Top 20 Most Common Words\"\n"
+        words_chart += "    x-axis \"Frequency\"\n"
+        words_chart += "    y-axis [" + ", ".join([f'"{escape_mermaid_label(w)}"' for w, _ in top_words]) + "]\n"
+        words_chart += "    bar [" + ", ".join([str(c) for _, c in top_words]) + "]\n"
+        words_chart += "```\n"
+        
+        words_file = output_dir / "chart_top_words.mmd"
+        with open(words_file, 'w', encoding='utf-8') as f:
+            f.write(words_chart)
+        print(f"  ✓ {words_file.name}")
+    
+    # 4. Mode Usage Bar Chart
+    if mode_data:
+        sorted_modes = sorted(mode_data.items(), key=lambda x: x[1]["count"], reverse=True)
+        mode_chart = "```mermaid\n---\nconfig:\n  xyChart:\n    width: 900\n    height: 400\n---\nxyChart-beta horizontal\n"
+        mode_chart += "    title \"Recording Mode Usage\"\n"
+        mode_chart += "    x-axis \"Number of Recordings\"\n"
+        mode_chart += "    y-axis [" + ", ".join([f'"{escape_mermaid_label(mode)}"' for mode, _ in sorted_modes]) + "]\n"
+        mode_chart += "    bar [" + ", ".join([str(data["count"]) for _, data in sorted_modes]) + "]\n"
+        mode_chart += "```\n"
+        
+        mode_file = output_dir / "chart_mode_usage.mmd"
+        with open(mode_file, 'w', encoding='utf-8') as f:
+            f.write(mode_chart)
+        print(f"  ✓ {mode_file.name}")
+    
+    # 5. Topic Distribution Bar Chart
+    if topic_data:
+        sorted_topics = sorted(topic_data.items(), key=lambda x: x[1]["recording_count"], reverse=True)
+        topic_chart = "```mermaid\n---\nconfig:\n  xyChart:\n    width: 900\n    height: 500\n---\nxyChart-beta horizontal\n"
+        topic_chart += "    title \"Topic Distribution\"\n"
+        topic_chart += "    x-axis \"Number of Recordings\"\n"
+        topic_chart += "    y-axis [" + ", ".join([f'"{escape_mermaid_label(topic)}"' for topic, _ in sorted_topics]) + "]\n"
+        topic_chart += "    bar [" + ", ".join([str(data["recording_count"]) for _, data in sorted_topics]) + "]\n"
+        topic_chart += "```\n"
+        
+        topic_file = output_dir / "chart_topic_distribution.mmd"
+        with open(topic_file, 'w', encoding='utf-8') as f:
+            f.write(topic_chart)
+        print(f"  ✓ {topic_file.name}")
 
 
 def generate_ai_prompt_file(output_dir: Path):
