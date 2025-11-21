@@ -203,6 +203,45 @@ def count_filler_words(text: str) -> Tuple[int, Dict[str, int]]:
     return total_count, filler_counts
 
 
+def extract_ngrams(text: str, n: int) -> List[str]:
+    """Extract n-grams from text.
+    
+    Args:
+        text: Input text
+        n: Size of n-gram (2 for bigrams, 3 for trigrams)
+    
+    Returns:
+        List of n-gram strings
+    """
+    if not text:
+        return []
+    
+    # Clean and tokenize
+    words = clean_text(text).split()
+    words = [w for w in words if w and len(w) > 1]  # Filter very short words
+    
+    if len(words) < n:
+        return []
+    
+    # Generate n-grams
+    ngrams = []
+    for i in range(len(words) - n + 1):
+        ngram_words = words[i:i+n]
+        
+        # Skip if all words are stop words
+        if all(w in STOP_WORDS for w in ngram_words):
+            continue
+        
+        # Skip if contains too many stop words (more than half)
+        stop_word_count = sum(1 for w in ngram_words if w in STOP_WORDS)
+        if stop_word_count > n / 2:
+            continue
+        
+        ngrams.append(" ".join(ngram_words))
+    
+    return ngrams
+
+
 def filter_by_date(folder_name: str, date_filter: Optional[str], month_filter: Optional[str],
                    date_from: Optional[str], date_to: Optional[str]) -> bool:
     """Filter recording folder by date criteria."""
@@ -448,6 +487,36 @@ def generate_csv_files(recordings_data: List[Dict], output_dir: Path):
             percentage = round((freq / total_words * 100), 4) if total_words > 0 else 0
             writer.writerow({"word": word, "frequency": freq, "percentage": percentage})
     print(f"  ✓ {word_file.name}")
+    
+    # 4b. Phrase frequency (n-grams)
+    all_bigrams = []
+    all_trigrams = []
+    for rec in recordings_data:
+        if rec["transcript"]:
+            all_bigrams.extend(extract_ngrams(rec["transcript"], 2))
+            all_trigrams.extend(extract_ngrams(rec["transcript"], 3))
+    
+    bigram_freq = Counter(all_bigrams)
+    trigram_freq = Counter(all_trigrams)
+    
+    phrase_file = output_dir / "phrase_frequency.csv"
+    with open(phrase_file, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.DictWriter(f, fieldnames=["phrase", "type", "frequency", "percentage"])
+        writer.writeheader()
+        
+        # Write bigrams
+        total_bigrams = sum(bigram_freq.values())
+        for phrase, freq in bigram_freq.most_common(100):  # Top 100 bigrams
+            percentage = round((freq / total_bigrams * 100), 4) if total_bigrams > 0 else 0
+            writer.writerow({"phrase": phrase, "type": "2-gram", "frequency": freq, "percentage": percentage})
+        
+        # Write trigrams
+        total_trigrams = sum(trigram_freq.values())
+        for phrase, freq in trigram_freq.most_common(50):  # Top 50 trigrams
+            percentage = round((freq / total_trigrams * 100), 4) if total_trigrams > 0 else 0
+            writer.writerow({"phrase": phrase, "type": "3-gram", "frequency": freq, "percentage": percentage})
+    
+    print(f"  ✓ {phrase_file.name}")
 
     # 5. Mode usage
     mode_data = {}
@@ -523,7 +592,7 @@ def generate_csv_files(recordings_data: List[Dict], output_dir: Path):
             writer.writerow({"filler_phrase": filler, "count": count, "percentage": percentage})
     print(f"  ✓ {filler_file.name}")
 
-    return daily_summary, hourly_data, word_freq, mode_data, topic_data, all_fillers
+    return daily_summary, hourly_data, word_freq, mode_data, topic_data, all_fillers, bigram_freq, trigram_freq
 
 
 def generate_insights_report(recordings_data: List[Dict], output_dir: Path):
@@ -713,7 +782,8 @@ Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 
 
 def generate_xlsx_file(recordings_data: List[Dict], daily_summary: Dict, hourly_data: Dict,
-                       word_freq: Counter, mode_data: Dict, topic_data: Dict, filler_data: Counter, output_dir: Path):
+                       word_freq: Counter, mode_data: Dict, topic_data: Dict, filler_data: Counter,
+                       bigram_freq: Counter, trigram_freq: Counter, output_dir: Path):
     """Generate XLSX file with multiple sheets."""
     if not OPENPYXL_AVAILABLE:
         print("\n⚠ Skipping XLSX generation: openpyxl not installed")
@@ -833,6 +903,25 @@ def generate_xlsx_file(recordings_data: List[Dict], daily_summary: Dict, hourly_
     for filler, count in filler_data.most_common():
         percentage = round((count / total_fillers * 100), 2) if total_fillers > 0 else 0
         ws7.append([filler, count, percentage])
+    
+    # Sheet 8: Phrase Frequency
+    ws8 = wb.create_sheet("Phrase Frequency")
+    ws8.append(["phrase", "type", "frequency", "percentage"])
+    for cell in ws8[1]:
+        cell.font = Font(bold=True)
+        cell.alignment = Alignment(horizontal='center')
+    
+    # Add bigrams
+    total_bigrams = sum(bigram_freq.values())
+    for phrase, freq in bigram_freq.most_common(100):
+        percentage = round((freq / total_bigrams * 100), 4) if total_bigrams > 0 else 0
+        ws8.append([phrase, "2-gram", freq, percentage])
+    
+    # Add trigrams
+    total_trigrams = sum(trigram_freq.values())
+    for phrase, freq in trigram_freq.most_common(50):
+        percentage = round((freq / total_trigrams * 100), 4) if total_trigrams > 0 else 0
+        ws8.append([phrase, "3-gram", freq, percentage])
 
     xlsx_file = output_dir / "analytics.xlsx"
     wb.save(xlsx_file)
@@ -840,7 +929,8 @@ def generate_xlsx_file(recordings_data: List[Dict], daily_summary: Dict, hourly_
 
 
 def generate_json_file(recordings_data: List[Dict], daily_summary: Dict, hourly_data: Dict,
-                       word_freq: Counter, mode_data: Dict, topic_data: Dict, filler_data: Counter, output_dir: Path):
+                       word_freq: Counter, mode_data: Dict, topic_data: Dict, filler_data: Counter,
+                       bigram_freq: Counter, trigram_freq: Counter, output_dir: Path):
     """Generate JSON file with structured data."""
     print("\nGenerating JSON file...")
 
@@ -917,6 +1007,29 @@ def generate_json_file(recordings_data: List[Dict], daily_summary: Dict, hourly_
         {"filler_phrase": filler, "count": count, "percentage": round((count / total_fillers_count * 100), 2)}
         for filler, count in filler_data.most_common()
     ]
+    
+    # Prepare phrase frequency
+    total_bigrams_count = sum(bigram_freq.values())
+    total_trigrams_count = sum(trigram_freq.values())
+    phrase_frequency_list = []
+    
+    # Add bigrams
+    for phrase, count in bigram_freq.most_common(100):
+        phrase_frequency_list.append({
+            "phrase": phrase,
+            "type": "2-gram",
+            "frequency": count,
+            "percentage": round((count / total_bigrams_count * 100), 4) if total_bigrams_count > 0 else 0
+        })
+    
+    # Add trigrams
+    for phrase, count in trigram_freq.most_common(50):
+        phrase_frequency_list.append({
+            "phrase": phrase,
+            "type": "3-gram",
+            "frequency": count,
+            "percentage": round((count / total_trigrams_count * 100), 4) if total_trigrams_count > 0 else 0
+        })
 
     json_data = {
         "metadata": {
@@ -944,7 +1057,8 @@ def generate_json_file(recordings_data: List[Dict], daily_summary: Dict, hourly_
         "word_frequency": word_frequency_list,
         "mode_usage": mode_usage_list,
         "topic_distribution": topic_distribution_list,
-        "filler_word_analysis": filler_analysis_list
+        "filler_word_analysis": filler_analysis_list,
+        "phrase_frequency": phrase_frequency_list
     }
 
     json_file = output_dir / "analytics.json"
@@ -1219,16 +1333,16 @@ def main():
         sys.exit(1)
 
     # Generate CSV files (returns aggregated data)
-    daily_summary, hourly_data, word_freq, mode_data, topic_data, filler_data = generate_csv_files(recordings_data, output_dir)
+    daily_summary, hourly_data, word_freq, mode_data, topic_data, filler_data, bigram_freq, trigram_freq = generate_csv_files(recordings_data, output_dir)
 
     # Generate insights report
     generate_insights_report(recordings_data, output_dir)
 
     # Generate XLSX file
-    generate_xlsx_file(recordings_data, daily_summary, hourly_data, word_freq, mode_data, topic_data, filler_data, output_dir)
+    generate_xlsx_file(recordings_data, daily_summary, hourly_data, word_freq, mode_data, topic_data, filler_data, bigram_freq, trigram_freq, output_dir)
 
     # Generate JSON file
-    generate_json_file(recordings_data, daily_summary, hourly_data, word_freq, mode_data, topic_data, filler_data, output_dir)
+    generate_json_file(recordings_data, daily_summary, hourly_data, word_freq, mode_data, topic_data, filler_data, bigram_freq, trigram_freq, output_dir)
 
     # Generate AI prompt file
     generate_ai_prompt_file(output_dir)
