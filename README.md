@@ -14,15 +14,53 @@ Generic analytics tool for analyzing Super Whisper recordings. Generates compreh
 pip install -r requirements.txt
 ```
 
+## Configuration
+
+The script uses configuration files for path management, making it portable across different systems.
+
+### Setup Configuration
+
+1. Copy the example configuration:
+   ```bash
+   cp config.local.ini.example config.local.ini
+   ```
+
+2. Edit `config.local.ini` to match your system:
+   ```ini
+   [paths]
+   # Path to your recordings directory
+   recordings_dir = ../recordings
+   
+   # Path for output files
+   output_dir = ./outputs
+   
+   [analysis]
+   default_top_words = 500
+   ```
+
+**Configuration Priority:**
+- `config.local.ini` (if exists, not tracked in git)
+- `config.ini` (default template)
+- Built-in defaults
+
+**Path Formats:**
+- Relative paths: `../recordings` (relative to script directory)
+- Absolute paths: `/path/to/recordings`
+
 ## Usage
 
-Run the script from the directory containing your Super Whisper workspace:
+Run the script from the analysis directory:
 
 ```bash
 python3 analytics.py
 ```
 
-The script expects a `recordings/` folder at the workspace root (one level up from the script location). Each recording should be in its own folder with `meta.json` and optionally `output.wav` files.
+The script will:
+1. Load configuration from `config.local.ini` or `config.ini`
+2. Process all recordings in the configured recordings directory
+3. Generate outputs in a timestamped folder
+
+Each recording should be in its own folder with `meta.json` and optionally `output.wav` files.
 
 ## Output
 
@@ -78,7 +116,7 @@ Each run creates a new timestamped folder, preserving historical outputs.
 
 ```
 outputs/
-  2025-11-20_12-30-45/
+  2025-01-15_14-30-45/
     analytics.xlsx
     analytics.json
     recordings_detail.csv
@@ -90,4 +128,23 @@ outputs/
     insights_report.md
     insights_prompt.md
 ```
+
+## Example Recording Structure
+
+Your recordings directory should follow this structure:
+
+```
+recordings/
+  1640000000/
+    meta.json
+    output.wav
+  1640000123/
+    meta.json
+    output.wav
+  ...
+```
+
+Each folder is named with a Unix timestamp and contains:
+- `meta.json`: Metadata including transcript, mode, datetime, etc.
+- `output.wav`: Audio file (optional, used for duration validation)
 

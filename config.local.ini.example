@@ -1,0 +1,21 @@
+# Local Configuration Example
+# Copy this file to config.local.ini and adjust paths for your system
+# config.local.ini is excluded from version control
+
+[paths]
+# Example: Absolute path to recordings
+# recordings_dir = /Users/yourname/Documents/superwhisper/recordings
+
+# Example: Relative path to recordings (from script directory)
+recordings_dir = ../recordings
+
+# Example: Custom output directory
+# output_dir = /Users/yourname/Documents/analytics-output
+output_dir = ./outputs
+
+[analysis]
+# Customize analysis parameters
+default_top_words = 500
+default_top_bigrams = 100
+default_top_trigrams = 50
+

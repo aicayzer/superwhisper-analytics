@@ -5,6 +5,7 @@ import csv
 import wave
 import re
 import sys
+import configparser
 from pathlib import Path
 from collections import Counter
 from datetime import datetime
@@ -804,6 +805,44 @@ def generate_json_file(recordings_data: List[Dict], daily_summary: Dict, hourly_
     print(f"  ✓ {json_file.name}")
 
 
+def load_config() -> configparser.ConfigParser:
+    """Load configuration from config files with fallback."""
+    config = configparser.ConfigParser()
+    script_dir = Path(__file__).parent
+    
+    # Set defaults
+    config['paths'] = {
+        'recordings_dir': '../recordings',
+        'output_dir': './outputs'
+    }
+    config['analysis'] = {
+        'default_top_words': '500',
+        'default_top_bigrams': '100',
+        'default_top_trigrams': '50'
+    }
+    
+    # Try to load config.ini first
+    config_file = script_dir / 'config.ini'
+    if config_file.exists():
+        config.read(config_file)
+    
+    # Override with local config if it exists
+    local_config_file = script_dir / 'config.local.ini'
+    if local_config_file.exists():
+        config.read(local_config_file)
+    
+    return config
+
+
+def resolve_path(path_str: str, script_dir: Path) -> Path:
+    """Resolve a path string to an absolute Path, handling relative paths."""
+    path = Path(path_str)
+    if path.is_absolute():
+        return path
+    else:
+        return (script_dir / path).resolve()
+
+
 def generate_ai_prompt_file(output_dir: Path):
     """Generate AI prompt file for insights generation."""
     print("\nGenerating AI prompt file...")
@@ -897,17 +936,29 @@ Begin your analysis now.
 def main():
     """Main execution function."""
     script_dir = Path(__file__).parent
-    workspace_root = script_dir.parent
-    recordings_dir = workspace_root / "recordings"
-
+    
+    # Load configuration
+    config = load_config()
+    
+    # Resolve paths from configuration
+    recordings_dir = resolve_path(config['paths']['recordings_dir'], script_dir)
+    outputs_base = resolve_path(config['paths']['output_dir'], script_dir)
+    
+    # Validate recordings directory
     if not recordings_dir.exists():
-        print(f"Error: {recordings_dir} does not exist")
-        print(f"Expected recordings folder at: {recordings_dir}")
+        print(f"Error: Recordings directory does not exist: {recordings_dir}")
+        print(f"\nPlease check your configuration:")
+        print(f"  - config.local.ini (if it exists)")
+        print(f"  - config.ini")
+        print(f"\nExpected recordings directory at: {recordings_dir}")
+        sys.exit(1)
+    
+    if not recordings_dir.is_dir():
+        print(f"Error: Recordings path is not a directory: {recordings_dir}")
         sys.exit(1)
 
     # Create timestamped output folder
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    outputs_base = script_dir / "outputs"
     outputs_base.mkdir(exist_ok=True)
     output_dir = outputs_base / timestamp
     output_dir.mkdir(exist_ok=True)
@@ -915,6 +966,7 @@ def main():
     print("=" * 60)
     print("Super Whisper Recordings Analytics")
     print("=" * 60)
+    print(f"Recordings directory: {recordings_dir}")
     print(f"Output directory: {output_dir}")
 
     # Process recordings

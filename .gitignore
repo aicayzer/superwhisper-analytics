@@ -1,25 +1,33 @@
-# Generated outputs
-*.csv
-insights_report.md
+# Output directories
 outputs/
+
+# Virtual environment
+venv/
+env/
+*.virtualenv
 
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
+.Python
 
-# Virtual environment
-venv/
-env/
-ENV/
-
-# macOS
-.DS_Store
+# Local configuration
+config.local.ini
 
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
 
+# OS
+.DS_Store
+Thumbs.db
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
