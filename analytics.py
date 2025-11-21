@@ -1074,7 +1074,7 @@ def main():
     # Create analytics summary (aggregations computed ONCE)
     print("\nComputing analytics...")
     summary = create_analytics_summary(recordings_data)
-    
+
     # Extract for backward compatibility with old generators
     daily_summary = summary.daily_summary
     hourly_data = summary.hourly_data

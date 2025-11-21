@@ -25,27 +25,27 @@ def setup_logger(
     log_file: Optional[Path] = None
 ) -> logging.Logger:
     """Setup logger with rich integration
-    
+
     Args:
         name: Logger name
         level: Logging level (DEBUG, INFO, WARNING, ERROR)
         log_file: Optional file path for file logging
-        
+
     Returns:
         Configured logger instance
     """
     global _logger
-    
+
     if _logger is not None:
         return _logger
-    
+
     # Create logger
     logger = logging.getLogger(name)
     logger.setLevel(level)
-    
+
     # Remove any existing handlers
     logger.handlers = []
-    
+
     # Rich console handler with colour coding
     console_handler = RichHandler(
         console=console,
@@ -57,7 +57,7 @@ def setup_logger(
     )
     console_handler.setLevel(level)
     logger.addHandler(console_handler)
-    
+
     # Optional file handler
     if log_file:
         file_handler = logging.FileHandler(log_file)
@@ -67,14 +67,14 @@ def setup_logger(
         )
         file_handler.setFormatter(file_formatter)
         logger.addHandler(file_handler)
-    
+
     _logger = logger
     return logger
 
 
 def get_logger() -> logging.Logger:
     """Get the global logger instance
-    
+
     Returns:
         Logger instance (creates one if doesn't exist)
     """
@@ -86,7 +86,7 @@ def get_logger() -> logging.Logger:
 
 def create_progress() -> Progress:
     """Create a rich progress bar for long-running operations
-    
+
     Returns:
         Progress instance configured with spinner, bar, and time remaining
     """
@@ -102,7 +102,7 @@ def create_progress() -> Progress:
 
 def print_header(title: str) -> None:
     """Print a formatted header
-    
+
     Args:
         title: Header title text
     """
@@ -113,7 +113,7 @@ def print_header(title: str) -> None:
 
 def print_success(message: str) -> None:
     """Print a success message
-    
+
     Args:
         message: Success message text
     """
@@ -122,7 +122,7 @@ def print_success(message: str) -> None:
 
 def print_error(message: str) -> None:
     """Print an error message
-    
+
     Args:
         message: Error message text
     """
@@ -131,7 +131,7 @@ def print_error(message: str) -> None:
 
 def print_warning(message: str) -> None:
     """Print a warning message
-    
+
     Args:
         message: Warning message text
     """
@@ -140,7 +140,7 @@ def print_warning(message: str) -> None:
 
 def print_info(message: str) -> None:
     """Print an info message
-    
+
     Args:
         message: Info message text
     """
@@ -149,7 +149,7 @@ def print_info(message: str) -> None:
 
 def print_section(title: str) -> None:
     """Print a section header
-    
+
     Args:
         title: Section title
     """

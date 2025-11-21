@@ -53,45 +53,45 @@ def main(
     ),
 ) -> None:
     """Process Super Whisper recordings and generate analytics reports.
-    
+
     Examples:
-    
+
         # Process all recordings
         python3 main.py
-        
+
         # Filter by specific date
         python3 main.py --date 2025-01-15
-        
+
         # Filter by month
         python3 main.py --month 2025-01
-        
+
         # Filter by date range
         python3 main.py --date-from 2025-01-01 --date-to 2025-01-31
     """
-    
+
     print_header("Super Whisper Analytics")
-    
+
     # Load configuration
     script_dir = Path(__file__).parent.parent
     config = load_config(script_dir)
-    
+
     # Resolve paths
     recordings_dir = resolve_path(config['paths']['recordings_dir'], script_dir)
     outputs_base = resolve_path(config['paths']['output_dir'], script_dir)
-    
+
     # Validate configuration
     validate_config(config, script_dir)
-    
+
     # Create timestamped output folder
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     outputs_base.mkdir(exist_ok=True)
     output_dir = outputs_base / timestamp
     output_dir.mkdir(exist_ok=True)
-    
+
     # Display configuration
     console.print(f"[blue]📁 Recordings:[/blue] {recordings_dir}")
     console.print(f"[blue]📊 Output:[/blue] {output_dir}")
-    
+
     # Display active filters
     if date or month or date_from or date_to:
         console.print("\n[yellow]Active filters:[/yellow]")
@@ -103,9 +103,9 @@ def main(
             console.print(f"  • From: {date_from}")
         if date_to:
             console.print(f"  • To: {date_to}")
-    
+
     console.print()
-    
+
     # Validate filters
     filter_criteria = {}
     if date:
@@ -116,14 +116,14 @@ def main(
         filter_criteria['date_from'] = date_from
     if date_to:
         filter_criteria['date_to'] = date_to
-    
+
     if filter_criteria:
         validate_filter_criteria(filter_criteria)
-    
+
     # Process recordings with progress bar
     with create_progress() as progress:
         task = progress.add_task("[cyan]Processing recordings...", total=None)
-        
+
         recordings_data = process_recordings(
             recordings_dir,
             date_filter=date,
@@ -131,26 +131,26 @@ def main(
             date_from=date_from,
             date_to=date_to
         )
-        
+
         progress.update(task, completed=True)
-    
+
     if not recordings_data:
         console.print("\n[red]✗[/red] No recordings found matching the specified criteria!")
         if date or month or date_from or date_to:
             console.print("[yellow]Try adjusting your date filters or removing them to see all recordings.[/yellow]")
         raise typer.Exit(1)
-    
+
     print_success(f"Processed {len(recordings_data):,} recordings")
-    
+
     # Create analytics summary
     console.print("\n[cyan]Computing analytics...[/cyan]")
     summary = create_analytics_summary(recordings_data)
-    
+
     # Generate outputs
     try:
         # CSV files
         generate_csv_files(recordings_data, summary, output_dir)
-        
+
         # For now, call the old functions for other outputs
         # TODO: Extract these to dedicated modules
         from analytics import (
@@ -160,7 +160,7 @@ def main(
             generate_mermaid_charts,
             generate_ai_prompt_file
         )
-        
+
         # Extract data from summary for old functions
         daily_summary = summary.daily_summary
         hourly_data = summary.hourly_data
@@ -171,7 +171,7 @@ def main(
         bigram_freq = summary.bigram_freq
         trigram_freq = summary.trigram_freq
         sentence_summary = summary.sentence_summary
-        
+
         generate_insights_report(recordings_data, output_dir)
         generate_xlsx_file(recordings_data, daily_summary, hourly_data, word_freq, mode_data, topic_data, filler_data, bigram_freq, trigram_freq, sentence_summary, output_dir)
         generate_json_file(recordings_data, daily_summary, hourly_data, word_freq, mode_data, topic_data, filler_data, bigram_freq, trigram_freq, sentence_summary, output_dir)
@@ -180,25 +180,25 @@ def main(
     except Exception as e:
         console.print(f"\n[red]✗ Error generating outputs: {e}[/red]")
         raise typer.Exit(1)
-    
+
     # Summary table
     console.print()
     table = Table(title="Analytics Summary", show_header=True, header_style="bold magenta")
     table.add_column("Metric", style="cyan", no_wrap=True)
     table.add_column("Value", justify="right", style="green")
-    
+
     total_duration = sum(r["duration_seconds"] for r in recordings_data)
     total_words = sum(r["word_count"] for r in recordings_data)
-    
+
     table.add_row("Total Recordings", f"{len(recordings_data):,}")
     table.add_row("Total Duration", f"{total_duration/3600:.1f} hours")
     table.add_row("Total Words", f"{total_words:,}")
     table.add_row("Unique Words", f"{len(summary.word_freq):,}")
     table.add_row("Topics Found", f"{len(summary.topic_data)}")
     table.add_row("Modes Used", f"{len(summary.mode_data)}")
-    
+
     console.print(table)
-    
+
     # Final success message
     console.print()
     print_success(f"Analytics complete! Output saved to: {output_dir}")
