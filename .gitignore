@@ -1,6 +1,9 @@
 # Output directories
 outputs/
 
+# Temporary files
+tmp/
+
 # Virtual environment
 venv/
 env/
