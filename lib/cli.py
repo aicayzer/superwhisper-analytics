@@ -3,7 +3,6 @@
 Modern CLI with beautiful help, progress bars, and rich formatting.
 """
 
-import sys
 from pathlib import Path
 from datetime import datetime
 from typing import Optional
@@ -13,11 +12,14 @@ from rich.console import Console
 from rich.table import Table
 
 from lib.core.config import load_config, resolve_path, validate_config
-from lib.core.analytics_summary import AnalyticsSummary
 from lib.processing.validators import validate_filter_criteria
 from lib.processing.recording_processor import process_recordings
 from lib.processing.aggregators import create_analytics_summary
 from lib.outputs.csv import generate_csv_files
+from lib.outputs.markdown import generate_insights_report, generate_ai_prompt_file
+from lib.outputs.xlsx import generate_xlsx_file
+from lib.outputs.json import generate_json_file
+from lib.outputs.mermaid import generate_mermaid_charts
 from lib.utils.logger import print_header, print_success, print_info, create_progress
 
 app = typer.Typer(
@@ -148,20 +150,7 @@ def main(
 
     # Generate outputs
     try:
-        # CSV files
-        generate_csv_files(recordings_data, summary, output_dir)
-
-        # For now, call the old functions for other outputs
-        # TODO: Extract these to dedicated modules
-        from analytics import (
-            generate_insights_report,
-            generate_xlsx_file,
-            generate_json_file,
-            generate_mermaid_charts,
-            generate_ai_prompt_file
-        )
-
-        # Extract data from summary for old functions
+        # Extract data from summary for output generators
         daily_summary = summary.daily_summary
         hourly_data = summary.hourly_data
         word_freq = summary.word_freq
@@ -172,10 +161,21 @@ def main(
         trigram_freq = summary.trigram_freq
         sentence_summary = summary.sentence_summary
 
+        # Generate all output files
+        generate_csv_files(recordings_data, summary, output_dir)
         generate_insights_report(recordings_data, output_dir)
-        generate_xlsx_file(recordings_data, daily_summary, hourly_data, word_freq, mode_data, topic_data, filler_data, bigram_freq, trigram_freq, sentence_summary, output_dir)
-        generate_json_file(recordings_data, daily_summary, hourly_data, word_freq, mode_data, topic_data, filler_data, bigram_freq, trigram_freq, sentence_summary, output_dir)
-        generate_mermaid_charts(recordings_data, daily_summary, word_freq, mode_data, topic_data, output_dir)
+        generate_xlsx_file(
+            recordings_data, daily_summary, hourly_data, word_freq, mode_data,
+            topic_data, filler_data, bigram_freq, trigram_freq, sentence_summary, output_dir
+        )
+        generate_json_file(
+            recordings_data, daily_summary, hourly_data, word_freq, mode_data,
+            topic_data, filler_data, bigram_freq, trigram_freq, sentence_summary, output_dir
+        )
+        generate_mermaid_charts(
+            recordings_data, daily_summary, word_freq, mode_data, topic_data,
+            output_dir, config, hourly_data, filler_data
+        )
         generate_ai_prompt_file(output_dir)
     except Exception as e:
         console.print(f"\n[red]✗ Error generating outputs: {e}[/red]")

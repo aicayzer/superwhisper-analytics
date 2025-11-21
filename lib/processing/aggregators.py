@@ -36,6 +36,19 @@ def aggregate_daily_summary(recordings: List[Dict]) -> Dict[str, Dict[str, Any]]
         daily_summary[date]["total_words"] += rec["word_count"]
         daily_summary[date]["total_characters"] += rec["char_count"]
 
+    # Calculate derived fields
+    for date in daily_summary:
+        data = daily_summary[date]
+        data["total_duration_hours"] = round(data["total_duration_seconds"] / 3600, 2)
+        data["avg_duration_seconds"] = (
+            round(data["total_duration_seconds"] / data["recordings_count"], 2)
+            if data["recordings_count"] > 0
+            else 0
+        )
+        data["avg_words_per_recording"] = (
+            round(data["total_words"] / data["recordings_count"], 2) if data["recordings_count"] > 0 else 0
+        )
+
     return daily_summary
 
 
@@ -59,6 +72,13 @@ def aggregate_hourly_patterns(recordings: List[Dict]) -> Dict[int, Dict[str, Any
             }
         hourly_data[hour]["recordings_count"] += 1
         hourly_data[hour]["total_duration_seconds"] += rec["duration_seconds"]
+
+    # Calculate derived fields
+    for hour in hourly_data:
+        data = hourly_data[hour]
+        data["avg_duration_seconds"] = (
+            round(data["total_duration_seconds"] / data["recordings_count"], 2) if data["recordings_count"] > 0 else 0
+        )
 
     return hourly_data
 
@@ -111,6 +131,7 @@ def aggregate_mode_usage(recordings: List[Dict]) -> Dict[str, Dict[str, Any]]:
         Dict mapping mode name to usage statistics
     """
     mode_data = {}
+    total_recordings = len(recordings)
     for rec in recordings:
         mode = rec["mode_name"]
         if mode not in mode_data:
@@ -121,6 +142,12 @@ def aggregate_mode_usage(recordings: List[Dict]) -> Dict[str, Dict[str, Any]]:
             }
         mode_data[mode]["count"] += 1
         mode_data[mode]["total_duration_seconds"] += rec["duration_seconds"]
+
+    # Calculate percentage
+    for mode in mode_data:
+        mode_data[mode]["percentage"] = (
+            round((mode_data[mode]["count"] / total_recordings * 100), 2) if total_recordings > 0 else 0
+        )
 
     return mode_data
 
@@ -135,6 +162,8 @@ def aggregate_topic_distribution(recordings: List[Dict]) -> Dict[str, Dict[str, 
         Dict mapping topic to distribution statistics
     """
     topic_data = {}
+    total_recordings = len(recordings)
+    total_duration = sum(rec["duration_seconds"] for rec in recordings)
     for rec in recordings:
         topic = rec["primary_topic"]
         if topic not in topic_data:
@@ -145,6 +174,16 @@ def aggregate_topic_distribution(recordings: List[Dict]) -> Dict[str, Dict[str, 
             }
         topic_data[topic]["recording_count"] += 1
         topic_data[topic]["total_duration_seconds"] += rec["duration_seconds"]
+
+    # Calculate percentages
+    for topic in topic_data:
+        data = topic_data[topic]
+        data["percentage_of_recordings"] = (
+            round((data["recording_count"] / total_recordings * 100), 2) if total_recordings > 0 else 0
+        )
+        data["percentage_of_time"] = (
+            round((data["total_duration_seconds"] / total_duration * 100), 2) if total_duration > 0 else 0
+        )
 
     return topic_data
 
