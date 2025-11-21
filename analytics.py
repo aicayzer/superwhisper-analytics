@@ -6,6 +6,7 @@ import wave
 import re
 import sys
 import configparser
+import argparse
 from pathlib import Path
 from collections import Counter
 from datetime import datetime
@@ -142,13 +143,57 @@ def extract_words(text: str) -> List[str]:
     return [w for w in words if w and w not in STOP_WORDS and len(w) > 2]
 
 
-def process_recordings(recordings_dir: Path) -> List[Dict]:
-    """Process all recordings and extract data."""
-    recordings_data = []
-    recordings_folders = sorted([d for d in recordings_dir.iterdir() if d.is_dir()])
+def filter_by_date(folder_name: str, date_filter: Optional[str], month_filter: Optional[str],
+                   date_from: Optional[str], date_to: Optional[str]) -> bool:
+    """Filter recording folder by date criteria."""
+    try:
+        # Parse Unix timestamp from folder name
+        timestamp = int(folder_name)
+        recording_date = datetime.fromtimestamp(timestamp)
+        recording_date_str = recording_date.date().isoformat()
+        
+        # Check single date filter
+        if date_filter and recording_date_str != date_filter:
+            return False
+        
+        # Check month filter (YYYY-MM format)
+        if month_filter:
+            recording_month = recording_date.strftime("%Y-%m")
+            if recording_month != month_filter:
+                return False
+        
+        # Check date range
+        if date_from and recording_date_str < date_from:
+            return False
+        if date_to and recording_date_str > date_to:
+            return False
+        
+        return True
+    except (ValueError, OSError):
+        # Invalid timestamp, exclude from results
+        return False
 
+
+def process_recordings(recordings_dir: Path, date_filter: Optional[str] = None,
+                      month_filter: Optional[str] = None, date_from: Optional[str] = None,
+                      date_to: Optional[str] = None) -> List[Dict]:
+    """Process all recordings and extract data, optionally filtering by date."""
+    recordings_data = []
+    all_folders = sorted([d for d in recordings_dir.iterdir() if d.is_dir()])
+    
+    # Apply date filtering
+    recordings_folders = [
+        d for d in all_folders
+        if filter_by_date(d.name, date_filter, month_filter, date_from, date_to)
+    ]
+    
     total = len(recordings_folders)
-    print(f"Processing {total} recordings...")
+    total_before_filter = len(all_folders)
+    
+    if total < total_before_filter:
+        print(f"Filtered to {total} recordings (from {total_before_filter} total)")
+    else:
+        print(f"Processing {total} recordings...")
 
     for idx, folder in enumerate(recordings_folders, 1):
         if idx % 100 == 0:
@@ -933,8 +978,81 @@ Begin your analysis now.
     print(f"  ✓ {prompt_file.name}")
 
 
+def parse_arguments():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(
+        description='Analyze Super Whisper recordings with optional date filtering.',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Process all recordings
+  python3 analytics.py
+  
+  # Filter by specific date
+  python3 analytics.py --date 2025-01-15
+  
+  # Filter by month
+  python3 analytics.py --month 2025-01
+  
+  # Filter by date range
+  python3 analytics.py --date-from 2025-01-01 --date-to 2025-01-31
+  
+  # Combine month and date range
+  python3 analytics.py --month 2025-01 --date-from 2025-01-15
+        """
+    )
+    
+    parser.add_argument(
+        '--date',
+        type=str,
+        help='Filter recordings by specific date (YYYY-MM-DD format)'
+    )
+    parser.add_argument(
+        '--month',
+        type=str,
+        help='Filter recordings by month (YYYY-MM format)'
+    )
+    parser.add_argument(
+        '--date-from',
+        type=str,
+        help='Filter recordings from this date onwards (YYYY-MM-DD format)'
+    )
+    parser.add_argument(
+        '--date-to',
+        type=str,
+        help='Filter recordings up to this date (YYYY-MM-DD format)'
+    )
+    
+    return parser.parse_args()
+
+
+def validate_date_format(date_str: Optional[str], format_type: str) -> None:
+    """Validate date string format."""
+    if not date_str:
+        return
+    
+    try:
+        if format_type == 'date':
+            datetime.strptime(date_str, '%Y-%m-%d')
+        elif format_type == 'month':
+            datetime.strptime(date_str, '%Y-%m')
+    except ValueError:
+        print(f"Error: Invalid {format_type} format: {date_str}")
+        print(f"Expected format: {'YYYY-MM-DD' if format_type == 'date' else 'YYYY-MM'}")
+        sys.exit(1)
+
+
 def main():
     """Main execution function."""
+    # Parse command line arguments
+    args = parse_arguments()
+    
+    # Validate date formats
+    validate_date_format(args.date, 'date')
+    validate_date_format(args.month, 'month')
+    validate_date_format(args.date_from, 'date')
+    validate_date_format(args.date_to, 'date')
+    
     script_dir = Path(__file__).parent
     
     # Load configuration
@@ -968,12 +1086,33 @@ def main():
     print("=" * 60)
     print(f"Recordings directory: {recordings_dir}")
     print(f"Output directory: {output_dir}")
+    
+    # Display active filters
+    if args.date or args.month or args.date_from or args.date_to:
+        print("\nActive filters:")
+        if args.date:
+            print(f"  - Date: {args.date}")
+        if args.month:
+            print(f"  - Month: {args.month}")
+        if args.date_from:
+            print(f"  - From: {args.date_from}")
+        if args.date_to:
+            print(f"  - To: {args.date_to}")
+        print()
 
     # Process recordings
-    recordings_data = process_recordings(recordings_dir)
+    recordings_data = process_recordings(
+        recordings_dir,
+        date_filter=args.date,
+        month_filter=args.month,
+        date_from=args.date_from,
+        date_to=args.date_to
+    )
 
     if not recordings_data:
-        print("No recordings data found!")
+        print("\nNo recordings found matching the specified criteria!")
+        if args.date or args.month or args.date_from or args.date_to:
+            print("Try adjusting your date filters or removing them to see all recordings.")
         sys.exit(1)
 
     # Generate CSV files (returns aggregated data)
