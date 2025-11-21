@@ -1,16 +1,47 @@
 # Super Whisper Analytics
 
-Generic analytics tool for analyzing Super Whisper recordings. Generates comprehensive statistics, topic analysis, and insights from your recording metadata.
+A professional, modular analytics tool for analyzing Super Whisper recordings. Generates comprehensive statistics, topic analysis, and insights from your recording metadata with a beautiful command-line interface.
+
+## Features
+
+### Core Analytics
+- **Time-based analysis** - Daily, hourly, weekly patterns with flexible date filtering
+- **Volume metrics** - Words, characters, speech rate, recording duration
+- **Topic classification** - 8 categories using keyword matching
+- **Mode tracking** - Usage patterns across different recording modes
+
+### Text Analysis
+- **Word frequency** - Top 500 words (excluding stop words)
+- **Phrase extraction** - N-gram analysis (bigrams and trigrams)
+- **Filler word detection** - 30+ patterns including multi-word phrases
+- **Sentence metrics** - Comprehensive sentence-level statistics
+
+### Technical Features
+- **Modern CLI** - Typer-based interface with Rich formatting
+- **Progress tracking** - Real-time progress bars during processing
+- **Beautiful output** - Color-coded messages and summary tables
+- **Modular architecture** - Clean separation of concerns for maintainability
+- **Date filtering** - Filter by specific date, month, or date range
+- **Multiple output formats** - CSV, XLSX, JSON, Markdown, Mermaid charts
+- **Timestamped outputs** - Each run creates a new folder preserving history
+- **Platform agnostic** - Works with any Super Whisper installation
 
 ## Requirements
 
-- Python 3.x
-- `openpyxl` library for XLSX support (optional, install with `pip install openpyxl`)
-- Super Whisper recordings folder structure
+- Python 3.8+
+- `typer` - Modern CLI framework
+- `rich` - Beautiful terminal formatting
+- `openpyxl` - Excel support (optional)
 
 ### Installation
 
 ```bash
+# Activate virtual environment (if not already active)
+source venv/bin/activate  # macOS/Linux
+# or
+.\venv\Scripts\activate  # Windows
+
+# Install dependencies
 pip install -r requirements.txt
 ```
 
@@ -49,27 +80,31 @@ The script uses configuration files for path management, making it portable acro
 
 ## Usage
 
-Run the script from the analysis directory:
+Run the tool from the analysis directory:
 
 ```bash
 # Process all recordings
-python3 analytics.py
+python3 main.py
 
 # Filter by specific date
-python3 analytics.py --date 2025-01-15
+python3 main.py --date 2025-01-15
 
 # Filter by month
-python3 analytics.py --month 2025-01
+python3 main.py --month 2025-01
 
 # Filter by date range
-python3 analytics.py --date-from 2025-01-01 --date-to 2025-01-31
+python3 main.py --date-from 2025-01-01 --date-to 2025-01-31
+
+# Show help
+python3 main.py --help
 ```
 
-The script will:
+The tool will:
 1. Load configuration from `config.local.ini` or `config.ini`
 2. Apply any date filters specified
-3. Process all matching recordings
+3. Process all matching recordings with progress tracking
 4. Generate comprehensive analytics outputs in a timestamped folder
+5. Display a beautiful summary table with key metrics
 
 Each recording should be in its own folder with `meta.json` and optionally `output.wav` files.
 
@@ -79,6 +114,7 @@ Each recording should be in its own folder with `meta.json` and optionally `outp
 - `--month YYYY-MM`: Filter recordings by month
 - `--date-from YYYY-MM-DD`: Filter recordings from this date onwards
 - `--date-to YYYY-MM-DD`: Filter recordings up to this date
+- `--help`: Show help message with all options
 
 Filters can be combined (e.g., `--month 2025-01 --date-from 2025-01-15`).
 
@@ -114,49 +150,97 @@ The script generates all outputs in a timestamped folder: `outputs/YYYY-MM-DD_HH
 
 Each run creates a new timestamped folder, preserving historical outputs.
 
-## Features
+## Architecture
 
-- Time-based analysis (daily, hourly, weekly patterns)
-- Volume metrics (words, characters, speech rate)
-- Topic classification (8 categories)
-- Word frequency analysis
-- Technical metrics (processing efficiency, mode usage)
+The tool follows a clean, modular architecture for maintainability and extensibility:
 
-## Features
+```
+analysis/
+├── main.py              # Entry point
+├── lib/
+│   ├── core/           # Core data structures and configuration
+│   │   ├── constants.py      # Topic keywords, stop words, filler words
+│   │   ├── models.py         # TypedDict data models
+│   │   ├── config.py         # Configuration management
+│   │   └── analytics_summary.py  # Summary dataclass
+│   ├── processing/     # Data processing and analysis
+│   │   ├── text_analysis.py      # Text processing functions
+│   │   ├── validators.py         # Input validation
+│   │   ├── recording_processor.py # Recording data extraction
+│   │   └── aggregators.py        # Data aggregation logic
+│   ├── outputs/        # Output generation
+│   │   ├── csv.py      # CSV file generation
+│   │   ├── xlsx.py     # Excel file generation
+│   │   ├── json.py     # JSON file generation
+│   │   ├── markdown.py # Markdown reports
+│   │   └── mermaid.py  # Mermaid charts
+│   ├── utils/          # Utility functions
+│   │   └── logger.py   # Rich-based logging
+│   └── cli.py          # Typer CLI interface
+├── config.ini          # Default configuration
+├── config.local.ini    # Local overrides (gitignored)
+└── requirements.txt    # Python dependencies
+```
 
-### Core Analytics
-- **Time-based analysis** - Daily, hourly, weekly patterns with configurable date filtering
-- **Volume metrics** - Words, characters, speech rate, recording duration
-- **Topic classification** - 8 categories using keyword matching
-- **Mode tracking** - Usage patterns across different recording modes
+### Design Principles
 
-### Text Analysis
-- **Word frequency** - Top 500 words (excluding stop words)
-- **Phrase extraction** - N-gram analysis (bigrams and trigrams)
-- **Filler word detection** - 30+ patterns including multi-word phrases ("you know", "I mean", etc.)
-- **Sentence metrics** - Sentence count, average words per sentence, average characters per sentence
+- **Single Responsibility** - Each module has one clear purpose
+- **Centralized Aggregation** - Data is aggregated once, used everywhere
+- **Type Safety** - TypedDict models for structured data
+- **Clean Interfaces** - Clear function signatures and return types
+- **No Duplication** - Shared logic extracted to reusable functions
+- **Rich Logging** - Progress bars, colored output, summary tables
 
-### Visualisations
-- **Timeline charts** - Activity and topic trends over time (auto-aggregates to weekly for large datasets)
-- **Bar charts** - Word frequency, mode usage, topic distribution
-- **Mermaid format** - Renders in Markdown viewers and documentation platforms
+## Development
 
-### Technical Features
-- **Date filtering** - Filter by specific date, month, or date range
-- **Configurable paths** - Platform-agnostic configuration system
-- **Multiple output formats** - CSV, XLSX, JSON, Markdown, Mermaid
-- **Timestamped outputs** - Each run creates a new folder preserving history
-- **No external dependencies** - Uses only Python standard library (openpyxl optional for Excel)
-- **AI-ready prompts** - Includes prompt file for AI-assisted deeper analysis
+### Project Structure
+
+The codebase is organized into logical modules:
+
+- **`lib/core/`** - Core data structures, configuration, constants
+- **`lib/processing/`** - Text analysis, validation, recording processing, aggregation
+- **`lib/outputs/`** - Output generators for each format (CSV, XLSX, JSON, etc.)
+- **`lib/utils/`** - Logging and utility functions
+- **`lib/cli.py`** - Typer-based CLI interface
+
+### Key Design Decisions
+
+1. **Centralized Aggregation** - All data aggregation happens once in `aggregators.py`, creating an `AnalyticsSummary` object that is passed to all output generators. This eliminates duplication and ensures consistency.
+
+2. **TypedDict Models** - Structured data models in `models.py` provide type safety and clear interfaces without runtime overhead.
+
+3. **Rich Integration** - The `rich` library provides beautiful progress bars, colored output, and formatted tables throughout the tool.
+
+4. **Configuration-Driven** - Paths and parameters are configurable via INI files, making the tool portable across systems.
+
+### Testing
+
+Run the baseline comparison test to ensure outputs match:
+
+```bash
+# Generate baseline (one-time)
+python3 main.py  # or with specific filters
+cp -r outputs/<latest> tmp/baseline
+
+# Run test
+bash tests/test_outputs.sh
+```
+
+### Adding New Output Formats
+
+1. Create a new module in `lib/outputs/`
+2. Implement a generation function that accepts `recordings_data` and `summary`
+3. Import and call from `lib/cli.py` main function
+4. All aggregated data is available in the `AnalyticsSummary` object
 
 ## Notes
 
-- The script processes all recordings found in the `recordings/` folder
 - Transcripts are extracted from the `result` or `rawResult` fields in `meta.json`
-- Topic classification uses keyword matching
-- XLSX generation is optional - script will continue if openpyxl is not installed
+- Topic classification uses keyword matching (configurable in `lib/core/constants.py`)
+- XLSX generation is optional - tool will continue if openpyxl is not installed
 - All outputs are saved to timestamped folders in `outputs/` directory
-- Generated outputs are excluded from git (see `.gitignore`)
+- Generated outputs and virtual environments are excluded from git (see `.gitignore`)
+- The tool is platform-agnostic and works with any Super Whisper installation
 
 ## Output Structure
 
