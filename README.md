@@ -28,7 +28,7 @@ A professional, modular analytics tool for analyzing Super Whisper recordings. G
 
 ## Requirements
 
-- Python 3.8+
+- Python 3.9+
 - `typer` - Modern CLI framework
 - `rich` - Beautiful terminal formatting
 - `openpyxl` - Excel support (optional)
