@@ -6,6 +6,7 @@ import wave
 import re
 import sys
 import configparser
+import argparse
 from pathlib import Path
 from collections import Counter
 from datetime import datetime
@@ -72,6 +73,44 @@ STOP_WORDS = {
     "what", "which", "who", "whom", "whose", "where", "when", "why", "how", "all", "each",
     "every", "both", "few", "more", "most", "other", "some", "such", "no", "nor", "not",
     "only", "own", "same", "so", "than", "too", "very", "just", "now"
+}
+
+# Filler words and phrases (multi-word phrases use regex patterns)
+FILLER_WORDS = {
+    # Single word fillers
+    'um': r'\bum+\b',
+    'uh': r'\buh+\b',
+    'er': r'\ber+\b',
+    'ah': r'\bah+\b',
+    'like': r'\blike\b',
+    'basically': r'\bbasically\b',
+    'literally': r'\bliterally\b',
+    'actually': r'\bactually\b',
+    'honestly': r'\bhonestly\b',
+    'seriously': r'\bseriously\b',
+    'totally': r'\btotally\b',
+    'right': r'\bright\b(?!\s+now)',  # Exclude "right now" which is meaningful
+    'okay': r'\bokay\b',
+    'ok': r'\bok\b',
+    'well': r'\bwell\b(?=\s+[,.]|\s+$)',  # Only filler when at end or before punctuation
+    'so': r'\bso\b(?=\s+[,.]|\s+$)',
+    'yeah': r'\byeah\b',
+    'yes': r'\byes\b(?=\s+[,.]|\s+$)',
+    
+    # Multi-word fillers
+    'you know': r'\byou\s+know\b',
+    'i mean': r'\bi\s+mean\b',
+    'you see': r'\byou\s+see\b',
+    'i think': r'\bi\s+think\b',
+    'you think': r'\byou\s+think\b',
+    'sort of': r'\bsort\s+of\b',
+    'kind of': r'\bkind\s+of\b',
+    'a bit': r'\ba\s+bit\b',
+    'a little': r'\ba\s+little\b',
+    'at the end of the day': r'\bat\s+the\s+end\s+of\s+the\s+day\b',
+    'to be honest': r'\bto\s+be\s+honest\b',
+    'if you will': r'\bif\s+you\s+will\b',
+    'as it were': r'\bas\s+it\s+were\b',
 }
 
 
@@ -142,13 +181,189 @@ def extract_words(text: str) -> List[str]:
     return [w for w in words if w and w not in STOP_WORDS and len(w) > 2]
 
 
-def process_recordings(recordings_dir: Path) -> List[Dict]:
-    """Process all recordings and extract data."""
-    recordings_data = []
-    recordings_folders = sorted([d for d in recordings_dir.iterdir() if d.is_dir()])
+def count_filler_words(text: str) -> Tuple[int, Dict[str, int]]:
+    """Count filler words and phrases in text.
+    
+    Returns:
+        Tuple of (total_count, filler_breakdown)
+    """
+    if not text:
+        return 0, {}
+    
+    text_lower = text.lower()
+    filler_counts = {}
+    
+    # Count each filler word/phrase
+    for filler_name, pattern in FILLER_WORDS.items():
+        matches = re.findall(pattern, text_lower)
+        if matches:
+            filler_counts[filler_name] = len(matches)
+    
+    total_count = sum(filler_counts.values())
+    return total_count, filler_counts
 
+
+def extract_ngrams(text: str, n: int) -> List[str]:
+    """Extract n-grams from text.
+    
+    Args:
+        text: Input text
+        n: Size of n-gram (2 for bigrams, 3 for trigrams)
+    
+    Returns:
+        List of n-gram strings
+    """
+    if not text:
+        return []
+    
+    # Clean and tokenize
+    words = clean_text(text).split()
+    words = [w for w in words if w and len(w) > 1]  # Filter very short words
+    
+    if len(words) < n:
+        return []
+    
+    # Generate n-grams
+    ngrams = []
+    for i in range(len(words) - n + 1):
+        ngram_words = words[i:i+n]
+        
+        # Skip if all words are stop words
+        if all(w in STOP_WORDS for w in ngram_words):
+            continue
+        
+        # Skip if contains too many stop words (more than half)
+        stop_word_count = sum(1 for w in ngram_words if w in STOP_WORDS)
+        if stop_word_count > n / 2:
+            continue
+        
+        ngrams.append(" ".join(ngram_words))
+    
+    return ngrams
+
+
+def split_sentences(text: str) -> List[str]:
+    """Split text into sentences with improved handling of abbreviations.
+    
+    Returns:
+        List of sentence strings
+    """
+    if not text:
+        return []
+    
+    # Common abbreviations that shouldn't end sentences (protect them first)
+    protected = text
+    abbreviations = ['Mr.', 'Mrs.', 'Ms.', 'Dr.', 'Prof.', 'Sr.', 'Jr.', 'vs.', 'etc.', 'Inc.', 'Ltd.', 'Corp.', 'St.', 'Ave.', 'Rd.', 'Blvd.']
+    
+    # Temporarily replace abbreviations with placeholders
+    placeholders = {}
+    for i, abbr in enumerate(abbreviations):
+        placeholder = f'__ABBR{i}__'
+        placeholders[placeholder] = abbr
+        protected = protected.replace(abbr, placeholder)
+    
+    # Split on sentence endings followed by space and capital letter, or at end of string
+    sentence_pattern = r'[.!?]+\s+(?=[A-Z])|[.!?]+\s*$'
+    sentences = re.split(sentence_pattern, protected)
+    
+    # Restore abbreviations and clean up
+    restored_sentences = []
+    for sent in sentences:
+        if sent and sent.strip():
+            # Restore abbreviations
+            for placeholder, abbr in placeholders.items():
+                sent = sent.replace(placeholder, abbr)
+            restored_sentences.append(sent.strip())
+    
+    return restored_sentences
+
+
+def calculate_sentence_metrics(text: str) -> Dict[str, float]:
+    """Calculate sentence-level metrics for text.
+    
+    Returns:
+        Dict with sentence_count, avg_words_per_sentence, avg_chars_per_sentence
+    """
+    if not text:
+        return {
+            "sentence_count": 0,
+            "avg_words_per_sentence": 0.0,
+            "avg_chars_per_sentence": 0.0
+        }
+    
+    sentences = split_sentences(text)
+    sentence_count = len(sentences)
+    
+    if sentence_count == 0:
+        # Treat entire text as one sentence if no sentence boundaries found
+        return {
+            "sentence_count": 1,
+            "avg_words_per_sentence": float(len(text.split())),
+            "avg_chars_per_sentence": float(len(text))
+        }
+    
+    # Calculate metrics
+    total_words = sum(len(s.split()) for s in sentences)
+    total_chars = sum(len(s) for s in sentences)
+    
+    return {
+        "sentence_count": sentence_count,
+        "avg_words_per_sentence": round(total_words / sentence_count, 2) if sentence_count > 0 else 0.0,
+        "avg_chars_per_sentence": round(total_chars / sentence_count, 2) if sentence_count > 0 else 0.0
+    }
+
+
+def filter_by_date(folder_name: str, date_filter: Optional[str], month_filter: Optional[str],
+                   date_from: Optional[str], date_to: Optional[str]) -> bool:
+    """Filter recording folder by date criteria."""
+    try:
+        # Parse Unix timestamp from folder name
+        timestamp = int(folder_name)
+        recording_date = datetime.fromtimestamp(timestamp)
+        recording_date_str = recording_date.date().isoformat()
+        
+        # Check single date filter
+        if date_filter and recording_date_str != date_filter:
+            return False
+        
+        # Check month filter (YYYY-MM format)
+        if month_filter:
+            recording_month = recording_date.strftime("%Y-%m")
+            if recording_month != month_filter:
+                return False
+        
+        # Check date range
+        if date_from and recording_date_str < date_from:
+            return False
+        if date_to and recording_date_str > date_to:
+            return False
+        
+        return True
+    except (ValueError, OSError):
+        # Invalid timestamp, exclude from results
+        return False
+
+
+def process_recordings(recordings_dir: Path, date_filter: Optional[str] = None,
+                      month_filter: Optional[str] = None, date_from: Optional[str] = None,
+                      date_to: Optional[str] = None) -> List[Dict]:
+    """Process all recordings and extract data, optionally filtering by date."""
+    recordings_data = []
+    all_folders = sorted([d for d in recordings_dir.iterdir() if d.is_dir()])
+    
+    # Apply date filtering
+    recordings_folders = [
+        d for d in all_folders
+        if filter_by_date(d.name, date_filter, month_filter, date_from, date_to)
+    ]
+    
     total = len(recordings_folders)
-    print(f"Processing {total} recordings...")
+    total_before_filter = len(all_folders)
+    
+    if total < total_before_filter:
+        print(f"Filtered to {total} recordings (from {total_before_filter} total)")
+    else:
+        print(f"Processing {total} recordings...")
 
     for idx, folder in enumerate(recordings_folders, 1):
         if idx % 100 == 0:
@@ -194,6 +409,13 @@ def process_recordings(recordings_dir: Path) -> List[Dict]:
         word_count = len(result.split()) if result else 0
         char_count = len(result) if result else 0
         words_per_minute = (word_count / duration_seconds * 60) if duration_seconds > 0 else 0
+        
+        # Filler word analysis
+        filler_count, filler_breakdown = count_filler_words(result)
+        filler_percentage = (filler_count / word_count * 100) if word_count > 0 else 0
+        
+        # Sentence-level metrics
+        sentence_metrics = calculate_sentence_metrics(result)
 
         # Topic classification
         primary_topic, secondary_topics = classify_topic(result)
@@ -219,6 +441,11 @@ def process_recordings(recordings_dir: Path) -> List[Dict]:
             "word_count": word_count,
             "char_count": char_count,
             "words_per_minute": round(words_per_minute, 2),
+            "filler_word_count": filler_count,
+            "filler_word_percentage": round(filler_percentage, 2),
+            "sentence_count": sentence_metrics["sentence_count"],
+            "avg_words_per_sentence": sentence_metrics["avg_words_per_sentence"],
+            "avg_chars_per_sentence": sentence_metrics["avg_chars_per_sentence"],
             "mode_name": mode_name,
             "model_name": model_name,
             "app_version": app_version,
@@ -227,7 +454,8 @@ def process_recordings(recordings_dir: Path) -> List[Dict]:
             "folder_name": recording_id,
             "primary_topic": primary_topic,
             "secondary_topics": secondary_topics_str,
-            "transcript": result  # Keep for word frequency analysis
+            "transcript": result,  # Keep for word/phrase frequency analysis
+            "filler_breakdown": filler_breakdown  # Keep for aggregate analysis
         })
 
     print(f"\nProcessed {len(recordings_data)} recordings successfully.")
@@ -243,9 +471,10 @@ def generate_csv_files(recordings_data: List[Dict], output_dir: Path):
     detail_fields = [
         "recording_id", "datetime", "date", "hour", "day_of_week",
         "duration_seconds", "duration_ms", "has_transcript", "word_count",
-        "char_count", "words_per_minute", "mode_name", "model_name",
-        "app_version", "processing_time_ms", "segment_count", "folder_name",
-        "primary_topic", "secondary_topics"
+        "char_count", "words_per_minute", "filler_word_count", "filler_word_percentage",
+        "sentence_count", "avg_words_per_sentence", "avg_chars_per_sentence",
+        "mode_name", "model_name", "app_version", "processing_time_ms", "segment_count",
+        "folder_name", "primary_topic", "secondary_topics"
     ]
 
     with open(detail_file, 'w', newline='', encoding='utf-8') as f:
@@ -336,6 +565,36 @@ def generate_csv_files(recordings_data: List[Dict], output_dir: Path):
             percentage = round((freq / total_words * 100), 4) if total_words > 0 else 0
             writer.writerow({"word": word, "frequency": freq, "percentage": percentage})
     print(f"  ✓ {word_file.name}")
+    
+    # 4b. Phrase frequency (n-grams)
+    all_bigrams = []
+    all_trigrams = []
+    for rec in recordings_data:
+        if rec["transcript"]:
+            all_bigrams.extend(extract_ngrams(rec["transcript"], 2))
+            all_trigrams.extend(extract_ngrams(rec["transcript"], 3))
+    
+    bigram_freq = Counter(all_bigrams)
+    trigram_freq = Counter(all_trigrams)
+    
+    phrase_file = output_dir / "phrase_frequency.csv"
+    with open(phrase_file, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.DictWriter(f, fieldnames=["phrase", "type", "frequency", "percentage"])
+        writer.writeheader()
+        
+        # Write bigrams
+        total_bigrams = sum(bigram_freq.values())
+        for phrase, freq in bigram_freq.most_common(100):  # Top 100 bigrams
+            percentage = round((freq / total_bigrams * 100), 4) if total_bigrams > 0 else 0
+            writer.writerow({"phrase": phrase, "type": "2-gram", "frequency": freq, "percentage": percentage})
+        
+        # Write trigrams
+        total_trigrams = sum(trigram_freq.values())
+        for phrase, freq in trigram_freq.most_common(50):  # Top 50 trigrams
+            percentage = round((freq / total_trigrams * 100), 4) if total_trigrams > 0 else 0
+            writer.writerow({"phrase": phrase, "type": "3-gram", "frequency": freq, "percentage": percentage})
+    
+    print(f"  ✓ {phrase_file.name}")
 
     # 5. Mode usage
     mode_data = {}
@@ -394,8 +653,71 @@ def generate_csv_files(recordings_data: List[Dict], output_dir: Path):
             ) if total_duration > 0 else 0
             writer.writerow(data)
     print(f"  ✓ {topic_file.name}")
+    
+    # 7. Filler word analysis
+    all_fillers = Counter()
+    for rec in recordings_data:
+        if rec.get("filler_breakdown"):
+            all_fillers.update(rec["filler_breakdown"])
+    
+    total_fillers = sum(all_fillers.values())
+    filler_file = output_dir / "filler_word_analysis.csv"
+    with open(filler_file, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.DictWriter(f, fieldnames=["filler_phrase", "count", "percentage"])
+        writer.writeheader()
+        for filler, count in all_fillers.most_common():
+            percentage = round((count / total_fillers * 100), 2) if total_fillers > 0 else 0
+            writer.writerow({"filler_phrase": filler, "count": count, "percentage": percentage})
+    print(f"  ✓ {filler_file.name}")
+    
+    # 8. Sentence metrics summary
+    recordings_with_sentences = [r for r in recordings_data if r.get("sentence_count", 0) > 0]
+    
+    if recordings_with_sentences:
+        sentence_lengths = []
+        words_per_sentence_all = []
+        chars_per_sentence_all = []
+        
+        for rec in recordings_with_sentences:
+            sentence_count = rec.get("sentence_count", 0)
+            if sentence_count > 0:
+                sentence_lengths.append(sentence_count)
+                words_per_sentence_all.append(rec.get("avg_words_per_sentence", 0))
+                chars_per_sentence_all.append(rec.get("avg_chars_per_sentence", 0))
+        
+        # Calculate aggregate statistics
+        sentence_metrics_summary = {
+            "total_recordings_analyzed": len(recordings_with_sentences),
+            "total_sentences": sum(sentence_lengths),
+            "avg_sentences_per_recording": round(sum(sentence_lengths) / len(sentence_lengths), 2) if sentence_lengths else 0,
+            "min_sentences_per_recording": min(sentence_lengths) if sentence_lengths else 0,
+            "max_sentences_per_recording": max(sentence_lengths) if sentence_lengths else 0,
+            "avg_words_per_sentence": round(sum(words_per_sentence_all) / len(words_per_sentence_all), 2) if words_per_sentence_all else 0,
+            "min_words_per_sentence": round(min(words_per_sentence_all), 2) if words_per_sentence_all else 0,
+            "max_words_per_sentence": round(max(words_per_sentence_all), 2) if words_per_sentence_all else 0,
+            "avg_chars_per_sentence": round(sum(chars_per_sentence_all) / len(chars_per_sentence_all), 2) if chars_per_sentence_all else 0,
+        }
+    else:
+        sentence_metrics_summary = {
+            "total_recordings_analyzed": 0,
+            "total_sentences": 0,
+            "avg_sentences_per_recording": 0,
+            "min_sentences_per_recording": 0,
+            "max_sentences_per_recording": 0,
+            "avg_words_per_sentence": 0,
+            "min_words_per_sentence": 0,
+            "max_words_per_sentence": 0,
+            "avg_chars_per_sentence": 0,
+        }
+    
+    sentence_file = output_dir / "sentence_metrics.csv"
+    with open(sentence_file, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.DictWriter(f, fieldnames=sentence_metrics_summary.keys())
+        writer.writeheader()
+        writer.writerow(sentence_metrics_summary)
+    print(f"  ✓ {sentence_file.name}")
 
-    return daily_summary, hourly_data, word_freq, mode_data, topic_data
+    return daily_summary, hourly_data, word_freq, mode_data, topic_data, all_fillers, bigram_freq, trigram_freq, sentence_metrics_summary
 
 
 def generate_insights_report(recordings_data: List[Dict], output_dir: Path):
@@ -585,7 +907,8 @@ Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 
 
 def generate_xlsx_file(recordings_data: List[Dict], daily_summary: Dict, hourly_data: Dict,
-                       word_freq: Counter, mode_data: Dict, topic_data: Dict, output_dir: Path):
+                       word_freq: Counter, mode_data: Dict, topic_data: Dict, filler_data: Counter,
+                       bigram_freq: Counter, trigram_freq: Counter, sentence_summary: Dict, output_dir: Path):
     """Generate XLSX file with multiple sheets."""
     if not OPENPYXL_AVAILABLE:
         print("\n⚠ Skipping XLSX generation: openpyxl not installed")
@@ -602,9 +925,10 @@ def generate_xlsx_file(recordings_data: List[Dict], daily_summary: Dict, hourly_
     detail_fields = [
         "recording_id", "datetime", "date", "hour", "day_of_week",
         "duration_seconds", "duration_ms", "has_transcript", "word_count",
-        "char_count", "words_per_minute", "mode_name", "model_name",
-        "app_version", "processing_time_ms", "segment_count", "folder_name",
-        "primary_topic", "secondary_topics"
+        "char_count", "words_per_minute", "filler_word_count", "filler_word_percentage",
+        "sentence_count", "avg_words_per_sentence", "avg_chars_per_sentence",
+        "mode_name", "model_name", "app_version", "processing_time_ms", "segment_count",
+        "folder_name", "primary_topic", "secondary_topics"
     ]
     ws1.append(detail_fields)
     # Style header
@@ -694,6 +1018,44 @@ def generate_xlsx_file(recordings_data: List[Dict], daily_summary: Dict, hourly_
             data["topic"], data["recording_count"], data["total_duration_seconds"],
             data["percentage_of_recordings"], data["percentage_of_time"]
         ])
+    
+    # Sheet 7: Filler Word Analysis
+    ws7 = wb.create_sheet("Filler Word Analysis")
+    ws7.append(["filler_phrase", "count", "percentage"])
+    for cell in ws7[1]:
+        cell.font = Font(bold=True)
+        cell.alignment = Alignment(horizontal='center')
+    total_fillers = sum(filler_data.values())
+    for filler, count in filler_data.most_common():
+        percentage = round((count / total_fillers * 100), 2) if total_fillers > 0 else 0
+        ws7.append([filler, count, percentage])
+    
+    # Sheet 8: Phrase Frequency
+    ws8 = wb.create_sheet("Phrase Frequency")
+    ws8.append(["phrase", "type", "frequency", "percentage"])
+    for cell in ws8[1]:
+        cell.font = Font(bold=True)
+        cell.alignment = Alignment(horizontal='center')
+    
+    # Add bigrams
+    total_bigrams = sum(bigram_freq.values())
+    for phrase, freq in bigram_freq.most_common(100):
+        percentage = round((freq / total_bigrams * 100), 4) if total_bigrams > 0 else 0
+        ws8.append([phrase, "2-gram", freq, percentage])
+    
+    # Add trigrams
+    total_trigrams = sum(trigram_freq.values())
+    for phrase, freq in trigram_freq.most_common(50):
+        percentage = round((freq / total_trigrams * 100), 4) if total_trigrams > 0 else 0
+        ws8.append([phrase, "3-gram", freq, percentage])
+    
+    # Sheet 9: Sentence Metrics
+    ws9 = wb.create_sheet("Sentence Metrics")
+    ws9.append(list(sentence_summary.keys()))
+    for cell in ws9[1]:
+        cell.font = Font(bold=True)
+        cell.alignment = Alignment(horizontal='center')
+    ws9.append(list(sentence_summary.values()))
 
     xlsx_file = output_dir / "analytics.xlsx"
     wb.save(xlsx_file)
@@ -701,7 +1063,8 @@ def generate_xlsx_file(recordings_data: List[Dict], daily_summary: Dict, hourly_
 
 
 def generate_json_file(recordings_data: List[Dict], daily_summary: Dict, hourly_data: Dict,
-                       word_freq: Counter, mode_data: Dict, topic_data: Dict, output_dir: Path):
+                       word_freq: Counter, mode_data: Dict, topic_data: Dict, filler_data: Counter,
+                       bigram_freq: Counter, trigram_freq: Counter, sentence_summary: Dict, output_dir: Path):
     """Generate JSON file with structured data."""
     print("\nGenerating JSON file...")
 
@@ -715,11 +1078,12 @@ def generate_json_file(recordings_data: List[Dict], daily_summary: Dict, hourly_
     first_date = dates[0] if dates else "Unknown"
     last_date = dates[-1] if dates else "Unknown"
 
-    # Prepare recordings without transcript field
+    # Prepare recordings without transcript and filler breakdown fields
     recordings_clean = []
     for rec in recordings_data:
         rec_copy = rec.copy()
         rec_copy.pop("transcript", None)  # Remove transcript from JSON
+        rec_copy.pop("filler_breakdown", None)  # Remove detailed breakdown
         recordings_clean.append(rec_copy)
 
     # Prepare daily summary
@@ -770,6 +1134,36 @@ def generate_json_file(recordings_data: List[Dict], daily_summary: Dict, hourly_
             (data["total_duration_seconds"] / total_duration * 100), 2
         ) if total_duration > 0 else 0
         topic_distribution_list.append(data)
+    
+    # Prepare filler word analysis
+    total_fillers_count = sum(filler_data.values())
+    filler_analysis_list = [
+        {"filler_phrase": filler, "count": count, "percentage": round((count / total_fillers_count * 100), 2)}
+        for filler, count in filler_data.most_common()
+    ]
+    
+    # Prepare phrase frequency
+    total_bigrams_count = sum(bigram_freq.values())
+    total_trigrams_count = sum(trigram_freq.values())
+    phrase_frequency_list = []
+    
+    # Add bigrams
+    for phrase, count in bigram_freq.most_common(100):
+        phrase_frequency_list.append({
+            "phrase": phrase,
+            "type": "2-gram",
+            "frequency": count,
+            "percentage": round((count / total_bigrams_count * 100), 4) if total_bigrams_count > 0 else 0
+        })
+    
+    # Add trigrams
+    for phrase, count in trigram_freq.most_common(50):
+        phrase_frequency_list.append({
+            "phrase": phrase,
+            "type": "3-gram",
+            "frequency": count,
+            "percentage": round((count / total_trigrams_count * 100), 4) if total_trigrams_count > 0 else 0
+        })
 
     json_data = {
         "metadata": {
@@ -796,7 +1190,10 @@ def generate_json_file(recordings_data: List[Dict], daily_summary: Dict, hourly_
         "hourly_patterns": hourly_patterns_list,
         "word_frequency": word_frequency_list,
         "mode_usage": mode_usage_list,
-        "topic_distribution": topic_distribution_list
+        "topic_distribution": topic_distribution_list,
+        "filler_word_analysis": filler_analysis_list,
+        "phrase_frequency": phrase_frequency_list,
+        "sentence_metrics": sentence_summary
     }
 
     json_file = output_dir / "analytics.json"
@@ -933,8 +1330,81 @@ Begin your analysis now.
     print(f"  ✓ {prompt_file.name}")
 
 
+def parse_arguments():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(
+        description='Analyze Super Whisper recordings with optional date filtering.',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Process all recordings
+  python3 analytics.py
+  
+  # Filter by specific date
+  python3 analytics.py --date 2025-01-15
+  
+  # Filter by month
+  python3 analytics.py --month 2025-01
+  
+  # Filter by date range
+  python3 analytics.py --date-from 2025-01-01 --date-to 2025-01-31
+  
+  # Combine month and date range
+  python3 analytics.py --month 2025-01 --date-from 2025-01-15
+        """
+    )
+    
+    parser.add_argument(
+        '--date',
+        type=str,
+        help='Filter recordings by specific date (YYYY-MM-DD format)'
+    )
+    parser.add_argument(
+        '--month',
+        type=str,
+        help='Filter recordings by month (YYYY-MM format)'
+    )
+    parser.add_argument(
+        '--date-from',
+        type=str,
+        help='Filter recordings from this date onwards (YYYY-MM-DD format)'
+    )
+    parser.add_argument(
+        '--date-to',
+        type=str,
+        help='Filter recordings up to this date (YYYY-MM-DD format)'
+    )
+    
+    return parser.parse_args()
+
+
+def validate_date_format(date_str: Optional[str], format_type: str) -> None:
+    """Validate date string format."""
+    if not date_str:
+        return
+    
+    try:
+        if format_type == 'date':
+            datetime.strptime(date_str, '%Y-%m-%d')
+        elif format_type == 'month':
+            datetime.strptime(date_str, '%Y-%m')
+    except ValueError:
+        print(f"Error: Invalid {format_type} format: {date_str}")
+        print(f"Expected format: {'YYYY-MM-DD' if format_type == 'date' else 'YYYY-MM'}")
+        sys.exit(1)
+
+
 def main():
     """Main execution function."""
+    # Parse command line arguments
+    args = parse_arguments()
+    
+    # Validate date formats
+    validate_date_format(args.date, 'date')
+    validate_date_format(args.month, 'month')
+    validate_date_format(args.date_from, 'date')
+    validate_date_format(args.date_to, 'date')
+    
     script_dir = Path(__file__).parent
     
     # Load configuration
@@ -968,25 +1438,46 @@ def main():
     print("=" * 60)
     print(f"Recordings directory: {recordings_dir}")
     print(f"Output directory: {output_dir}")
+    
+    # Display active filters
+    if args.date or args.month or args.date_from or args.date_to:
+        print("\nActive filters:")
+        if args.date:
+            print(f"  - Date: {args.date}")
+        if args.month:
+            print(f"  - Month: {args.month}")
+        if args.date_from:
+            print(f"  - From: {args.date_from}")
+        if args.date_to:
+            print(f"  - To: {args.date_to}")
+        print()
 
     # Process recordings
-    recordings_data = process_recordings(recordings_dir)
+    recordings_data = process_recordings(
+        recordings_dir,
+        date_filter=args.date,
+        month_filter=args.month,
+        date_from=args.date_from,
+        date_to=args.date_to
+    )
 
     if not recordings_data:
-        print("No recordings data found!")
+        print("\nNo recordings found matching the specified criteria!")
+        if args.date or args.month or args.date_from or args.date_to:
+            print("Try adjusting your date filters or removing them to see all recordings.")
         sys.exit(1)
 
     # Generate CSV files (returns aggregated data)
-    daily_summary, hourly_data, word_freq, mode_data, topic_data = generate_csv_files(recordings_data, output_dir)
+    daily_summary, hourly_data, word_freq, mode_data, topic_data, filler_data, bigram_freq, trigram_freq, sentence_summary = generate_csv_files(recordings_data, output_dir)
 
     # Generate insights report
     generate_insights_report(recordings_data, output_dir)
 
     # Generate XLSX file
-    generate_xlsx_file(recordings_data, daily_summary, hourly_data, word_freq, mode_data, topic_data, output_dir)
+    generate_xlsx_file(recordings_data, daily_summary, hourly_data, word_freq, mode_data, topic_data, filler_data, bigram_freq, trigram_freq, sentence_summary, output_dir)
 
     # Generate JSON file
-    generate_json_file(recordings_data, daily_summary, hourly_data, word_freq, mode_data, topic_data, output_dir)
+    generate_json_file(recordings_data, daily_summary, hourly_data, word_freq, mode_data, topic_data, filler_data, bigram_freq, trigram_freq, sentence_summary, output_dir)
 
     # Generate AI prompt file
     generate_ai_prompt_file(output_dir)
