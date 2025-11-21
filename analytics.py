@@ -21,6 +21,7 @@ from lib.processing.text_analysis import (
     split_sentences,
     calculate_sentence_metrics
 )
+from lib.processing.validators import validate_date_format
 
 # Try to import openpyxl for XLSX support
 try:
@@ -1448,22 +1449,6 @@ Examples:
     )
 
     return parser.parse_args()
-
-
-def validate_date_format(date_str: Optional[str], format_type: str) -> None:
-    """Validate date string format."""
-    if not date_str:
-        return
-
-    try:
-        if format_type == 'date':
-            datetime.strptime(date_str, '%Y-%m-%d')
-        elif format_type == 'month':
-            datetime.strptime(date_str, '%Y-%m')
-    except ValueError:
-        print(f"Error: Invalid {format_type} format: {date_str}")
-        print(f"Expected format: {'YYYY-MM-DD' if format_type == 'date' else 'YYYY-MM'}")
-        sys.exit(1)
 
 
 def main():
