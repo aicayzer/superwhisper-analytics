@@ -2,10 +2,11 @@
 
 Handles parsing meta.json files, extracting WAV duration, classifying topics,
 applying date filters, and the main recording processing loop.
+Includes graceful error handling for corrupt or missing files.
 """
 
 import json
-import sys
+import logging
 import wave
 from datetime import datetime
 from pathlib import Path
@@ -13,6 +14,9 @@ from typing import Optional
 
 from lib.core.constants import TOPIC_KEYWORDS
 from lib.processing.text_analysis import calculate_sentence_metrics, count_filler_words
+
+# Get logger instance
+logger = logging.getLogger("analytics")
 
 
 def parse_datetime(dt_str: Optional[str], folder_timestamp: str) -> datetime:
@@ -170,6 +174,9 @@ def process_recordings(recordings_dir: Path, date_filter: Optional[str] = None,
     else:
         print(f"Processing {total} recordings...")
 
+    skipped_count = 0
+    error_count = 0
+
     for idx, folder in enumerate(recordings_folders, 1):
         if idx % 100 == 0:
             print(f"Processed {idx}/{total} recordings...", end='\r')
@@ -178,13 +185,20 @@ def process_recordings(recordings_dir: Path, date_filter: Optional[str] = None,
         wav_file = folder / "output.wav"
 
         if not meta_file.exists():
+            logger.warning(f"Missing meta.json in {folder.name}")
+            skipped_count += 1
             continue
 
         try:
             with open(meta_file, encoding='utf-8') as f:
                 meta = json.load(f)
+        except json.JSONDecodeError as e:
+            logger.error(f"Invalid JSON in {folder.name}/meta.json: {e}")
+            error_count += 1
+            continue
         except Exception as e:
-            print(f"\nError reading {meta_file}: {e}", file=sys.stderr)
+            logger.error(f"Error reading {folder.name}/meta.json: {e}")
+            error_count += 1
             continue
 
         # Extract basic info
@@ -264,5 +278,12 @@ def process_recordings(recordings_dir: Path, date_filter: Optional[str] = None,
         })
 
     print(f"\nProcessed {len(recordings_data)} recordings successfully.")
+
+    if skipped_count > 0:
+        logger.warning(f"Skipped {skipped_count} recordings (missing meta.json)")
+
+    if error_count > 0:
+        logger.error(f"Failed to process {error_count} recordings (see log for details)")
+
     return recordings_data
 

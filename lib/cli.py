@@ -20,7 +20,7 @@ from lib.outputs.xlsx import generate_xlsx_file
 from lib.processing.aggregators import create_analytics_summary
 from lib.processing.recording_processor import process_recordings
 from lib.processing.validators import validate_filter_criteria
-from lib.utils.logger import create_progress, print_header, print_success
+from lib.utils.logger import create_progress, print_header, print_success, setup_logger
 
 app = typer.Typer(
     name="analytics",
@@ -76,6 +76,10 @@ def main(
     # Load configuration
     script_dir = Path(__file__).parent.parent
     config = load_config(script_dir)
+
+    # Setup logger with daily rotation
+    logs_dir = script_dir / "logs"
+    setup_logger(enable_file_logging=True, logs_dir=logs_dir)
 
     # Resolve paths
     recordings_dir = resolve_path(config['paths']['recordings_dir'], script_dir)

@@ -1,9 +1,11 @@
 """Logger module - Professional logging with rich integration
 
 Provides structured logging with colour coding, progress tracking, and rich formatting.
+Supports daily log file rotation for persistent error tracking.
 """
 
 import logging
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -21,14 +23,18 @@ _logger: Optional[logging.Logger] = None
 def setup_logger(
     name: str = "analytics",
     level: int = logging.INFO,
-    log_file: Optional[Path] = None
+    log_file: Optional[Path] = None,
+    enable_file_logging: bool = True,
+    logs_dir: Optional[Path] = None
 ) -> logging.Logger:
-    """Setup logger with rich integration
+    """Setup logger with rich integration and daily log rotation
 
     Args:
         name: Logger name
         level: Logging level (DEBUG, INFO, WARNING, ERROR)
-        log_file: Optional file path for file logging
+        log_file: Optional specific file path for file logging (overrides daily rotation)
+        enable_file_logging: Enable file-based logging with daily rotation
+        logs_dir: Directory for log files (defaults to ./logs)
 
     Returns:
         Configured logger instance
@@ -57,12 +63,28 @@ def setup_logger(
     console_handler.setLevel(level)
     logger.addHandler(console_handler)
 
-    # Optional file handler
-    if log_file:
-        file_handler = logging.FileHandler(log_file)
+    # File handler with daily rotation
+    if enable_file_logging or log_file:
+        if log_file:
+            # Use specific log file path
+            log_path = log_file
+        else:
+            # Use daily log file in logs directory
+            if logs_dir is None:
+                # Default to logs directory relative to project root
+                logs_dir = Path(__file__).parent.parent.parent / "logs"
+
+            logs_dir.mkdir(exist_ok=True)
+
+            # Create daily log file
+            today = datetime.now().strftime("%Y-%m-%d")
+            log_path = logs_dir / f"{today}.log"
+
+        file_handler = logging.FileHandler(log_path, encoding='utf-8')
         file_handler.setLevel(logging.DEBUG)
         file_formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
         )
         file_handler.setFormatter(file_formatter)
         logger.addHandler(file_handler)
@@ -81,6 +103,20 @@ def get_logger() -> logging.Logger:
     if _logger is None:
         _logger = setup_logger()
     return _logger
+
+
+def reset_logger() -> None:
+    """Reset the global logger instance
+
+    Useful for testing or reconfiguration.
+    """
+    global _logger
+    if _logger is not None:
+        # Remove all handlers
+        for handler in _logger.handlers[:]:
+            handler.close()
+            _logger.removeHandler(handler)
+        _logger = None
 
 
 def create_progress() -> Progress:
