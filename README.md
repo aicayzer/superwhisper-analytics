@@ -80,40 +80,71 @@ The script uses configuration files for path management, making it portable acro
 
 ## Usage
 
-Run the tool from the analysis directory:
+The tool supports both **interactive mode** and **direct command** usage.
+
+### Interactive Mode
+
+Simply run without any arguments to see the interactive menu:
 
 ```bash
-# Process all recordings
 python3 main.py
-
-# Filter by specific date
-python3 main.py --date 2025-01-15
-
-# Filter by month
-python3 main.py --month 2025-01
-
-# Filter by date range
-python3 main.py --date-from 2025-01-01 --date-to 2025-01-31
-
-# Show help
-python3 main.py --help
 ```
 
-The tool will:
-1. Load configuration from `config.local.ini` or `config.ini`
-2. Apply any date filters specified
-3. Process all matching recordings with progress tracking
-4. Generate comprehensive analytics outputs in a timestamped folder
-5. Display a beautiful summary table with key metrics
+The interactive menu lets you:
+1. **Run full analysis** - With optional date filters
+2. **Search transcripts** - Find specific words or phrases
+3. **Exit**
 
-Each recording should be in its own folder with `meta.json` and optionally `output.wav` files.
+### Direct Commands
+
+#### Analyze Command
+
+Process recordings and generate comprehensive analytics:
+
+```bash
+# Analyze all recordings
+python3 main.py analyze
+
+# Filter by specific date
+python3 main.py analyze --date 2025-01-15
+
+# Filter by month
+python3 main.py analyze --month 2025-01
+
+# Filter by date range
+python3 main.py analyze --date-from 2025-01-01 --date-to 2025-01-31
+```
+
+#### Search Command
+
+Search transcript content across all recordings:
+
+```bash
+# Basic search
+python3 main.py search "database"
+
+# Case-sensitive search
+python3 main.py search "BigQuery" --case-sensitive
+
+# Search with date filter
+python3 main.py search "meeting" --date 2025-01-15
+
+# Search in date range
+python3 main.py search "project" --date-from 2025-01-01 --date-to 2025-01-31
+```
 
 ### Command Line Options
 
+**Date Filters** (available for both analyze and search):
 - `--date YYYY-MM-DD`: Filter recordings by specific date
 - `--month YYYY-MM`: Filter recordings by month
 - `--date-from YYYY-MM-DD`: Filter recordings from this date onwards
 - `--date-to YYYY-MM-DD`: Filter recordings up to this date
+
+**Search Options**:
+- `--case-sensitive`, `-c`: Perform case-sensitive search
+
+**Help**:
 - `--help`: Show help message with all options
 
 Filters can be combined (e.g., `--month 2025-01 --date-from 2025-01-15`).
