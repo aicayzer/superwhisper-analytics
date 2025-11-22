@@ -7,7 +7,6 @@ Includes graceful error handling for corrupt or missing files.
 
 import json
 import logging
-import sys
 import wave
 from datetime import datetime
 from pathlib import Path
@@ -279,12 +278,12 @@ def process_recordings(recordings_dir: Path, date_filter: Optional[str] = None,
         })
 
     print(f"\nProcessed {len(recordings_data)} recordings successfully.")
-    
+
     if skipped_count > 0:
         logger.warning(f"Skipped {skipped_count} recordings (missing meta.json)")
-    
+
     if error_count > 0:
         logger.error(f"Failed to process {error_count} recordings (see log for details)")
-    
+
     return recordings_data
 

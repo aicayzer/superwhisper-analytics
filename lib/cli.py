@@ -76,7 +76,7 @@ def main(
     # Load configuration
     script_dir = Path(__file__).parent.parent
     config = load_config(script_dir)
-    
+
     # Setup logger with daily rotation
     logs_dir = script_dir / "logs"
     setup_logger(enable_file_logging=True, logs_dir=logs_dir)

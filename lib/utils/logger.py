@@ -73,13 +73,13 @@ def setup_logger(
             if logs_dir is None:
                 # Default to logs directory relative to project root
                 logs_dir = Path(__file__).parent.parent.parent / "logs"
-            
+
             logs_dir.mkdir(exist_ok=True)
-            
+
             # Create daily log file
             today = datetime.now().strftime("%Y-%m-%d")
             log_path = logs_dir / f"{today}.log"
-        
+
         file_handler = logging.FileHandler(log_path, encoding='utf-8')
         file_handler.setLevel(logging.DEBUG)
         file_formatter = logging.Formatter(
@@ -107,7 +107,7 @@ def get_logger() -> logging.Logger:
 
 def reset_logger() -> None:
     """Reset the global logger instance
-    
+
     Useful for testing or reconfiguration.
     """
     global _logger
