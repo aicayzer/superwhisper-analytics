@@ -20,6 +20,7 @@ from lib.outputs.xlsx import generate_xlsx_file
 from lib.processing.aggregators import create_analytics_summary
 from lib.processing.recording_processor import process_recordings
 from lib.processing.validators import validate_filter_criteria
+from lib.search.transcript_search import search_transcripts
 from lib.utils.logger import create_progress, print_header, print_success, setup_logger
 
 app = typer.Typer(
@@ -206,6 +207,179 @@ def main(
     # Final success message
     console.print()
     print_success(f"Analytics complete! Output saved to: {output_dir}")
+    console.print()
+
+
+@app.command()
+def search(
+    term: str = typer.Argument(..., help="Search term or phrase to find in transcripts"),
+    case_sensitive: bool = typer.Option(
+        False,
+        "--case-sensitive",
+        "-c",
+        help="Perform case-sensitive search"
+    ),
+    date: Optional[str] = typer.Option(
+        None,
+        "--date",
+        help="Filter recordings by specific date (YYYY-MM-DD format)"
+    ),
+    month: Optional[str] = typer.Option(
+        None,
+        "--month",
+        help="Filter recordings by month (YYYY-MM format)"
+    ),
+    date_from: Optional[str] = typer.Option(
+        None,
+        "--date-from",
+        help="Filter recordings from this date onwards (YYYY-MM-DD format)"
+    ),
+    date_to: Optional[str] = typer.Option(
+        None,
+        "--date-to",
+        help="Filter recordings up to this date (YYYY-MM-DD format)"
+    ),
+) -> None:
+    """Search transcript content across all recordings.
+
+    Examples:
+
+        # Basic search
+        python3 main.py search "database"
+
+        # Case-sensitive search
+        python3 main.py search "BigQuery" --case-sensitive
+
+        # Search with date filter
+        python3 main.py search "meeting" --date 2025-01-15
+
+        # Search in date range
+        python3 main.py search "project" --date-from 2025-01-01 --date-to 2025-01-31
+    """
+
+    print_header("Transcript Search")
+
+    # Load configuration
+    script_dir = Path(__file__).parent.parent
+    config = load_config(script_dir)
+
+    # Setup logger
+    logs_dir = script_dir / "logs"
+    setup_logger(enable_file_logging=True, logs_dir=logs_dir)
+
+    # Resolve paths
+    recordings_dir = resolve_path(config['paths']['recordings_dir'], script_dir)
+
+    # Validate configuration
+    validate_config(config, script_dir)
+
+    # Display search info
+    console.print(f"[blue]📁 Recordings:[/blue] {recordings_dir}")
+    console.print(f"[blue]🔍 Search term:[/blue] \"{term}\"")
+    if case_sensitive:
+        console.print("[yellow]  (case-sensitive)[/yellow]")
+
+    # Display active filters
+    if date or month or date_from or date_to:
+        console.print("\n[yellow]Active filters:[/yellow]")
+        if date:
+            console.print(f"  • Date: {date}")
+        if month:
+            console.print(f"  • Month: {month}")
+        if date_from:
+            console.print(f"  • From: {date_from}")
+        if date_to:
+            console.print(f"  • To: {date_to}")
+
+    console.print()
+
+    # Validate filters
+    filter_criteria = {}
+    if date:
+        filter_criteria['date'] = date
+    if month:
+        filter_criteria['month'] = month
+    if date_from:
+        filter_criteria['date_from'] = date_from
+    if date_to:
+        filter_criteria['date_to'] = date_to
+
+    if filter_criteria:
+        validate_filter_criteria(filter_criteria)
+
+    # Perform search with progress bar
+    with create_progress() as progress:
+        task = progress.add_task("[cyan]Searching transcripts...", total=None)
+
+        results = search_transcripts(
+            recordings_dir,
+            term,
+            case_sensitive=case_sensitive,
+            date_filter=date,
+            month_filter=month,
+            date_from=date_from,
+            date_to=date_to
+        )
+
+        progress.update(task, completed=True)
+
+    # Display results
+    if results["recordings_with_matches"] == 0:
+        console.print("\n[yellow]No matches found.[/yellow]")
+        if date or month or date_from or date_to:
+            console.print("[dim]Try adjusting your date filters or search term.[/dim]")
+        raise typer.Exit(0)
+
+    # Summary statistics
+    console.print()
+    summary_table = Table(title="Search Results", show_header=True, header_style="bold magenta")
+    summary_table.add_column("Metric", style="cyan", no_wrap=True)
+    summary_table.add_column("Value", justify="right", style="green")
+
+    summary_table.add_row("Total Matches", f"{results['total_matches']:,}")
+    summary_table.add_row("Recordings with Matches", f"{results['recordings_with_matches']:,}")
+    summary_table.add_row(
+        "Avg Matches per Recording",
+        f"{results['total_matches'] / results['recordings_with_matches']:.1f}"
+    )
+
+    console.print(summary_table)
+
+    # Detailed matches table (show top 20)
+    console.print()
+    matches_table = Table(
+        title=f"Top Matches (showing {min(20, len(results['matches']))} of {len(results['matches'])})",
+        show_header=True,
+        header_style="bold blue"
+    )
+    matches_table.add_column("Date", style="cyan", no_wrap=True)
+    matches_table.add_column("Mode", style="yellow")
+    matches_table.add_column("Count", justify="right", style="green")
+    matches_table.add_column("Words", justify="right", style="dim")
+    matches_table.add_column("Duration", justify="right", style="dim")
+    matches_table.add_column("Excerpt", style="white", max_width=60)
+
+    for match in results["matches"][:20]:
+        # Format excerpt (show first one only for table)
+        excerpt = match["excerpts"][0] if match["excerpts"] else ""
+        # Truncate if too long
+        if len(excerpt) > 100:
+            excerpt = excerpt[:97] + "..."
+
+        matches_table.add_row(
+            match["date"],
+            match["mode"],
+            str(match["occurrence_count"]),
+            str(match["word_count"]),
+            f"{match['duration_seconds']:.0f}s",
+            excerpt
+        )
+
+    console.print(matches_table)
+
+    # Final success message
+    console.print()
+    print_success(f"Found {results['total_matches']:,} matches in {results['recordings_with_matches']:,} recordings")
     console.print()
 
 
