@@ -1,14 +1,18 @@
 """CLI module - Command-line interface with Typer and Rich
 
 Modern CLI with beautiful help, progress bars, and rich formatting.
+Supports both interactive menu and direct command invocation.
 """
 
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 import typer
 from rich.console import Console
+from rich.panel import Panel
+from rich.prompt import Prompt
 from rich.table import Table
 
 from lib.core.config import load_config, resolve_path, validate_config
@@ -26,14 +30,15 @@ from lib.utils.logger import create_progress, print_header, print_success, setup
 app = typer.Typer(
     name="analytics",
     help="Super Whisper Analytics - Analyze voice recording metadata and generate comprehensive reports",
-    add_completion=False
+    add_completion=False,
+    no_args_is_help=False
 )
 
 console = Console()
 
 
 @app.command()
-def main(
+def analyze(
     date: Optional[str] = typer.Option(
         None,
         "--date",
@@ -55,21 +60,21 @@ def main(
         help="Filter recordings up to this date (YYYY-MM-DD format)"
     ),
 ) -> None:
-    """Process Super Whisper recordings and generate analytics reports.
+    """Analyze recordings and generate comprehensive reports.
 
     Examples:
 
         # Process all recordings
-        python3 main.py
+        python3 main.py analyze
 
         # Filter by specific date
-        python3 main.py --date 2025-01-15
+        python3 main.py analyze --date 2025-01-15
 
         # Filter by month
-        python3 main.py --month 2025-01
+        python3 main.py analyze --month 2025-01
 
         # Filter by date range
-        python3 main.py --date-from 2025-01-01 --date-to 2025-01-31
+        python3 main.py analyze --date-from 2025-01-01 --date-to 2025-01-31
     """
 
     print_header("Super Whisper Analytics")
@@ -381,6 +386,131 @@ def search(
     console.print()
     print_success(f"Found {results['total_matches']:,} matches in {results['recordings_with_matches']:,} recordings")
     console.print()
+
+
+def show_interactive_menu() -> None:
+    """Display interactive menu for choosing actions."""
+    print_header("Super Whisper Analytics")
+
+    # Welcome panel
+    welcome_text = (
+        "[cyan]Welcome to Super Whisper Analytics![/cyan]\n\n"
+        "Choose an option below to get started:"
+    )
+    console.print(Panel(welcome_text, border_style="blue", padding=(1, 2)))
+    console.print()
+
+    # Menu options
+    menu_table = Table(show_header=False, box=None, padding=(0, 2))
+    menu_table.add_column("Option", style="bold cyan", no_wrap=True)
+    menu_table.add_column("Description", style="white")
+
+    menu_table.add_row("1", "Run full analysis")
+    menu_table.add_row("2", "Search transcripts")
+    menu_table.add_row("3", "Exit")
+
+    console.print(menu_table)
+    console.print()
+
+    # Get user choice
+    choice = Prompt.ask(
+        "[bold]Select an option[/bold]",
+        choices=["1", "2", "3"],
+        default="1"
+    )
+
+    console.print()
+
+    if choice == "1":
+        # Run analysis - optionally ask for filters
+        use_filters = Prompt.ask(
+            "Apply date filters?",
+            choices=["y", "n"],
+            default="n"
+        )
+
+        if use_filters == "y":
+            console.print("\n[dim]Leave blank to skip a filter[/dim]")
+            date = Prompt.ask("Filter by date (YYYY-MM-DD)", default="")
+            month = Prompt.ask("Filter by month (YYYY-MM)", default="")
+            date_from = Prompt.ask("Filter from date (YYYY-MM-DD)", default="")
+            date_to = Prompt.ask("Filter to date (YYYY-MM-DD)", default="")
+
+            # Convert empty strings to None
+            date = date if date else None
+            month = month if month else None
+            date_from = date_from if date_from else None
+            date_to = date_to if date_to else None
+        else:
+            date = month = date_from = date_to = None
+
+        console.print()
+        analyze(date=date, month=month, date_from=date_from, date_to=date_to)
+
+    elif choice == "2":
+        # Search transcripts
+        search_term = Prompt.ask("[bold]Enter search term[/bold]")
+
+        case_sensitive = Prompt.ask(
+            "Case-sensitive search?",
+            choices=["y", "n"],
+            default="n"
+        )
+
+        use_filters = Prompt.ask(
+            "Apply date filters?",
+            choices=["y", "n"],
+            default="n"
+        )
+
+        if use_filters == "y":
+            console.print("\n[dim]Leave blank to skip a filter[/dim]")
+            date = Prompt.ask("Filter by date (YYYY-MM-DD)", default="")
+            month = Prompt.ask("Filter by month (YYYY-MM)", default="")
+            date_from = Prompt.ask("Filter from date (YYYY-MM-DD)", default="")
+            date_to = Prompt.ask("Filter to date (YYYY-MM-DD)", default="")
+
+            # Convert empty strings to None
+            date = date if date else None
+            month = month if month else None
+            date_from = date_from if date_from else None
+            date_to = date_to if date_to else None
+        else:
+            date = month = date_from = date_to = None
+
+        console.print()
+        search(
+            term=search_term,
+            case_sensitive=(case_sensitive == "y"),
+            date=date,
+            month=month,
+            date_from=date_from,
+            date_to=date_to
+        )
+
+    elif choice == "3":
+        console.print("[yellow]Goodbye![/yellow]")
+        raise typer.Exit(0)
+
+
+@app.callback(invoke_without_command=True)
+def main_callback(ctx: typer.Context) -> None:
+    """Main entry point - shows interactive menu if no command specified."""
+    # If a subcommand is being invoked, let it handle execution
+    if ctx.invoked_subcommand is not None:
+        return
+
+    # If arguments are provided but no command, show help
+    if len(sys.argv) > 1:
+        console.print("[red]Error: Please specify a command (analyze or search)[/red]")
+        console.print("\nAvailable commands:")
+        console.print("  [cyan]analyze[/cyan]  - Run full analytics on recordings")
+        console.print("  [cyan]search[/cyan]   - Search transcript content")
+        console.print("\nRun with --help for more information")
+        raise typer.Exit(1)
+
+    # No command and no arguments - show interactive menu
+    show_interactive_menu()
 
 
 if __name__ == "__main__":
