@@ -1,6 +1,9 @@
 # Output directories (generated data, not source code)
 /outputs/
 
+# Log files
+/logs/
+
 # Temporary files
 tmp/
 
