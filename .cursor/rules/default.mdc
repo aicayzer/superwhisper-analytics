@@ -1,0 +1,62 @@
+---
+alwaysApply: true
+---
+
+# Superwhisper Analytics - Repository Standards
+
+## Repository Context
+- **Git root**: This repository exists within the `analysis/` folder
+- **Important**: Do NOT create .git folders above the analysis directory
+- **Target**: Repository will be made public on GitHub (currently private)
+- **Environment**: All code must be environment-agnostic (no personal/local paths in code)
+
+## Code Quality Standards
+- **Linting**: Use `ruff` for all Python code - must pass `ruff check .` before committing
+- **Testing**: All tests must pass via `pytest tests/` before committing
+- **Python**: Target Python 3.9+ (see ruff.toml for specifics)
+- **Type hints**: Use modern Python type annotations (e.g., `dict[str, int]` not `Dict[str, int]`)
+
+## Git Workflow
+- **Commits**: Make atomic commits - each commit should be a single logical change
+- **Commit messages**: Use conventional commit format (e.g., "Add feature X", "Fix bug in Y")
+- **Push policy**: Push commits to GitHub after each commit or logical group of commits
+- **Branch strategy**: For significant features, create feature branches and merge via PR
+- **PR structure**: Each PR should contain multiple atomic commits, not one giant commit
+
+## Project Structure
+```
+analysis/
+├── lib/              # Core library code
+│   ├── cli.py        # Typer CLI with Rich formatting
+│   ├── core/         # Data structures, config, constants
+│   ├── processing/   # Text analysis, recording processing, aggregation
+│   ├── outputs/      # Output generators (CSV, JSON, XLSX, Mermaid, Markdown)
+│   ├── search/       # Transcript search functionality
+│   └── utils/        # Logging and utilities
+├── tests/            # Unit and integration tests
+├── main.py           # Entry point
+├── requirements.txt  # Dependencies
+├── ruff.toml         # Linting configuration
+└── README.md         # User documentation
+```
+
+## CLI Framework
+- **Framework**: Typer for command structure + Rich for beautiful terminal output
+- **Interactive mode**: Supported via Rich Prompts when no arguments provided
+- **Direct mode**: All functionality accessible via command-line arguments
+
+## File Handling
+- **Outputs**: Generated in timestamped folders (`outputs/YYYY-MM-DD_HH-MM-SS/`)
+- **Logs**: Daily log files in `logs/YYYY-MM-DD.log` with structured format
+- **Config**: Uses `config.local.ini` (gitignored) or `config.ini` (template)
+
+## Testing Requirements
+- Write tests for new functionality
+- Maintain test coverage for critical paths
+- Run full test suite (`pytest tests/`) before completing work
+- Integration tests should use `typer.testing.CliRunner`
+
+## Documentation
+- Update README.md for user-facing changes
+- Add docstrings to all functions and classes
+- Keep examples up-to-date with actual usage

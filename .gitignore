@@ -24,6 +24,9 @@ __pycache__/
 .coverage
 htmlcov/
 
+# Linting
+.ruff_cache/
+
 # Local configuration
 config.local.ini
 
