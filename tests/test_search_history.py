@@ -18,13 +18,13 @@ from lib.search.search_history import (
 def clean_history(monkeypatch, tmp_path):
     """Use temporary history file for tests."""
     history_file = tmp_path / "test_history.json"
-    
+
     # Patch the module-level function
     import lib.search.search_history as history_module
     monkeypatch.setattr(history_module, "get_history_file", lambda: history_file)
-    
+
     yield history_file
-    
+
     # Cleanup
     if history_file.exists():
         history_file.unlink()
@@ -151,7 +151,7 @@ class TestClearHistory:
     def test_clear_history_deletes_file(self, clean_history):
         """Test that clear_history deletes the history file."""
         history_file = clean_history
-        
+
         add_search("test", "exact", 1)
 
         # Verify file was created
@@ -167,7 +167,7 @@ class TestClearHistory:
     def test_clear_history_when_no_file(self, clean_history):
         """Test clear_history is safe when no file exists."""
         history_file = clean_history
-        
+
         # Ensure no file exists first
         if history_file.exists():
             history_file.unlink()
