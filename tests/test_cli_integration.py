@@ -55,7 +55,7 @@ class TestMainHelp:
         """Test main help shows all commands."""
         result = runner.invoke(app, ["--help"])
         assert result.exit_code == 0
-        assert "Super Whisper Analytics" in result.stdout
+        assert "Superwhisper Analytics" in result.stdout
         assert "analyze" in result.stdout
         assert "search" in result.stdout
 

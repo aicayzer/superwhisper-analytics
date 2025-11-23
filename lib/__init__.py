@@ -1,6 +1,6 @@
-"""Super Whisper Analytics Library
+"""Superwhisper Analytics Library
 
-A modular analytics package for processing Super Whisper voice recordings.
+A modular analytics package for processing Superwhisper voice recordings.
 Generates comprehensive statistics, topic analysis, and insights from recording metadata.
 """
 

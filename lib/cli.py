@@ -29,7 +29,7 @@ from lib.utils.logger import create_progress, print_header, print_success, setup
 
 app = typer.Typer(
     name="analytics",
-    help="Super Whisper Analytics - Analyze voice recording metadata and generate comprehensive reports",
+    help="Superwhisper Analytics - Analyze voice recording metadata and generate comprehensive reports",
     add_completion=False,
     no_args_is_help=False
 )
@@ -77,7 +77,7 @@ def analyze(
         python3 main.py analyze --date-from 2025-01-01 --date-to 2025-01-31
     """
 
-    print_header("Super Whisper Analytics")
+    print_header("Superwhisper Analytics")
 
     # Load configuration
     script_dir = Path(__file__).parent.parent
@@ -390,11 +390,11 @@ def search(
 
 def show_interactive_menu() -> None:
     """Display interactive menu for choosing actions."""
-    print_header("Super Whisper Analytics")
+    print_header("Superwhisper Analytics")
 
     # Welcome panel
     welcome_text = (
-        "[cyan]Welcome to Super Whisper Analytics![/cyan]\n\n"
+        "[cyan]Welcome to Superwhisper Analytics![/cyan]\n\n"
         "Choose an option below to get started:"
     )
     console.print(Panel(welcome_text, border_style="blue", padding=(1, 2)))

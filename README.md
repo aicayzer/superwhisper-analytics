@@ -1,6 +1,6 @@
-# Super Whisper Analytics
+# Superwhisper Analytics
 
-A professional, modular analytics tool for analyzing Super Whisper recordings. Generates comprehensive statistics, topic analysis, and insights from your recording metadata with a beautiful command-line interface.
+A professional, modular analytics tool for analyzing Superwhisper recordings. Generates comprehensive statistics, topic analysis, and insights from your recording metadata with a beautiful command-line interface.
 
 ## Features
 
@@ -24,7 +24,7 @@ A professional, modular analytics tool for analyzing Super Whisper recordings. G
 - **Date filtering** - Filter by specific date, month, or date range
 - **Multiple output formats** - CSV, XLSX, JSON, Markdown, Mermaid charts
 - **Timestamped outputs** - Each run creates a new folder preserving history
-- **Platform agnostic** - Works with any Super Whisper installation
+- **Platform agnostic** - Works with any Superwhisper installation
 
 ## Requirements
 
@@ -271,7 +271,7 @@ bash tests/test_outputs.sh
 - XLSX generation is optional - tool will continue if openpyxl is not installed
 - All outputs are saved to timestamped folders in `outputs/` directory
 - Generated outputs and virtual environments are excluded from git (see `.gitignore`)
-- The tool is platform-agnostic and works with any Super Whisper installation
+- The tool is platform-agnostic and works with any Superwhisper installation
 
 ## Output Structure
 

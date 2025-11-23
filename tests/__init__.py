@@ -1,2 +1,2 @@
-"""Tests for Super Whisper Analytics"""
+"""Tests for Superwhisper Analytics"""
 

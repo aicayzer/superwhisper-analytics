@@ -68,7 +68,7 @@ def generate_insights_report(recordings_data: list[dict], output_dir: Path):
         [r for r in recordings_data if r["has_transcript"]], key=lambda x: x["word_count"], reverse=True
     )[:5]
 
-    report = f"""# Super Whisper Recordings Analytics Report
+    report = f"""# Superwhisper Recordings Analytics Report
 
 Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 
@@ -214,7 +214,7 @@ def generate_ai_prompt_file(output_dir: Path):
 
     prompt = """# AI Insights Generation Prompt
 
-You are analyzing Super Whisper recording analytics data. The following files are available in this directory:
+You are analyzing Superwhisper recording analytics data. The following files are available in this directory:
 
 ## Available Data Files
 

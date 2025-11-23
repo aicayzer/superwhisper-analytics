@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Super Whisper Analytics - Main Entry Point
+"""Superwhisper Analytics - Main Entry Point
 
-Modern, modular analytics tool for Super Whisper voice recordings.
+Modern, modular analytics tool for Superwhisper voice recordings.
 Generates comprehensive statistics, topic analysis, and insights from recording metadata.
 """
 

@@ -1,4 +1,4 @@
-# Ruff configuration for Super Whisper Analytics
+# Ruff configuration for Superwhisper Analytics
 # Maintains financial services quality standards
 
 line-length = 120
