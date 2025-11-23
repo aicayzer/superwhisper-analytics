@@ -1,7 +1,8 @@
 """Unit tests for aggregation module."""
 
-import pytest
 from collections import Counter
+
+import pytest
 
 from lib.processing.aggregators import (
     aggregate_daily_summary,

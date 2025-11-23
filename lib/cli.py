@@ -20,6 +20,7 @@ from lib.outputs.csv import generate_csv_files
 from lib.outputs.json import generate_json_file
 from lib.outputs.markdown import generate_ai_prompt_file, generate_insights_report
 from lib.outputs.mermaid import generate_mermaid_charts
+from lib.outputs.output_manager import parse_output_selection
 from lib.outputs.xlsx import generate_xlsx_file
 from lib.processing.aggregators import create_analytics_summary
 from lib.processing.recording_processor import process_recordings
@@ -59,22 +60,44 @@ def analyze(
         "--date-to",
         help="Filter recordings up to this date (YYYY-MM-DD format)"
     ),
+    outputs: Optional[str] = typer.Option(
+        None,
+        "--outputs",
+        help="Comma-separated list of outputs: csv,json,xlsx,mermaid,insights,all (default: csv,json,insights)"
+    ),
+    skip_charts: bool = typer.Option(
+        False,
+        "--skip-charts",
+        help="Skip generating Mermaid charts (faster)"
+    ),
 ) -> None:
-    """Analyze recordings and generate comprehensive reports.
+    """Analyse recordings and generate comprehensive reports.
 
     Examples:
 
-        # Process all recordings
-        python3 main.py analyze
+        # Process all recordings (default outputs: CSV, JSON, insights)
+        python3 main.py analyse
+
+        # Generate only CSV output
+        python3 main.py analyse --outputs csv
+
+        # Generate all outputs
+        python3 main.py analyse --outputs all
+
+        # Custom output selection
+        python3 main.py analyse --outputs csv,json,xlsx
+
+        # Skip charts for faster processing
+        python3 main.py analyse --skip-charts
 
         # Filter by specific date
-        python3 main.py analyze --date 2025-01-15
+        python3 main.py analyse --date 2025-01-15
 
         # Filter by month
-        python3 main.py analyze --month 2025-01
+        python3 main.py analyse --month 2025-01
 
-        # Filter by date range
-        python3 main.py analyze --date-from 2025-01-01 --date-to 2025-01-31
+        # Filter by date range with custom outputs
+        python3 main.py analyse --date-from 2025-01-01 --date-to 2025-01-31 --outputs csv,insights
     """
 
     print_header("Superwhisper Analytics")
@@ -154,11 +177,22 @@ def analyze(
 
     print_success(f"Processed {len(recordings_data):,} recordings")
 
+    # Parse output selection
+    try:
+        output_selection = parse_output_selection(outputs, skip_charts)
+    except ValueError as e:
+        console.print(f"\n[red]✗ {e}[/red]")
+        raise typer.Exit(1) from e
+
+    # Show what will be generated
+    enabled_outputs = output_selection.get_enabled_outputs()
+    console.print(f"\n[cyan]Outputs to generate:[/cyan] {', '.join(enabled_outputs)}")
+
     # Create analytics summary
-    console.print("\n[cyan]Computing analytics...[/cyan]")
+    console.print("[cyan]Computing analytics...[/cyan]")
     summary = create_analytics_summary(recordings_data)
 
-    # Generate outputs
+    # Generate outputs based on selection
     try:
         # Extract data from summary for output generators
         daily_summary = summary.daily_summary
@@ -171,22 +205,44 @@ def analyze(
         trigram_freq = summary.trigram_freq
         sentence_summary = summary.sentence_summary
 
-        # Generate all output files
-        generate_csv_files(recordings_data, summary, output_dir)
-        generate_insights_report(recordings_data, output_dir)
-        generate_xlsx_file(
-            recordings_data, daily_summary, hourly_data, word_freq, mode_data,
-            topic_data, filler_data, bigram_freq, trigram_freq, sentence_summary, output_dir
-        )
-        generate_json_file(
-            recordings_data, daily_summary, hourly_data, word_freq, mode_data,
-            topic_data, filler_data, bigram_freq, trigram_freq, sentence_summary, output_dir
-        )
-        generate_mermaid_charts(
-            recordings_data, daily_summary, word_freq, mode_data, topic_data,
-            output_dir, config, hourly_data, filler_data
-        )
-        generate_ai_prompt_file(output_dir)
+        generated_outputs = []
+
+        # Generate selected output files
+        if output_selection.csv:
+            console.print("[cyan]Generating CSV files...[/cyan]")
+            generate_csv_files(recordings_data, summary, output_dir)
+            generated_outputs.append("CSV")
+
+        if output_selection.json:
+            console.print("[cyan]Generating JSON file...[/cyan]")
+            generate_json_file(
+                recordings_data, daily_summary, hourly_data, word_freq, mode_data,
+                topic_data, filler_data, bigram_freq, trigram_freq, sentence_summary, output_dir
+            )
+            generated_outputs.append("JSON")
+
+        if output_selection.xlsx:
+            console.print("[cyan]Generating XLSX file...[/cyan]")
+            generate_xlsx_file(
+                recordings_data, daily_summary, hourly_data, word_freq, mode_data,
+                topic_data, filler_data, bigram_freq, trigram_freq, sentence_summary, output_dir
+            )
+            generated_outputs.append("XLSX")
+
+        if output_selection.mermaid:
+            console.print("[cyan]Generating Mermaid charts...[/cyan]")
+            generate_mermaid_charts(
+                recordings_data, daily_summary, word_freq, mode_data, topic_data,
+                output_dir, config, hourly_data, filler_data
+            )
+            generated_outputs.append("Mermaid")
+
+        if output_selection.insights:
+            console.print("[cyan]Generating insights report...[/cyan]")
+            generate_insights_report(recordings_data, output_dir)
+            generate_ai_prompt_file(output_dir)
+            generated_outputs.append("Insights")
+
     except Exception as e:
         console.print(f"\n[red]✗ Error generating outputs: {e}[/red]")
         raise typer.Exit(1) from e
@@ -211,8 +267,13 @@ def analyze(
 
     # Final success message
     console.print()
-    print_success(f"Analytics complete! Output saved to: {output_dir}")
+    print_success(f"Analysis complete! Generated: {', '.join(generated_outputs)}")
+    console.print(f"[dim]Output directory: {output_dir}[/dim]")
     console.print()
+
+
+# Add UK English alias for analyze command
+analyse = analyze
 
 
 @app.command()
@@ -405,9 +466,11 @@ def show_interactive_menu() -> None:
     menu_table.add_column("Option", style="bold cyan", no_wrap=True)
     menu_table.add_column("Description", style="white")
 
-    menu_table.add_row("1", "Run full analysis")
-    menu_table.add_row("2", "Search transcripts")
-    menu_table.add_row("3", "Exit")
+    menu_table.add_row("1", "Quick analyse (CSV + insights, fastest)")
+    menu_table.add_row("2", "Full analyse (all outputs)")
+    menu_table.add_row("3", "Custom analyse (choose outputs)")
+    menu_table.add_row("4", "Search transcripts")
+    menu_table.add_row("5", "Exit")
 
     console.print(menu_table)
     console.print()
@@ -415,14 +478,60 @@ def show_interactive_menu() -> None:
     # Get user choice
     choice = Prompt.ask(
         "[bold]Select an option[/bold]",
-        choices=["1", "2", "3"],
+        choices=["1", "2", "3", "4", "5"],
         default="1"
     )
 
     console.print()
 
-    if choice == "1":
-        # Run analysis - optionally ask for filters
+    if choice in ["1", "2", "3"]:
+        # Determine output selection based on choice
+        if choice == "1":
+            # Quick analysis
+            outputs_str = "csv,insights"
+            skip_charts = True
+            console.print("[cyan]Mode:[/cyan] Quick analyse (CSV + insights)")
+        elif choice == "2":
+            # Full analysis
+            outputs_str = "all"
+            skip_charts = False
+            console.print("[cyan]Mode:[/cyan] Full analyse (all outputs)")
+        else:
+            # Custom analysis
+            console.print("[cyan]Mode:[/cyan] Custom analyse")
+            console.print("\n[dim]Select which outputs to generate:[/dim]")
+
+            # Ask for each output type
+            want_csv = Prompt.ask("Generate CSV files?", choices=["y", "n"], default="y")
+            want_json = Prompt.ask("Generate JSON file?", choices=["y", "n"], default="y")
+            want_xlsx = Prompt.ask("Generate XLSX file?", choices=["y", "n"], default="n")
+            want_mermaid = Prompt.ask("Generate Mermaid charts?", choices=["y", "n"], default="n")
+            want_insights = Prompt.ask("Generate insights report?", choices=["y", "n"], default="y")
+
+            want_csv = want_csv == "y"
+            want_json = want_json == "y"
+            want_xlsx = want_xlsx == "y"
+            want_mermaid = want_mermaid == "y"
+            want_insights = want_insights == "y"
+
+            # Build outputs string
+            selected_outputs = []
+            if want_csv:
+                selected_outputs.append("csv")
+            if want_json:
+                selected_outputs.append("json")
+            if want_xlsx:
+                selected_outputs.append("xlsx")
+            if want_mermaid:
+                selected_outputs.append("mermaid")
+            if want_insights:
+                selected_outputs.append("insights")
+            
+            outputs_str = ",".join(selected_outputs) if selected_outputs else "csv"
+            skip_charts = not want_mermaid
+
+        # Ask for date filters
+        console.print()
         use_filters = Prompt.ask(
             "Apply date filters?",
             choices=["y", "n"],
@@ -445,7 +554,14 @@ def show_interactive_menu() -> None:
             date = month = date_from = date_to = None
 
         console.print()
-        analyze(date=date, month=month, date_from=date_from, date_to=date_to)
+        analyze(
+            date=date,
+            month=month,
+            date_from=date_from,
+            date_to=date_to,
+            outputs=outputs_str,
+            skip_charts=skip_charts
+        )
 
     elif choice == "2":
         # Search transcripts
@@ -488,7 +604,7 @@ def show_interactive_menu() -> None:
             date_to=date_to
         )
 
-    elif choice == "3":
+    elif choice == "5":
         console.print("[yellow]Goodbye![/yellow]")
         raise typer.Exit(0)
 
