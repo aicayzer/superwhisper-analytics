@@ -25,6 +25,7 @@ from lib.processing.aggregators import create_analytics_summary
 from lib.processing.recording_processor import process_recordings
 from lib.processing.validators import validate_filter_criteria
 from lib.search.search_export import export_search_results
+from lib.search.search_history import add_search, clear_history, get_recent_searches
 from lib.search.transcript_search import search_transcripts
 from lib.utils.logger import create_progress, print_header, print_success, setup_logger
 
@@ -440,6 +441,9 @@ def search(
 
     console.print(matches_table)
 
+    # Add to search history
+    add_search(term, search_mode, results["total_matches"])
+
     # Export results if requested
     if export:
         try:
@@ -455,6 +459,74 @@ def search(
     # Final success message
     console.print()
     print_success(f"Found {results['total_matches']:,} matches in {results['recordings_with_matches']:,} recordings")
+    console.print()
+
+
+@app.command()
+def history(
+    clear: bool = typer.Option(
+        False,
+        "--clear",
+        help="Clear all search history"
+    ),
+) -> None:
+    """Show recent search history.
+
+    Examples:
+
+        # View recent searches
+        python3 main.py history
+
+        # Clear search history
+        python3 main.py history --clear
+    """
+    print_header("Search History")
+
+    if clear:
+        clear_history()
+        print_success("Search history cleared")
+        return
+
+    recent = get_recent_searches(limit=20)
+
+    if not recent:
+        console.print("\n[yellow]No search history found.[/yellow]")
+        console.print("[dim]Your searches will be saved here automatically.[/dim]\n")
+        return
+
+    # Display history table
+    console.print()
+    history_table = Table(
+        title=f"Recent Searches (showing {len(recent)})",
+        show_header=True,
+        header_style="bold magenta"
+    )
+    history_table.add_column("Date", style="cyan", no_wrap=True)
+    history_table.add_column("Time", style="cyan", no_wrap=True)
+    history_table.add_column("Term", style="white")
+    history_table.add_column("Mode", style="yellow")
+    history_table.add_column("Results", justify="right", style="green")
+
+    for entry in recent:
+        # Parse timestamp
+        try:
+            from datetime import datetime
+            dt = datetime.fromisoformat(entry["timestamp"])
+            date_str = dt.strftime("%Y-%m-%d")
+            time_str = dt.strftime("%H:%M")
+        except (ValueError, KeyError):
+            date_str = "Unknown"
+            time_str = ""
+
+        history_table.add_row(
+            date_str,
+            time_str,
+            entry.get("term", ""),
+            entry.get("mode", "exact"),
+            f"{entry.get('result_count', 0):,}"
+        )
+
+    console.print(history_table)
     console.print()
 
 
