@@ -421,6 +421,16 @@ def search(
         if len(excerpt) > 100:
             excerpt = excerpt[:97] + "..."
 
+        # Highlight search term in excerpt (case-insensitive for display)
+        if excerpt and results.get("search_mode") == "exact":
+            # Use Rich markup to highlight the search term
+            import re
+            search_term = results.get("search_term", "")
+            if search_term:
+                # Create case-insensitive pattern
+                pattern = re.compile(re.escape(search_term), re.IGNORECASE)
+                excerpt = pattern.sub(lambda m: f"[bold yellow]{m.group()}[/bold yellow]", excerpt)
+
         row_data = [
             match["date"],
             match["mode"],
