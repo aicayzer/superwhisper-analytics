@@ -1,6 +1,6 @@
 """Transcript Search module - Search recordings by transcript content
 
-Provides exact match search functionality for finding words and phrases
+Provides exact and fuzzy match search functionality for finding words and phrases
 across all recordings with detailed context and statistics.
 """
 
@@ -8,6 +8,8 @@ import json
 import logging
 import re
 from pathlib import Path
+
+from rapidfuzz import fuzz
 
 from lib.processing.recording_processor import filter_by_date, parse_datetime
 
@@ -18,6 +20,8 @@ def search_transcripts(
     recordings_dir: Path,
     search_term: str,
     case_sensitive: bool = False,
+    search_mode: str = "exact",
+    similarity_threshold: int = 80,
     date_filter: str | None = None,
     month_filter: str | None = None,
     date_from: str | None = None,
@@ -28,7 +32,9 @@ def search_transcripts(
     Args:
         recordings_dir: Path to recordings directory
         search_term: Term or phrase to search for
-        case_sensitive: Whether search should be case-sensitive
+        case_sensitive: Whether search should be case-sensitive (exact mode only)
+        search_mode: 'exact' for exact matching, 'fuzzy' for fuzzy matching
+        similarity_threshold: Minimum similarity score for fuzzy matches (0-100)
         date_filter: Optional single date filter (YYYY-MM-DD)
         month_filter: Optional month filter (YYYY-MM)
         date_from: Optional start of date range (YYYY-MM-DD)
@@ -36,9 +42,11 @@ def search_transcripts(
 
     Returns:
         Dictionary with search results containing:
+        - search_mode: The mode used ('exact' or 'fuzzy')
         - total_matches: Total number of occurrences
         - recordings_with_matches: Number of recordings containing the term
         - matches: List of match dictionaries with recording details
+            (includes similarity_score if fuzzy mode)
     """
     all_folders = sorted([d for d in recordings_dir.iterdir() if d.is_dir()])
 
@@ -76,12 +84,28 @@ def search_transcripts(
         if not transcript:
             continue
 
-        # Perform search
-        search_pattern = search_term if case_sensitive else search_term.lower()
-        search_text = transcript if case_sensitive else transcript.lower()
+        # Perform search based on mode
+        if search_mode == "fuzzy":
+            # Fuzzy search: check overall transcript similarity
+            similarity_score = fuzz.partial_ratio(search_term.lower(), transcript.lower())
 
-        # Count occurrences
-        occurrence_count = search_text.count(search_pattern)
+            if similarity_score < similarity_threshold:
+                continue
+
+            # For fuzzy, we count it as 1 match per recording
+            occurrence_count = 1
+        else:
+            # Exact search
+            search_pattern = search_term if case_sensitive else search_term.lower()
+            search_text = transcript if case_sensitive else transcript.lower()
+
+            # Count occurrences
+            occurrence_count = search_text.count(search_pattern)
+
+            if occurrence_count == 0:
+                continue
+
+            similarity_score = 100  # Exact match
 
         if occurrence_count > 0:
             # Extract datetime info
@@ -90,47 +114,83 @@ def search_transcripts(
 
             # Find all match positions and extract context
             excerpts = []
-            pattern_re = re.escape(search_pattern)
-            if not case_sensitive:
-                pattern_re = f"(?i){pattern_re}"
 
-            for match in re.finditer(pattern_re, transcript):
-                start_pos = max(0, match.start() - 50)
-                end_pos = min(len(transcript), match.end() + 50)
+            if search_mode == "fuzzy":
+                # For fuzzy, show the best matching section
+                words = transcript.split()
+                best_score = 0
+                best_excerpt = ""
 
-                # Extract context with ellipsis
-                excerpt = transcript[start_pos:end_pos]
-                if start_pos > 0:
-                    excerpt = "..." + excerpt
-                if end_pos < len(transcript):
-                    excerpt = excerpt + "..."
+                # Check each window of words for best match
+                window_size = min(len(search_term.split()) + 5, len(words))
+                for i in range(len(words) - window_size + 1):
+                    window_text = " ".join(words[i:i + window_size])
+                    score = fuzz.ratio(search_term.lower(), window_text.lower())
+                    if score > best_score:
+                        best_score = score
+                        best_excerpt = window_text
 
-                excerpts.append(excerpt)
+                if best_excerpt:
+                    excerpts = [f"...{best_excerpt}..."]
+                else:
+                    # Fallback to first part of transcript
+                    excerpts = [transcript[:150] + "..."]
+            else:
+                # Exact search: find all matches
+                pattern_re = re.escape(search_pattern)
+                if not case_sensitive:
+                    pattern_re = f"(?i){pattern_re}"
 
-            # Only include first 3 excerpts to keep output manageable
-            if len(excerpts) > 3:
-                excerpts = excerpts[:3] + [f"... and {len(excerpts) - 3} more matches"]
+                for match in re.finditer(pattern_re, transcript):
+                    start_pos = max(0, match.start() - 50)
+                    end_pos = min(len(transcript), match.end() + 50)
 
-            matches.append(
-                {
-                    "recording_id": folder.name,
-                    "date": dt.date().isoformat(),
-                    "datetime": dt.isoformat(),
-                    "mode": meta.get("modeName", "Unknown"),
-                    "duration_seconds": meta.get("duration", 0) / 1000.0,
-                    "word_count": len(transcript.split()),
-                    "occurrence_count": occurrence_count,
-                    "excerpts": excerpts,
-                }
-            )
+                    # Extract context with ellipsis
+                    excerpt = transcript[start_pos:end_pos]
+                    if start_pos > 0:
+                        excerpt = "..." + excerpt
+                    if end_pos < len(transcript):
+                        excerpt = excerpt + "..."
+
+                    excerpts.append(excerpt)
+
+                # Only include first 3 excerpts to keep output manageable
+                if len(excerpts) > 3:
+                    excerpts = excerpts[:3] + [f"... and {len(excerpts) - 3} more matches"]
+
+            match_data = {
+                "recording_id": folder.name,
+                "date": dt.date().isoformat(),
+                "datetime": dt.isoformat(),
+                "mode": meta.get("modeName", "Unknown"),
+                "duration_seconds": meta.get("duration", 0) / 1000.0,
+                "word_count": len(transcript.split()),
+                "occurrence_count": occurrence_count,
+                "excerpts": excerpts,
+            }
+
+            if search_mode == "fuzzy":
+                match_data["similarity_score"] = similarity_score
+
+            matches.append(match_data)
 
             total_occurrences += occurrence_count
 
+    # Sort matches: by similarity score (if fuzzy) then by occurrence count
+    if search_mode == "fuzzy":
+        sorted_matches = sorted(
+            matches, key=lambda x: (x.get("similarity_score", 0), x["occurrence_count"]), reverse=True
+        )
+    else:
+        sorted_matches = sorted(matches, key=lambda x: x["occurrence_count"], reverse=True)
+
     return {
         "search_term": search_term,
+        "search_mode": search_mode,
         "case_sensitive": case_sensitive,
+        "similarity_threshold": similarity_threshold if search_mode == "fuzzy" else None,
         "total_matches": total_occurrences,
         "recordings_with_matches": len(matches),
-        "matches": sorted(matches, key=lambda x: x["occurrence_count"], reverse=True),
+        "matches": sorted_matches,
     }
 

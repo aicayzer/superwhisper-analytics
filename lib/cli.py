@@ -25,6 +25,8 @@ from lib.outputs.xlsx import generate_xlsx_file
 from lib.processing.aggregators import create_analytics_summary
 from lib.processing.recording_processor import process_recordings
 from lib.processing.validators import validate_filter_criteria
+from lib.search.search_export import export_search_results
+from lib.search.search_history import add_search, clear_history, get_recent_searches
 from lib.search.transcript_search import search_transcripts
 from lib.utils.logger import create_progress, print_header, print_success, setup_logger
 
@@ -123,9 +125,10 @@ def analyze(
     output_dir = outputs_base / timestamp
     output_dir.mkdir(exist_ok=True)
 
-    # Display configuration
-    console.print(f"[blue]📁 Recordings:[/blue] {recordings_dir}")
-    console.print(f"[blue]📊 Output:[/blue] {output_dir}")
+    # Display configuration in a panel
+    config_info = f"[cyan]Recordings:[/cyan] {recordings_dir}\n"
+    config_info += f"[cyan]Output:[/cyan] {output_dir}"
+    console.print(Panel(config_info, title="📊 Configuration", border_style="blue", padding=(1, 2)))
 
     # Display active filters
     if date or month or date_from or date_to:
@@ -283,7 +286,21 @@ def search(
         False,
         "--case-sensitive",
         "-c",
-        help="Perform case-sensitive search"
+        help="Perform case-sensitive search (exact mode only)"
+    ),
+    fuzzy: bool = typer.Option(
+        False,
+        "--fuzzy",
+        "-f",
+        help="Enable fuzzy search (tolerates typos)"
+    ),
+    similarity: int = typer.Option(
+        80,
+        "--similarity",
+        "-s",
+        help="Minimum similarity score for fuzzy matches (0-100)",
+        min=0,
+        max=100
     ),
     date: Optional[str] = typer.Option(
         None,
@@ -305,22 +322,45 @@ def search(
         "--date-to",
         help="Filter recordings up to this date (YYYY-MM-DD format)"
     ),
+    export: Optional[str] = typer.Option(
+        None,
+        "--export",
+        "-e",
+        help="Export results to file (CSV or JSON)"
+    ),
+    export_format: Optional[str] = typer.Option(
+        None,
+        "--export-format",
+        help="Export format: csv or json (auto-detected from filename if not specified)"
+    ),
 ) -> None:
     """Search transcript content across all recordings.
 
     Examples:
 
-        # Basic search
+        # Basic exact search
         python3 main.py search "database"
 
-        # Case-sensitive search
+        # Fuzzy search (catches typos)
+        python3 main.py search "bigqery" --fuzzy
+
+        # Fuzzy search with custom similarity threshold
+        python3 main.py search "analitics" --fuzzy --similarity 75
+
+        # Case-sensitive exact search
         python3 main.py search "BigQuery" --case-sensitive
 
         # Search with date filter
         python3 main.py search "meeting" --date 2025-01-15
 
-        # Search in date range
-        python3 main.py search "project" --date-from 2025-01-01 --date-to 2025-01-31
+        # Export search results to CSV
+        python3 main.py search "database" --export results.csv
+
+        # Export to JSON
+        python3 main.py search "database" --export results.json
+
+        # Fuzzy search with export
+        python3 main.py search "project" --fuzzy --export project_matches.csv
     """
 
     print_header("Transcript Search")
@@ -339,11 +379,17 @@ def search(
     # Validate configuration
     validate_config(config, script_dir)
 
-    # Display search info
-    console.print(f"[blue]📁 Recordings:[/blue] {recordings_dir}")
-    console.print(f"[blue]🔍 Search term:[/blue] \"{term}\"")
-    if case_sensitive:
-        console.print("[yellow]  (case-sensitive)[/yellow]")
+    # Display search info in a panel
+    search_mode = "fuzzy" if fuzzy else "exact"
+    search_info = f"[cyan]Search term:[/cyan] \"{term}\"\n"
+    search_info += f"[cyan]Mode:[/cyan] {search_mode}"
+    if fuzzy:
+        search_info += f" (similarity ≥ {similarity}%)"
+    elif case_sensitive:
+        search_info += " (case-sensitive)"
+    search_info += f"\n[cyan]Recordings:[/cyan] {recordings_dir}"
+
+    console.print(Panel(search_info, title="🔍 Search Configuration", border_style="blue", padding=(1, 2)))
 
     # Display active filters
     if date or month or date_from or date_to:
@@ -381,6 +427,8 @@ def search(
             recordings_dir,
             term,
             case_sensitive=case_sensitive,
+            search_mode=search_mode,
+            similarity_threshold=similarity,
             date_filter=date,
             month_filter=month,
             date_from=date_from,
@@ -420,6 +468,11 @@ def search(
     )
     matches_table.add_column("Date", style="cyan", no_wrap=True)
     matches_table.add_column("Mode", style="yellow")
+
+    # Add similarity column for fuzzy search
+    if results.get("search_mode") == "fuzzy":
+        matches_table.add_column("Similarity", justify="right", style="green")
+
     matches_table.add_column("Count", justify="right", style="green")
     matches_table.add_column("Words", justify="right", style="dim")
     matches_table.add_column("Duration", justify="right", style="dim")
@@ -432,20 +485,122 @@ def search(
         if len(excerpt) > 100:
             excerpt = excerpt[:97] + "..."
 
-        matches_table.add_row(
+        # Highlight search term in excerpt (case-insensitive for display)
+        if excerpt and results.get("search_mode") == "exact":
+            # Use Rich markup to highlight the search term
+            import re
+            search_term = results.get("search_term", "")
+            if search_term:
+                # Create case-insensitive pattern
+                pattern = re.compile(re.escape(search_term), re.IGNORECASE)
+                excerpt = pattern.sub(lambda m: f"[bold yellow]{m.group()}[/bold yellow]", excerpt)
+
+        row_data = [
             match["date"],
             match["mode"],
+        ]
+
+        # Add similarity score if fuzzy mode
+        if results.get("search_mode") == "fuzzy":
+            row_data.append(f"{match.get('similarity_score', 0)}%")
+
+        row_data.extend([
             str(match["occurrence_count"]),
             str(match["word_count"]),
             f"{match['duration_seconds']:.0f}s",
             excerpt
-        )
+        ])
+
+        matches_table.add_row(*row_data)
 
     console.print(matches_table)
+
+    # Add to search history
+    add_search(term, search_mode, results["total_matches"])
+
+    # Export results if requested
+    if export:
+        try:
+            export_path = Path(export)
+            export_search_results(results, export_path, export_format)
+            console.print()
+            print_success(f"Results exported to: {export_path}")
+        except ValueError as e:
+            console.print(f"\n[red]✗ Export error: {e}[/red]")
+        except Exception as e:
+            console.print(f"\n[red]✗ Error exporting results: {e}[/red]")
 
     # Final success message
     console.print()
     print_success(f"Found {results['total_matches']:,} matches in {results['recordings_with_matches']:,} recordings")
+    console.print()
+
+
+@app.command()
+def history(
+    clear: bool = typer.Option(
+        False,
+        "--clear",
+        help="Clear all search history"
+    ),
+) -> None:
+    """Show recent search history.
+
+    Examples:
+
+        # View recent searches
+        python3 main.py history
+
+        # Clear search history
+        python3 main.py history --clear
+    """
+    print_header("Search History")
+
+    if clear:
+        clear_history()
+        print_success("Search history cleared")
+        return
+
+    recent = get_recent_searches(limit=20)
+
+    if not recent:
+        console.print("\n[yellow]No search history found.[/yellow]")
+        console.print("[dim]Your searches will be saved here automatically.[/dim]\n")
+        return
+
+    # Display history table
+    console.print()
+    history_table = Table(
+        title=f"Recent Searches (showing {len(recent)})",
+        show_header=True,
+        header_style="bold magenta"
+    )
+    history_table.add_column("Date", style="cyan", no_wrap=True)
+    history_table.add_column("Time", style="cyan", no_wrap=True)
+    history_table.add_column("Term", style="white")
+    history_table.add_column("Mode", style="yellow")
+    history_table.add_column("Results", justify="right", style="green")
+
+    for entry in recent:
+        # Parse timestamp
+        try:
+            from datetime import datetime
+            dt = datetime.fromisoformat(entry["timestamp"])
+            date_str = dt.strftime("%Y-%m-%d")
+            time_str = dt.strftime("%H:%M")
+        except (ValueError, KeyError):
+            date_str = "Unknown"
+            time_str = ""
+
+        history_table.add_row(
+            date_str,
+            time_str,
+            entry.get("term", ""),
+            entry.get("mode", "exact"),
+            f"{entry.get('result_count', 0):,}"
+        )
+
+    console.print(history_table)
     console.print()
 
 
