@@ -24,6 +24,7 @@ from lib.outputs.xlsx import generate_xlsx_file
 from lib.processing.aggregators import create_analytics_summary
 from lib.processing.recording_processor import process_recordings
 from lib.processing.validators import validate_filter_criteria
+from lib.search.search_export import export_search_results
 from lib.search.transcript_search import search_transcripts
 from lib.utils.logger import create_progress, print_header, print_success, setup_logger
 
@@ -258,6 +259,17 @@ def search(
         "--date-to",
         help="Filter recordings up to this date (YYYY-MM-DD format)"
     ),
+    export: Optional[str] = typer.Option(
+        None,
+        "--export",
+        "-e",
+        help="Export results to file (CSV or JSON)"
+    ),
+    export_format: Optional[str] = typer.Option(
+        None,
+        "--export-format",
+        help="Export format: csv or json (auto-detected from filename if not specified)"
+    ),
 ) -> None:
     """Search transcript content across all recordings.
 
@@ -278,8 +290,14 @@ def search(
         # Search with date filter
         python3 main.py search "meeting" --date 2025-01-15
 
-        # Fuzzy search in date range
-        python3 main.py search "project" --fuzzy --date-from 2025-01-01 --date-to 2025-01-31
+        # Export search results to CSV
+        python3 main.py search "database" --export results.csv
+
+        # Export to JSON
+        python3 main.py search "database" --export results.json
+
+        # Fuzzy search with export
+        python3 main.py search "project" --fuzzy --export project_matches.csv
     """
 
     print_header("Transcript Search")
@@ -421,6 +439,18 @@ def search(
         matches_table.add_row(*row_data)
 
     console.print(matches_table)
+
+    # Export results if requested
+    if export:
+        try:
+            export_path = Path(export)
+            export_search_results(results, export_path, export_format)
+            console.print()
+            print_success(f"Results exported to: {export_path}")
+        except ValueError as e:
+            console.print(f"\n[red]✗ Export error: {e}[/red]")
+        except Exception as e:
+            console.print(f"\n[red]✗ Error exporting results: {e}[/red]")
 
     # Final success message
     console.print()
