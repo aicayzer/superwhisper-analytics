@@ -102,9 +102,10 @@ def analyze(
     output_dir = outputs_base / timestamp
     output_dir.mkdir(exist_ok=True)
 
-    # Display configuration
-    console.print(f"[blue]📁 Recordings:[/blue] {recordings_dir}")
-    console.print(f"[blue]📊 Output:[/blue] {output_dir}")
+    # Display configuration in a panel
+    config_info = f"[cyan]Recordings:[/cyan] {recordings_dir}\n"
+    config_info += f"[cyan]Output:[/cyan] {output_dir}"
+    console.print(Panel(config_info, title="📊 Configuration", border_style="blue", padding=(1, 2)))
 
     # Display active filters
     if date or month or date_from or date_to:
@@ -317,15 +318,17 @@ def search(
     # Validate configuration
     validate_config(config, script_dir)
 
-    # Display search info
-    console.print(f"[blue]📁 Recordings:[/blue] {recordings_dir}")
-    console.print(f"[blue]🔍 Search term:[/blue] \"{term}\"")
+    # Display search info in a panel
     search_mode = "fuzzy" if fuzzy else "exact"
-    console.print(f"[blue]📊 Mode:[/blue] {search_mode}")
+    search_info = f"[cyan]Search term:[/cyan] \"{term}\"\n"
+    search_info += f"[cyan]Mode:[/cyan] {search_mode}"
     if fuzzy:
-        console.print(f"[yellow]  (similarity threshold: {similarity}%)[/yellow]")
+        search_info += f" (similarity ≥ {similarity}%)"
     elif case_sensitive:
-        console.print("[yellow]  (case-sensitive)[/yellow]")
+        search_info += " (case-sensitive)"
+    search_info += f"\n[cyan]Recordings:[/cyan] {recordings_dir}"
+
+    console.print(Panel(search_info, title="🔍 Search Configuration", border_style="blue", padding=(1, 2)))
 
     # Display active filters
     if date or month or date_from or date_to:
