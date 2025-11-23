@@ -222,7 +222,21 @@ def search(
         False,
         "--case-sensitive",
         "-c",
-        help="Perform case-sensitive search"
+        help="Perform case-sensitive search (exact mode only)"
+    ),
+    fuzzy: bool = typer.Option(
+        False,
+        "--fuzzy",
+        "-f",
+        help="Enable fuzzy search (tolerates typos)"
+    ),
+    similarity: int = typer.Option(
+        80,
+        "--similarity",
+        "-s",
+        help="Minimum similarity score for fuzzy matches (0-100)",
+        min=0,
+        max=100
     ),
     date: Optional[str] = typer.Option(
         None,
@@ -249,17 +263,23 @@ def search(
 
     Examples:
 
-        # Basic search
+        # Basic exact search
         python3 main.py search "database"
 
-        # Case-sensitive search
+        # Fuzzy search (catches typos)
+        python3 main.py search "bigqery" --fuzzy
+
+        # Fuzzy search with custom similarity threshold
+        python3 main.py search "analitics" --fuzzy --similarity 75
+
+        # Case-sensitive exact search
         python3 main.py search "BigQuery" --case-sensitive
 
         # Search with date filter
         python3 main.py search "meeting" --date 2025-01-15
 
-        # Search in date range
-        python3 main.py search "project" --date-from 2025-01-01 --date-to 2025-01-31
+        # Fuzzy search in date range
+        python3 main.py search "project" --fuzzy --date-from 2025-01-01 --date-to 2025-01-31
     """
 
     print_header("Transcript Search")
@@ -281,7 +301,11 @@ def search(
     # Display search info
     console.print(f"[blue]📁 Recordings:[/blue] {recordings_dir}")
     console.print(f"[blue]🔍 Search term:[/blue] \"{term}\"")
-    if case_sensitive:
+    search_mode = "fuzzy" if fuzzy else "exact"
+    console.print(f"[blue]📊 Mode:[/blue] {search_mode}")
+    if fuzzy:
+        console.print(f"[yellow]  (similarity threshold: {similarity}%)[/yellow]")
+    elif case_sensitive:
         console.print("[yellow]  (case-sensitive)[/yellow]")
 
     # Display active filters
@@ -320,6 +344,8 @@ def search(
             recordings_dir,
             term,
             case_sensitive=case_sensitive,
+            search_mode=search_mode,
+            similarity_threshold=similarity,
             date_filter=date,
             month_filter=month,
             date_from=date_from,
@@ -359,6 +385,11 @@ def search(
     )
     matches_table.add_column("Date", style="cyan", no_wrap=True)
     matches_table.add_column("Mode", style="yellow")
+
+    # Add similarity column for fuzzy search
+    if results.get("search_mode") == "fuzzy":
+        matches_table.add_column("Similarity", justify="right", style="green")
+
     matches_table.add_column("Count", justify="right", style="green")
     matches_table.add_column("Words", justify="right", style="dim")
     matches_table.add_column("Duration", justify="right", style="dim")
@@ -371,14 +402,23 @@ def search(
         if len(excerpt) > 100:
             excerpt = excerpt[:97] + "..."
 
-        matches_table.add_row(
+        row_data = [
             match["date"],
             match["mode"],
+        ]
+
+        # Add similarity score if fuzzy mode
+        if results.get("search_mode") == "fuzzy":
+            row_data.append(f"{match.get('similarity_score', 0)}%")
+
+        row_data.extend([
             str(match["occurrence_count"]),
             str(match["word_count"]),
             f"{match['duration_seconds']:.0f}s",
             excerpt
-        )
+        ])
+
+        matches_table.add_row(*row_data)
 
     console.print(matches_table)
 
