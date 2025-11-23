@@ -20,6 +20,7 @@ from lib.outputs.csv import generate_csv_files
 from lib.outputs.json import generate_json_file
 from lib.outputs.markdown import generate_ai_prompt_file, generate_insights_report
 from lib.outputs.mermaid import generate_mermaid_charts
+from lib.outputs.output_manager import parse_output_selection
 from lib.outputs.xlsx import generate_xlsx_file
 from lib.processing.aggregators import create_analytics_summary
 from lib.processing.recording_processor import process_recordings
@@ -59,22 +60,44 @@ def analyze(
         "--date-to",
         help="Filter recordings up to this date (YYYY-MM-DD format)"
     ),
+    outputs: Optional[str] = typer.Option(
+        None,
+        "--outputs",
+        help="Comma-separated list of outputs: csv,json,xlsx,mermaid,insights,all (default: csv,json,insights)"
+    ),
+    skip_charts: bool = typer.Option(
+        False,
+        "--skip-charts",
+        help="Skip generating Mermaid charts (faster)"
+    ),
 ) -> None:
-    """Analyze recordings and generate comprehensive reports.
+    """Analyse recordings and generate comprehensive reports.
 
     Examples:
 
-        # Process all recordings
-        python3 main.py analyze
+        # Process all recordings (default outputs: CSV, JSON, insights)
+        python3 main.py analyse
+
+        # Generate only CSV output
+        python3 main.py analyse --outputs csv
+
+        # Generate all outputs
+        python3 main.py analyse --outputs all
+
+        # Custom output selection
+        python3 main.py analyse --outputs csv,json,xlsx
+
+        # Skip charts for faster processing
+        python3 main.py analyse --skip-charts
 
         # Filter by specific date
-        python3 main.py analyze --date 2025-01-15
+        python3 main.py analyse --date 2025-01-15
 
         # Filter by month
-        python3 main.py analyze --month 2025-01
+        python3 main.py analyse --month 2025-01
 
-        # Filter by date range
-        python3 main.py analyze --date-from 2025-01-01 --date-to 2025-01-31
+        # Filter by date range with custom outputs
+        python3 main.py analyse --date-from 2025-01-01 --date-to 2025-01-31 --outputs csv,insights
     """
 
     print_header("Superwhisper Analytics")
@@ -154,11 +177,22 @@ def analyze(
 
     print_success(f"Processed {len(recordings_data):,} recordings")
 
+    # Parse output selection
+    try:
+        output_selection = parse_output_selection(outputs, skip_charts)
+    except ValueError as e:
+        console.print(f"\n[red]✗ {e}[/red]")
+        raise typer.Exit(1) from e
+
+    # Show what will be generated
+    enabled_outputs = output_selection.get_enabled_outputs()
+    console.print(f"\n[cyan]Outputs to generate:[/cyan] {', '.join(enabled_outputs)}")
+
     # Create analytics summary
-    console.print("\n[cyan]Computing analytics...[/cyan]")
+    console.print("[cyan]Computing analytics...[/cyan]")
     summary = create_analytics_summary(recordings_data)
 
-    # Generate outputs
+    # Generate outputs based on selection
     try:
         # Extract data from summary for output generators
         daily_summary = summary.daily_summary
@@ -171,22 +205,44 @@ def analyze(
         trigram_freq = summary.trigram_freq
         sentence_summary = summary.sentence_summary
 
-        # Generate all output files
-        generate_csv_files(recordings_data, summary, output_dir)
-        generate_insights_report(recordings_data, output_dir)
-        generate_xlsx_file(
-            recordings_data, daily_summary, hourly_data, word_freq, mode_data,
-            topic_data, filler_data, bigram_freq, trigram_freq, sentence_summary, output_dir
-        )
-        generate_json_file(
-            recordings_data, daily_summary, hourly_data, word_freq, mode_data,
-            topic_data, filler_data, bigram_freq, trigram_freq, sentence_summary, output_dir
-        )
-        generate_mermaid_charts(
-            recordings_data, daily_summary, word_freq, mode_data, topic_data,
-            output_dir, config, hourly_data, filler_data
-        )
-        generate_ai_prompt_file(output_dir)
+        generated_outputs = []
+
+        # Generate selected output files
+        if output_selection.csv:
+            console.print("[cyan]Generating CSV files...[/cyan]")
+            generate_csv_files(recordings_data, summary, output_dir)
+            generated_outputs.append("CSV")
+
+        if output_selection.json:
+            console.print("[cyan]Generating JSON file...[/cyan]")
+            generate_json_file(
+                recordings_data, daily_summary, hourly_data, word_freq, mode_data,
+                topic_data, filler_data, bigram_freq, trigram_freq, sentence_summary, output_dir
+            )
+            generated_outputs.append("JSON")
+
+        if output_selection.xlsx:
+            console.print("[cyan]Generating XLSX file...[/cyan]")
+            generate_xlsx_file(
+                recordings_data, daily_summary, hourly_data, word_freq, mode_data,
+                topic_data, filler_data, bigram_freq, trigram_freq, sentence_summary, output_dir
+            )
+            generated_outputs.append("XLSX")
+
+        if output_selection.mermaid:
+            console.print("[cyan]Generating Mermaid charts...[/cyan]")
+            generate_mermaid_charts(
+                recordings_data, daily_summary, word_freq, mode_data, topic_data,
+                output_dir, config, hourly_data, filler_data
+            )
+            generated_outputs.append("Mermaid")
+
+        if output_selection.insights:
+            console.print("[cyan]Generating insights report...[/cyan]")
+            generate_insights_report(recordings_data, output_dir)
+            generate_ai_prompt_file(output_dir)
+            generated_outputs.append("Insights")
+
     except Exception as e:
         console.print(f"\n[red]✗ Error generating outputs: {e}[/red]")
         raise typer.Exit(1) from e
@@ -211,8 +267,13 @@ def analyze(
 
     # Final success message
     console.print()
-    print_success(f"Analytics complete! Output saved to: {output_dir}")
+    print_success(f"Analysis complete! Generated: {', '.join(generated_outputs)}")
+    console.print(f"[dim]Output directory: {output_dir}[/dim]")
     console.print()
+
+
+# Add UK English alias for analyze command
+analyse = analyze
 
 
 @app.command()
