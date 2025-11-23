@@ -164,17 +164,17 @@ def analyze(
 
     # Process recordings with progress bar
     with create_progress() as progress:
-        task = progress.add_task("[cyan]Processing recordings...", total=None)
+        task = progress.add_task("[cyan]Scanning recordings...", total=None)
 
         recordings_data = process_recordings(
             recordings_dir,
             date_filter=date,
             month_filter=month,
             date_from=date_from,
-            date_to=date_to
+            date_to=date_to,
+            progress=progress,
+            task_id=task
         )
-
-        progress.update(task, completed=True)
 
     if not recordings_data:
         console.print("\n[red]✗[/red] No recordings found matching the specified criteria!")
@@ -646,10 +646,10 @@ def summary(
             date_filter=date,
             month_filter=month,
             date_from=date_from,
-            date_to=date_to
+            date_to=date_to,
+            progress=progress,
+            task_id=task
         )
-
-        progress.update(task, completed=True)
 
     if not recordings_data:
         console.print("\n[red]✗[/red] No recordings found matching the specified criteria!")
@@ -806,56 +806,50 @@ def show_interactive_menu() -> None:
     print_header("Superwhisper Analytics")
 
     # Welcome panel
-    welcome_text = (
-        "[cyan]Welcome to Superwhisper Analytics![/cyan]\n\n"
-        "Choose an option below to get started:"
-    )
-    console.print(Panel(welcome_text, border_style="blue", padding=(1, 2)))
+    console.print(Panel(
+        "[cyan]Superwhisper Analytics[/cyan]",
+        border_style="blue",
+        padding=(0, 2)
+    ))
     console.print()
 
-    # Menu options
-    menu_table = Table(show_header=False, box=None, padding=(0, 2))
-    menu_table.add_column("Key", style="bold cyan", no_wrap=True, width=8)
-    menu_table.add_column("Description", style="white")
-
-    menu_table.add_row("q / 1", "Quick analyse (CSV + insights, fastest)")
-    menu_table.add_row("f / 2", "Full analyse (all outputs)")
-    menu_table.add_row("c / 3", "Custom analyse (choose outputs)")
-    menu_table.add_row("s / 4", "Search transcripts")
-    menu_table.add_row("v / 5", "View summary (no file generation)")
-    menu_table.add_row("x / 6", "Exit")
-
-    console.print(menu_table)
+    # Menu options grouped logically
+    console.print("[bold]Analyse[/bold]")
+    console.print("  [cyan]a[/cyan]  Quick analyse (CSV + insights)")
+    console.print("  [cyan]f[/cyan]  Full analyse (all outputs)")
+    console.print("  [cyan]c[/cyan]  Custom analyse")
+    console.print()
+    console.print("[bold]View & Search[/bold]")
+    console.print("  [cyan]v[/cyan]  View summary (no files)")
+    console.print("  [cyan]s[/cyan]  Search transcripts")
+    console.print()
+    console.print("[dim]x[/dim]  Exit")
     console.print()
 
     # Get user choice
     choice = Prompt.ask(
-        "[bold]Select an option[/bold]",
-        choices=["q", "1", "f", "2", "c", "3", "s", "4", "v", "5", "x", "6"],
-        default="q"
+        "[bold]Choose[/bold]",
+        choices=["a", "f", "c", "v", "s", "x"],
+        default="a"
     )
-
-    # Normalize shortcuts to numbers
-    shortcut_map = {"q": "1", "f": "2", "c": "3", "s": "4", "v": "5", "x": "6"}
-    choice = shortcut_map.get(choice, choice)
 
     console.print()
 
-    if choice in ["1", "2", "3"]:
+    if choice in ["a", "f", "c"]:
         # Determine output selection based on choice
-        if choice == "1":
+        if choice == "a":
             # Quick analysis
             outputs_str = "csv,insights"
             skip_charts = True
-            console.print("[cyan]Mode:[/cyan] Quick analyse (CSV + insights)")
-        elif choice == "2":
+            console.print("[cyan]Quick analyse[/cyan]")
+        elif choice == "f":
             # Full analysis
             outputs_str = "all"
             skip_charts = False
-            console.print("[cyan]Mode:[/cyan] Full analyse (all outputs)")
+            console.print("[cyan]Full analyse[/cyan]")
         else:
             # Custom analysis
-            console.print("[cyan]Mode:[/cyan] Custom analyse")
+            console.print("[cyan]Custom analyse[/cyan]")
             console.print("\n[dim]Select which outputs to generate:[/dim]")
 
             # Ask for each output type
@@ -920,7 +914,7 @@ def show_interactive_menu() -> None:
             skip_charts=skip_charts
         )
 
-    elif choice == "4":
+    elif choice == "s":
         # Search transcripts
         search_term = Prompt.ask("[bold]Enter search term[/bold]")
 
@@ -971,7 +965,7 @@ def show_interactive_menu() -> None:
             export_format=None
         )
 
-    elif choice == "5":
+    elif choice == "v":
         # Summary view
         use_filters = Prompt.ask(
             "Apply date filters?",
@@ -1002,8 +996,8 @@ def show_interactive_menu() -> None:
             date_to=date_to
         )
 
-    elif choice == "6":
-        console.print("[yellow]Goodbye![/yellow]")
+    elif choice == "x":
+        console.print("[dim]Goodbye![/dim]")
         raise typer.Exit(0)
 
 

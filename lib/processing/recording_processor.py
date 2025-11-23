@@ -138,7 +138,7 @@ def filter_by_date(folder_name: str, date_filter: Optional[str], month_filter: O
 
 def process_recordings(recordings_dir: Path, date_filter: Optional[str] = None,
                       month_filter: Optional[str] = None, date_from: Optional[str] = None,
-                      date_to: Optional[str] = None) -> list[dict]:
+                      date_to: Optional[str] = None, progress=None, task_id=None) -> list[dict]:
     """Process all recordings and extract data, optionally filtering by date
 
     Main processing loop that:
@@ -153,6 +153,8 @@ def process_recordings(recordings_dir: Path, date_filter: Optional[str] = None,
         month_filter: Optional month filter (YYYY-MM)
         date_from: Optional start of date range (YYYY-MM-DD)
         date_to: Optional end of date range (YYYY-MM-DD)
+        progress: Optional Rich progress bar instance
+        task_id: Optional task ID for progress updates
 
     Returns:
         List of recording dictionaries with all metadata and metrics
@@ -169,16 +171,22 @@ def process_recordings(recordings_dir: Path, date_filter: Optional[str] = None,
     total = len(recordings_folders)
     total_before_filter = len(all_folders)
 
-    if total < total_before_filter:
-        print(f"Filtered to {total} recordings (from {total_before_filter} total)")
+    # Update progress bar with total
+    if progress and task_id is not None:
+        progress.update(task_id, total=total, description=f"[cyan]Processing {total} recordings...")
     else:
-        print(f"Processing {total} recordings...")
+        if total < total_before_filter:
+            print(f"Filtered to {total} recordings (from {total_before_filter} total)")
+        else:
+            print(f"Processing {total} recordings...")
 
     skipped_count = 0
     error_count = 0
 
     for idx, folder in enumerate(recordings_folders, 1):
-        if idx % 100 == 0:
+        if progress and task_id is not None:
+            progress.update(task_id, completed=idx)
+        elif idx % 100 == 0:
             print(f"Processed {idx}/{total} recordings...", end='\r')
 
         meta_file = folder / "meta.json"
@@ -277,7 +285,8 @@ def process_recordings(recordings_dir: Path, date_filter: Optional[str] = None,
             "filler_breakdown": filler_breakdown  # Keep for aggregate analysis
         })
 
-    print(f"\nProcessed {len(recordings_data)} recordings successfully.")
+    if not (progress and task_id is not None):
+        print(f"\nProcessed {len(recordings_data)} recordings successfully.")
 
     if skipped_count > 0:
         logger.warning(f"Skipped {skipped_count} recordings (missing meta.json)")
