@@ -548,6 +548,192 @@ def search(
 
 
 @app.command()
+def summary(
+    date: Optional[str] = typer.Option(
+        None,
+        "--date",
+        help="Filter recordings by specific date (YYYY-MM-DD format)"
+    ),
+    month: Optional[str] = typer.Option(
+        None,
+        "--month",
+        help="Filter recordings by month (YYYY-MM format)"
+    ),
+    date_from: Optional[str] = typer.Option(
+        None,
+        "--date-from",
+        help="Filter recordings from this date onwards (YYYY-MM-DD format)"
+    ),
+    date_to: Optional[str] = typer.Option(
+        None,
+        "--date-to",
+        help="Filter recordings up to this date (YYYY-MM-DD format)"
+    ),
+) -> None:
+    """Show quick summary statistics without generating full reports.
+
+    Examples:
+
+        # Quick overview of all recordings
+        python3 main.py summary
+
+        # Summary for a specific month
+        python3 main.py summary --month 2025-01
+
+        # Summary for a date range
+        python3 main.py summary --date-from 2025-01-01 --date-to 2025-01-31
+    """
+    from collections import Counter
+
+    # Start timing
+    summary_timer = Timer("Summary")
+    summary_timer.__enter__()
+
+    print_header("Recording Summary")
+
+    # Load configuration
+    script_dir = Path(__file__).parent.parent
+    config = load_config(script_dir)
+
+    # Setup logger
+    logs_dir = script_dir / "logs"
+    setup_logger(enable_file_logging=True, logs_dir=logs_dir)
+
+    # Resolve paths
+    recordings_dir = resolve_path(config['paths']['recordings_dir'], script_dir)
+
+    # Validate configuration
+    validate_config(config, script_dir)
+
+    # Display configuration in a panel
+    config_info = f"[cyan]Recordings:[/cyan] {recordings_dir}"
+    console.print(Panel(config_info, title="📊 Configuration", border_style="blue", padding=(1, 2)))
+
+    # Display active filters
+    if date or month or date_from or date_to:
+        console.print("\n[yellow]Active filters:[/yellow]")
+        if date:
+            console.print(f"  • Date: {date}")
+        if month:
+            console.print(f"  • Month: {month}")
+        if date_from:
+            console.print(f"  • From: {date_from}")
+        if date_to:
+            console.print(f"  • To: {date_to}")
+
+    console.print()
+
+    # Validate filters
+    filter_criteria = {}
+    if date:
+        filter_criteria['date'] = date
+    if month:
+        filter_criteria['month'] = month
+    if date_from:
+        filter_criteria['date_from'] = date_from
+    if date_to:
+        filter_criteria['date_to'] = date_to
+
+    if filter_criteria:
+        validate_filter_criteria(filter_criteria)
+
+    # Process recordings (lightweight - just metadata)
+    with create_progress() as progress:
+        task = progress.add_task("[cyan]Scanning recordings...", total=None)
+
+        recordings_data = process_recordings(
+            recordings_dir,
+            date_filter=date,
+            month_filter=month,
+            date_from=date_from,
+            date_to=date_to
+        )
+
+        progress.update(task, completed=True)
+
+    if not recordings_data:
+        console.print("\n[red]✗[/red] No recordings found matching the specified criteria!")
+        if date or month or date_from or date_to:
+            console.print("[yellow]Try adjusting your date filters or removing them to see all recordings.[/yellow]")
+        raise typer.Exit(1)
+
+    # Calculate summary statistics
+    total_recordings = len(recordings_data)
+    total_duration_ms = sum(r["duration_seconds"] * 1000 for r in recordings_data)
+    total_duration_hours = total_duration_ms / (1000 * 3600)
+    total_words = sum(r["word_count"] for r in recordings_data)
+    avg_words_per_recording = total_words / total_recordings if total_recordings > 0 else 0
+
+    # Collect dates
+    dates = [r["date"] for r in recordings_data]
+    date_range_start = min(dates) if dates else "N/A"
+    date_range_end = max(dates) if dates else "N/A"
+
+    # Collect modes
+    modes = [r.get("mode", "Unknown") for r in recordings_data]
+    mode_counts = Counter(modes)
+    top_modes = mode_counts.most_common(5)
+
+    # Collect topics
+    all_topics = []
+    for r in recordings_data:
+        topics = r.get("topics", [])
+        if topics:
+            all_topics.extend(topics)
+    topic_counts = Counter(all_topics)
+    top_topics = topic_counts.most_common(10)
+
+    # Display summary in a nice table
+    console.print()
+    summary_table = Table(title="Summary Statistics", show_header=True, header_style="bold magenta")
+    summary_table.add_column("Metric", style="cyan", no_wrap=True, width=30)
+    summary_table.add_column("Value", justify="right", style="green", width=30)
+
+    summary_table.add_row("Total Recordings", f"{total_recordings:,}")
+    summary_table.add_row("Total Duration", f"{total_duration_hours:.1f} hours")
+    summary_table.add_row("Total Words", f"{total_words:,}")
+    summary_table.add_row("Avg Words/Recording", f"{avg_words_per_recording:.0f}")
+    summary_table.add_row("Date Range", f"{date_range_start} to {date_range_end}")
+    summary_table.add_row("Unique Modes", f"{len(mode_counts)}")
+    summary_table.add_row("Unique Topics", f"{len(topic_counts)}")
+
+    console.print(summary_table)
+
+    # Top Modes
+    if top_modes:
+        console.print()
+        modes_table = Table(title="Top Modes", show_header=True, header_style="bold blue")
+        modes_table.add_column("Mode", style="yellow", width=30)
+        modes_table.add_column("Count", justify="right", style="green", width=15)
+        modes_table.add_column("Percentage", justify="right", style="cyan", width=15)
+
+        for mode, count in top_modes:
+            percentage = (count / total_recordings) * 100
+            modes_table.add_row(mode, f"{count:,}", f"{percentage:.1f}%")
+
+        console.print(modes_table)
+
+    # Top Topics
+    if top_topics:
+        console.print()
+        topics_table = Table(title="Top Topics", show_header=True, header_style="bold blue")
+        topics_table.add_column("Topic", style="yellow", width=30)
+        topics_table.add_column("Mentions", justify="right", style="green", width=15)
+
+        for topic, count in top_topics:
+            topics_table.add_row(topic, f"{count:,}")
+
+        console.print(topics_table)
+
+    # Finish timing and display
+    summary_timer.__exit__(None, None, None)
+    console.print()
+    print_success("Summary complete!")
+    console.print(f"[dim]⏱️  Completed in {summary_timer.get_formatted_elapsed()}[/dim]")
+    console.print()
+
+
+@app.command()
 def history(
     clear: bool = typer.Option(
         False,
@@ -629,14 +815,15 @@ def show_interactive_menu() -> None:
 
     # Menu options
     menu_table = Table(show_header=False, box=None, padding=(0, 2))
-    menu_table.add_column("Option", style="bold cyan", no_wrap=True)
+    menu_table.add_column("Key", style="bold cyan", no_wrap=True, width=8)
     menu_table.add_column("Description", style="white")
 
-    menu_table.add_row("1", "Quick analyse (CSV + insights, fastest)")
-    menu_table.add_row("2", "Full analyse (all outputs)")
-    menu_table.add_row("3", "Custom analyse (choose outputs)")
-    menu_table.add_row("4", "Search transcripts")
-    menu_table.add_row("5", "Exit")
+    menu_table.add_row("q / 1", "Quick analyse (CSV + insights, fastest)")
+    menu_table.add_row("f / 2", "Full analyse (all outputs)")
+    menu_table.add_row("c / 3", "Custom analyse (choose outputs)")
+    menu_table.add_row("s / 4", "Search transcripts")
+    menu_table.add_row("v / 5", "View summary (no file generation)")
+    menu_table.add_row("x / 6", "Exit")
 
     console.print(menu_table)
     console.print()
@@ -644,9 +831,13 @@ def show_interactive_menu() -> None:
     # Get user choice
     choice = Prompt.ask(
         "[bold]Select an option[/bold]",
-        choices=["1", "2", "3", "4", "5"],
-        default="1"
+        choices=["q", "1", "f", "2", "c", "3", "s", "4", "v", "5", "x", "6"],
+        default="q"
     )
+
+    # Normalize shortcuts to numbers
+    shortcut_map = {"q": "1", "f": "2", "c": "3", "s": "4", "v": "5", "x": "6"}
+    choice = shortcut_map.get(choice, choice)
 
     console.print()
 
@@ -729,12 +920,18 @@ def show_interactive_menu() -> None:
             skip_charts=skip_charts
         )
 
-    elif choice == "2":
+    elif choice == "4":
         # Search transcripts
         search_term = Prompt.ask("[bold]Enter search term[/bold]")
 
         case_sensitive = Prompt.ask(
             "Case-sensitive search?",
+            choices=["y", "n"],
+            default="n"
+        )
+
+        fuzzy_search = Prompt.ask(
+            "Enable fuzzy search (typo tolerance)?",
             choices=["y", "n"],
             default="n"
         )
@@ -764,13 +961,48 @@ def show_interactive_menu() -> None:
         search(
             term=search_term,
             case_sensitive=(case_sensitive == "y"),
+            fuzzy=(fuzzy_search == "y"),
+            similarity=80,
+            date=date,
+            month=month,
+            date_from=date_from,
+            date_to=date_to,
+            export=None,
+            export_format=None
+        )
+
+    elif choice == "5":
+        # Summary view
+        use_filters = Prompt.ask(
+            "Apply date filters?",
+            choices=["y", "n"],
+            default="n"
+        )
+
+        if use_filters == "y":
+            console.print("\n[dim]Leave blank to skip a filter[/dim]")
+            date = Prompt.ask("Filter by date (YYYY-MM-DD)", default="")
+            month = Prompt.ask("Filter by month (YYYY-MM)", default="")
+            date_from = Prompt.ask("Filter from date (YYYY-MM-DD)", default="")
+            date_to = Prompt.ask("Filter to date (YYYY-MM-DD)", default="")
+
+            # Convert empty strings to None
+            date = date if date else None
+            month = month if month else None
+            date_from = date_from if date_from else None
+            date_to = date_to if date_to else None
+        else:
+            date = month = date_from = date_to = None
+
+        console.print()
+        summary(
             date=date,
             month=month,
             date_from=date_from,
             date_to=date_to
         )
 
-    elif choice == "5":
+    elif choice == "6":
         console.print("[yellow]Goodbye![/yellow]")
         raise typer.Exit(0)
 
@@ -784,10 +1016,12 @@ def main_callback(ctx: typer.Context) -> None:
 
     # If arguments are provided but no command, show help
     if len(sys.argv) > 1:
-        console.print("[red]Error: Please specify a command (analyze or search)[/red]")
+        console.print("[red]Error: Please specify a command[/red]")
         console.print("\nAvailable commands:")
-        console.print("  [cyan]analyze[/cyan]  - Run full analytics on recordings")
+        console.print("  [cyan]analyse[/cyan]  - Run full analytics on recordings")
         console.print("  [cyan]search[/cyan]   - Search transcript content")
+        console.print("  [cyan]summary[/cyan]  - Quick summary statistics")
+        console.print("  [cyan]history[/cyan]  - View search history")
         console.print("\nRun with --help for more information")
         raise typer.Exit(1)
 
