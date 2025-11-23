@@ -14,7 +14,7 @@ class TestAnalyzeCommand:
         """Test analyze command help."""
         result = runner.invoke(app, ["analyze", "--help"])
         assert result.exit_code == 0
-        assert "Analyze recordings" in result.stdout
+        assert "Analyse recordings" in result.stdout
         assert "--date" in result.stdout
         assert "--month" in result.stdout
 
