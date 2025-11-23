@@ -17,6 +17,7 @@ from rich.table import Table
 
 from lib.core.config import load_config, resolve_path, validate_config
 from lib.outputs.csv import generate_csv_files
+from lib.outputs.duckdb_export import generate_duckdb_file
 from lib.outputs.json import generate_json_file
 from lib.outputs.markdown import generate_ai_prompt_file, generate_insights_report
 from lib.outputs.mermaid import generate_mermaid_charts
@@ -66,7 +67,7 @@ def analyze(
     outputs: Optional[str] = typer.Option(
         None,
         "--outputs",
-        help="Comma-separated list of outputs: csv,json,xlsx,mermaid,insights,all (default: csv,json,insights)"
+        help="Comma-separated list of outputs: csv,json,xlsx,duckdb,mermaid,insights,all (default: xlsx,insights)"
     ),
     skip_charts: bool = typer.Option(
         False,
@@ -235,6 +236,14 @@ def analyze(
                 topic_data, filler_data, bigram_freq, trigram_freq, sentence_summary, output_dir
             )
             generated_outputs.append("XLSX")
+
+        if output_selection.duckdb:
+            console.print("[cyan]Generating DuckDB database...[/cyan]")
+            generate_duckdb_file(
+                recordings_data, daily_summary, hourly_data, word_freq, mode_data,
+                topic_data, filler_data, bigram_freq, trigram_freq, sentence_summary, output_dir
+            )
+            generated_outputs.append("DuckDB")
 
         if output_selection.mermaid:
             console.print("[cyan]Generating Mermaid charts...[/cyan]")
@@ -815,7 +824,7 @@ def show_interactive_menu() -> None:
 
     # Menu options grouped logically
     console.print("[bold]Analyse[/bold]")
-    console.print("  [cyan]a[/cyan]  Quick analyse (CSV + insights)")
+    console.print("  [cyan]a[/cyan]  Quick analyse (Excel + insights)")
     console.print("  [cyan]f[/cyan]  Full analyse (all outputs)")
     console.print("  [cyan]c[/cyan]  Custom analyse")
     console.print()
@@ -838,8 +847,8 @@ def show_interactive_menu() -> None:
     if choice in ["a", "f", "c"]:
         # Determine output selection based on choice
         if choice == "a":
-            # Quick analysis
-            outputs_str = "csv,insights"
+            # Quick analysis - Excel + insights only
+            outputs_str = "xlsx,insights"
             skip_charts = True
             console.print("[cyan]Quick analyse[/cyan]")
         elif choice == "f":
@@ -853,15 +862,17 @@ def show_interactive_menu() -> None:
             console.print("\n[dim]Select which outputs to generate:[/dim]")
 
             # Ask for each output type
-            want_csv = Prompt.ask("Generate CSV files?", choices=["y", "n"], default="y")
-            want_json = Prompt.ask("Generate JSON file?", choices=["y", "n"], default="y")
-            want_xlsx = Prompt.ask("Generate XLSX file?", choices=["y", "n"], default="n")
+            want_csv = Prompt.ask("Generate CSV files?", choices=["y", "n"], default="n")
+            want_json = Prompt.ask("Generate JSON file?", choices=["y", "n"], default="n")
+            want_xlsx = Prompt.ask("Generate XLSX file?", choices=["y", "n"], default="y")
+            want_duckdb = Prompt.ask("Generate DuckDB database?", choices=["y", "n"], default="n")
             want_mermaid = Prompt.ask("Generate Mermaid charts?", choices=["y", "n"], default="n")
             want_insights = Prompt.ask("Generate insights report?", choices=["y", "n"], default="y")
 
             want_csv = want_csv == "y"
             want_json = want_json == "y"
             want_xlsx = want_xlsx == "y"
+            want_duckdb = want_duckdb == "y"
             want_mermaid = want_mermaid == "y"
             want_insights = want_insights == "y"
 
@@ -873,6 +884,8 @@ def show_interactive_menu() -> None:
                 selected_outputs.append("json")
             if want_xlsx:
                 selected_outputs.append("xlsx")
+            if want_duckdb:
+                selected_outputs.append("duckdb")
             if want_mermaid:
                 selected_outputs.append("mermaid")
             if want_insights:

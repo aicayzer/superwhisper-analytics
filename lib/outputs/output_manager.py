@@ -14,6 +14,7 @@ class OutputSelection:
     csv: bool = True
     json: bool = True
     xlsx: bool = False
+    duckdb: bool = False
     mermaid: bool = False
     insights: bool = True
 
@@ -21,7 +22,7 @@ class OutputSelection:
         """Check if a specific output type should be generated
 
         Args:
-            output_type: One of 'csv', 'json', 'xlsx', 'mermaid', 'insights'
+            output_type: One of 'csv', 'json', 'xlsx', 'duckdb', 'mermaid', 'insights'
 
         Returns:
             True if this output should be generated
@@ -35,7 +36,7 @@ class OutputSelection:
             List of output type names that are enabled
         """
         outputs = []
-        for output_type in ['csv', 'json', 'xlsx', 'mermaid', 'insights']:
+        for output_type in ['csv', 'json', 'xlsx', 'duckdb', 'mermaid', 'insights']:
             if getattr(self, output_type):
                 outputs.append(output_type)
         return outputs
@@ -79,6 +80,7 @@ def parse_output_selection(outputs_str: str | None, skip_charts: bool = False) -
             csv=True,
             json=True,
             xlsx=True,
+            duckdb=True,
             mermaid=not skip_charts,
             insights=True
         )
@@ -88,7 +90,7 @@ def parse_output_selection(outputs_str: str | None, skip_charts: bool = False) -
     requested = [o.strip().lower() for o in outputs_str.split(',')]
 
     # Validate all requested outputs
-    valid_outputs = {'csv', 'json', 'xlsx', 'mermaid', 'insights'}
+    valid_outputs = {'csv', 'json', 'xlsx', 'duckdb', 'mermaid', 'insights'}
     invalid = [o for o in requested if o not in valid_outputs]
     if invalid:
         msg = f"Invalid output types: {', '.join(invalid)}. Valid options: {', '.join(valid_outputs)}"
@@ -99,6 +101,7 @@ def parse_output_selection(outputs_str: str | None, skip_charts: bool = False) -
         csv='csv' in requested,
         json='json' in requested,
         xlsx='xlsx' in requested,
+        duckdb='duckdb' in requested,
         mermaid='mermaid' in requested and not skip_charts,
         insights='insights' in requested
     )
@@ -110,32 +113,33 @@ def get_default_selection() -> OutputSelection:
     """Get default output selection
 
     Returns fast, essential outputs by default:
-    - CSV: Core data for analysis
-    - JSON: Structured data export
+    - Excel: Comprehensive data in single file
     - Insights: Human-readable summary
 
     Returns:
         OutputSelection with defaults
     """
     return OutputSelection(
-        csv=True,
-        json=True,
-        xlsx=False,  # Slower, not always needed
+        csv=False,
+        json=False,
+        xlsx=True,  # Single file with everything
+        duckdb=False,
         mermaid=False,  # Slower, not always needed
         insights=True
     )
 
 
 def get_quick_selection() -> OutputSelection:
-    """Get quick analysis selection (CSV only + insights)
+    """Get quick analysis selection (Excel + insights only)
 
     Returns:
-        OutputSelection for fastest analysis
+        OutputSelection for fastest useful analysis
     """
     return OutputSelection(
-        csv=True,
+        csv=False,
         json=False,
-        xlsx=False,
+        xlsx=True,  # Excel easier to work with than CSVs
+        duckdb=False,
         mermaid=False,
         insights=True
     )
@@ -151,6 +155,7 @@ def get_full_selection() -> OutputSelection:
         csv=True,
         json=True,
         xlsx=True,
+        duckdb=True,
         mermaid=True,
         insights=True
     )

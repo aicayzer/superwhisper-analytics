@@ -2,6 +2,7 @@ openpyxl>=3.1.0
 typer>=0.12.0
 rich>=13.0.0
 rapidfuzz>=3.6.0
+duckdb>=0.9.0
 
 # Testing and code quality
 pytest>=7.4.0

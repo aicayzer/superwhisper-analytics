@@ -18,8 +18,13 @@ from lib.search.search_history import (
 def clean_history(monkeypatch, tmp_path):
     """Use temporary history file for tests."""
     history_file = tmp_path / "test_history.json"
-    monkeypatch.setattr("lib.search.search_history.get_history_file", lambda: history_file)
-    yield
+    
+    # Patch the module-level function
+    import lib.search.search_history as history_module
+    monkeypatch.setattr(history_module, "get_history_file", lambda: history_file)
+    
+    yield history_file
+    
     # Cleanup
     if history_file.exists():
         history_file.unlink()
@@ -143,27 +148,35 @@ class TestGetRecentSearches:
 class TestClearHistory:
     """Tests for clear_history function."""
 
-    def test_clear_history_deletes_file(self):
+    def test_clear_history_deletes_file(self, clean_history):
         """Test that clear_history deletes the history file."""
+        history_file = clean_history
+        
         add_search("test", "exact", 1)
 
         # Verify file was created
         history = load_history()
         assert len(history) == 1
+        assert history_file.exists()
 
-        history_file = get_history_file()
         clear_history()
 
         # File should not exist after clearing
         assert not history_file.exists()
 
-    def test_clear_history_when_no_file(self):
+    def test_clear_history_when_no_file(self, clean_history):
         """Test clear_history is safe when no file exists."""
-        history_file = get_history_file()
-        assert not history_file.exists()
+        history_file = clean_history
+        
+        # Ensure no file exists first
+        if history_file.exists():
+            history_file.unlink()
 
-        # Should not raise
+        # Should not raise even when file doesn't exist
         clear_history()
+
+        # Verify still no file
+        assert not history_file.exists()
 
     def test_clear_history_removes_all_entries(self):
         """Test that history is empty after clearing."""

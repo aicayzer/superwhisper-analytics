@@ -66,9 +66,10 @@ class TestParseOutputSelection:
     def test_parse_none_uses_defaults(self):
         """Test that None input uses default selection."""
         selection = parse_output_selection(None, False)
-        assert selection.csv is True
-        assert selection.json is True
-        assert selection.xlsx is False
+        assert selection.csv is False
+        assert selection.json is False
+        assert selection.xlsx is True  # New default: Excel instead of CSV
+        assert selection.duckdb is False
         assert selection.mermaid is False
         assert selection.insights is True
 
@@ -150,18 +151,20 @@ class TestPresetSelections:
     def test_get_default_selection(self):
         """Test default selection includes fast essentials."""
         selection = get_default_selection()
-        assert selection.csv is True
-        assert selection.json is True
-        assert selection.xlsx is False
+        assert selection.csv is False
+        assert selection.json is False
+        assert selection.xlsx is True  # New default: Excel
+        assert selection.duckdb is False
         assert selection.mermaid is False
         assert selection.insights is True
 
     def test_get_quick_selection(self):
         """Test quick selection is minimal."""
         selection = get_quick_selection()
-        assert selection.csv is True
+        assert selection.csv is False
         assert selection.json is False
-        assert selection.xlsx is False
+        assert selection.xlsx is True  # Excel only for quick analysis
+        assert selection.duckdb is False
         assert selection.mermaid is False
         assert selection.insights is True
 
@@ -171,6 +174,7 @@ class TestPresetSelections:
         assert selection.csv is True
         assert selection.json is True
         assert selection.xlsx is True
+        assert selection.duckdb is True
         assert selection.mermaid is True
         assert selection.insights is True
 
