@@ -29,6 +29,7 @@ from lib.search.search_export import export_search_results
 from lib.search.search_history import add_search, clear_history, get_recent_searches
 from lib.search.transcript_search import search_transcripts
 from lib.utils.logger import create_progress, print_header, print_success, setup_logger
+from lib.utils.timing import Timer
 
 app = typer.Typer(
     name="analytics",
@@ -101,6 +102,9 @@ def analyze(
         # Filter by date range with custom outputs
         python3 main.py analyse --date-from 2025-01-01 --date-to 2025-01-31 --outputs csv,insights
     """
+    # Start overall timing
+    overall_timer = Timer("Analysis")
+    overall_timer.__enter__()
 
     print_header("Superwhisper Analytics")
 
@@ -268,10 +272,12 @@ def analyze(
 
     console.print(table)
 
-    # Final success message
+    # Final success message with timing
+    overall_timer.__exit__(None, None, None)
     console.print()
     print_success(f"Analysis complete! Generated: {', '.join(generated_outputs)}")
     console.print(f"[dim]Output directory: {output_dir}[/dim]")
+    console.print(f"[dim]⏱️  Completed in {overall_timer.get_formatted_elapsed()}[/dim]")
     console.print()
 
 
@@ -362,6 +368,9 @@ def search(
         # Fuzzy search with export
         python3 main.py search "project" --fuzzy --export project_matches.csv
     """
+    # Start timing
+    search_timer = Timer("Search")
+    search_timer.__enter__()
 
     print_header("Transcript Search")
 
@@ -530,9 +539,11 @@ def search(
         except Exception as e:
             console.print(f"\n[red]✗ Error exporting results: {e}[/red]")
 
-    # Final success message
+    # Final success message with timing
+    search_timer.__exit__(None, None, None)
     console.print()
     print_success(f"Found {results['total_matches']:,} matches in {results['recordings_with_matches']:,} recordings")
+    console.print(f"[dim]⏱️  Completed in {search_timer.get_formatted_elapsed()}[/dim]")
     console.print()
 
 
@@ -681,7 +692,7 @@ def show_interactive_menu() -> None:
                 selected_outputs.append("mermaid")
             if want_insights:
                 selected_outputs.append("insights")
-            
+
             outputs_str = ",".join(selected_outputs) if selected_outputs else "csv"
             skip_charts = not want_mermaid
 

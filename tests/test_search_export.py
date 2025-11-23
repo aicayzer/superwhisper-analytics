@@ -1,7 +1,6 @@
 """Unit tests for search export module."""
 
 import json
-from pathlib import Path
 
 import pytest
 
