@@ -466,9 +466,11 @@ def show_interactive_menu() -> None:
     menu_table.add_column("Option", style="bold cyan", no_wrap=True)
     menu_table.add_column("Description", style="white")
 
-    menu_table.add_row("1", "Run full analysis")
-    menu_table.add_row("2", "Search transcripts")
-    menu_table.add_row("3", "Exit")
+    menu_table.add_row("1", "Quick analyse (CSV + insights, fastest)")
+    menu_table.add_row("2", "Full analyse (all outputs)")
+    menu_table.add_row("3", "Custom analyse (choose outputs)")
+    menu_table.add_row("4", "Search transcripts")
+    menu_table.add_row("5", "Exit")
 
     console.print(menu_table)
     console.print()
@@ -476,14 +478,60 @@ def show_interactive_menu() -> None:
     # Get user choice
     choice = Prompt.ask(
         "[bold]Select an option[/bold]",
-        choices=["1", "2", "3"],
+        choices=["1", "2", "3", "4", "5"],
         default="1"
     )
 
     console.print()
 
-    if choice == "1":
-        # Run analysis - optionally ask for filters
+    if choice in ["1", "2", "3"]:
+        # Determine output selection based on choice
+        if choice == "1":
+            # Quick analysis
+            outputs_str = "csv,insights"
+            skip_charts = True
+            console.print("[cyan]Mode:[/cyan] Quick analyse (CSV + insights)")
+        elif choice == "2":
+            # Full analysis
+            outputs_str = "all"
+            skip_charts = False
+            console.print("[cyan]Mode:[/cyan] Full analyse (all outputs)")
+        else:
+            # Custom analysis
+            console.print("[cyan]Mode:[/cyan] Custom analyse")
+            console.print("\n[dim]Select which outputs to generate:[/dim]")
+
+            # Ask for each output type
+            want_csv = Prompt.ask("Generate CSV files?", choices=["y", "n"], default="y")
+            want_json = Prompt.ask("Generate JSON file?", choices=["y", "n"], default="y")
+            want_xlsx = Prompt.ask("Generate XLSX file?", choices=["y", "n"], default="n")
+            want_mermaid = Prompt.ask("Generate Mermaid charts?", choices=["y", "n"], default="n")
+            want_insights = Prompt.ask("Generate insights report?", choices=["y", "n"], default="y")
+
+            want_csv = want_csv == "y"
+            want_json = want_json == "y"
+            want_xlsx = want_xlsx == "y"
+            want_mermaid = want_mermaid == "y"
+            want_insights = want_insights == "y"
+
+            # Build outputs string
+            selected_outputs = []
+            if want_csv:
+                selected_outputs.append("csv")
+            if want_json:
+                selected_outputs.append("json")
+            if want_xlsx:
+                selected_outputs.append("xlsx")
+            if want_mermaid:
+                selected_outputs.append("mermaid")
+            if want_insights:
+                selected_outputs.append("insights")
+            
+            outputs_str = ",".join(selected_outputs) if selected_outputs else "csv"
+            skip_charts = not want_mermaid
+
+        # Ask for date filters
+        console.print()
         use_filters = Prompt.ask(
             "Apply date filters?",
             choices=["y", "n"],
@@ -506,7 +554,14 @@ def show_interactive_menu() -> None:
             date = month = date_from = date_to = None
 
         console.print()
-        analyze(date=date, month=month, date_from=date_from, date_to=date_to)
+        analyze(
+            date=date,
+            month=month,
+            date_from=date_from,
+            date_to=date_to,
+            outputs=outputs_str,
+            skip_charts=skip_charts
+        )
 
     elif choice == "2":
         # Search transcripts
@@ -549,7 +604,7 @@ def show_interactive_menu() -> None:
             date_to=date_to
         )
 
-    elif choice == "3":
+    elif choice == "5":
         console.print("[yellow]Goodbye![/yellow]")
         raise typer.Exit(0)
 
