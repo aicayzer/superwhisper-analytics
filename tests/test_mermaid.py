@@ -1,7 +1,6 @@
 """Unit tests for Mermaid chart generation."""
 
 import configparser
-from datetime import datetime
 
 import pytest
 
@@ -132,7 +131,7 @@ class TestMermaidChartSyntax:
 
     def test_case_sensitivity(self):
         # Chart type must be lowercase
-        assert "xychart-beta" == "xychart-beta".lower()
+        assert "xychart-beta".lower() == "xychart-beta"
 
     def test_horizontal_chart_axes(self):
         # For horizontal charts, categories must be on x-axis, numbers on y-axis

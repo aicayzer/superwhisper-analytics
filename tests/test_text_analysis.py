@@ -1,6 +1,5 @@
 """Unit tests for text analysis module."""
 
-import pytest
 
 from lib.processing.text_analysis import (
     calculate_sentence_metrics,

@@ -130,11 +130,8 @@ def search_transcripts(
                         best_score = score
                         best_excerpt = window_text
 
-                if best_excerpt:
-                    excerpts = [f"...{best_excerpt}..."]
-                else:
-                    # Fallback to first part of transcript
-                    excerpts = [transcript[:150] + "..."]
+                # Use ternary operator for simplicity
+                excerpts = [f"...{best_excerpt}..."] if best_excerpt else [transcript[:150] + "..."]
             else:
                 # Exact search: find all matches
                 pattern_re = re.escape(search_pattern)

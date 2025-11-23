@@ -17,10 +17,14 @@ A professional, modular analytics tool for analysing Superwhisper recordings. Ge
 - **Sentence metrics** - Comprehensive sentence-level statistics
 
 ### Technical Features
-- **Modern CLI** - Typer-based interface with Rich formatting
+- **Modern CLI** - Typer-based interface with Rich formatting and keyboard shortcuts
 - **Granular output control** - Generate only the outputs you need (CSV, JSON, XLSX, Mermaid, insights)
+- **Smart search** - Fuzzy matching with typo tolerance and export capabilities
+- **Search history** - Automatic tracking of recent searches
+- **Quick summary** - Fast statistics view without file generation
+- **Performance timing** - See how long operations take
 - **Progress tracking** - Real-time progress bars during processing
-- **Beautiful output** - Colour-coded messages and summary tables
+- **Beautiful output** - Colour-coded messages, panels, and summary tables
 - **Modular architecture** - Clean separation of concerns for maintainability
 - **Date filtering** - Filter by specific date, month, or date range
 - **Multiple output formats** - CSV, XLSX, JSON, Markdown, Mermaid charts
@@ -31,9 +35,10 @@ A professional, modular analytics tool for analysing Superwhisper recordings. Ge
 ## Requirements
 
 - Python 3.9+
-- `typer` - Modern CLI framework
-- `rich` - Beautiful terminal formatting
-- `openpyxl` - Excel support (optional)
+- `typer>=0.12.0` - Modern CLI framework
+- `rich>=13.0.0` - Beautiful terminal formatting
+- `rapidfuzz>=3.0.0` - Fuzzy string matching
+- `openpyxl>=3.1.0` - Excel support (optional)
 
 ### Quick Start
 
@@ -127,12 +132,13 @@ Simply run without any arguments to see the interactive menu:
 python3 main.py
 ```
 
-The interactive menu lets you:
-1. **Quick analyse** - Fast analysis with CSV + insights only
-2. **Full analyse** - All outputs including charts and XLSX
-3. **Custom analyse** - Choose exactly which outputs you need
-4. **Search transcripts** - Find specific words or phrases
-5. **Exit**
+The interactive menu lets you (with keyboard shortcuts):
+- **q / 1** - Quick analyse (CSV + insights, fastest)
+- **f / 2** - Full analyse (all outputs)
+- **c / 3** - Custom analyse (choose outputs)
+- **s / 4** - Search transcripts (with fuzzy search support)
+- **v / 5** - View summary (no file generation)
+- **x / 6** - Exit
 
 ### Direct Commands
 
@@ -185,20 +191,63 @@ python3 main.py analyse --date-from 2025-01-01 --date-to 2025-01-31 --outputs cs
 
 #### Search Command
 
-Search transcript content across all recordings:
+Search transcript content across all recordings with fuzzy matching support:
 
 ```bash
-# Basic search
+# Basic exact search
 python3 main.py search "database"
+
+# Fuzzy search (catches typos like "bigqery" → "bigquery")
+python3 main.py search "bigqery" --fuzzy
+
+# Adjust fuzzy similarity threshold (0-100, default 80)
+python3 main.py search "analitics" --fuzzy --similarity 75
 
 # Case-sensitive search
 python3 main.py search "BigQuery" --case-sensitive
+
+# Export results to CSV or JSON
+python3 main.py search "database" --export results.csv
+python3 main.py search "meeting" --export results.json
 
 # Search with date filter
 python3 main.py search "meeting" --date 2025-01-15
 
 # Search in date range
 python3 main.py search "project" --date-from 2025-01-01 --date-to 2025-01-31
+```
+
+#### Summary Command
+
+Quick overview of your recordings without generating files:
+
+```bash
+# Quick summary of all recordings
+python3 main.py summary
+
+# Summary for a specific month
+python3 main.py summary --month 2025-01
+
+# Summary for a date range
+python3 main.py summary --date-from 2025-01-01 --date-to 2025-01-31
+```
+
+Displays:
+- Total recordings, duration, and words
+- Date range covered
+- Top modes and topics
+- Fast (~1-2 seconds for thousands of recordings)
+
+#### History Command
+
+View recent search history:
+
+```bash
+# View recent searches
+python3 main.py history
+
+# Clear search history
+python3 main.py history --clear
 ```
 
 ### Command Line Options
@@ -210,7 +259,11 @@ python3 main.py search "project" --date-from 2025-01-01 --date-to 2025-01-31
 - `--date-to YYYY-MM-DD`: Filter recordings up to this date
 
 **Search Options**:
-- `--case-sensitive`, `-c`: Perform case-sensitive search
+- `--case-sensitive`, `-c`: Perform case-sensitive search (exact mode only)
+- `--fuzzy`, `-f`: Enable fuzzy search (typo tolerance)
+- `--similarity`, `-s`: Minimum similarity score for fuzzy matches (0-100, default 80)
+- `--export`, `-e`: Export results to CSV or JSON file
+- `--export-format`: Specify format (csv/json) if not clear from filename
 
 **Help**:
 - `--help`: Show help message with all options
@@ -283,9 +336,12 @@ analysis/
 │   │   ├── mermaid.py  # Mermaid charts
 │   │   └── output_manager.py  # Output selection logic
 │   ├── search/         # Search functionality
-│   │   └── transcript_search.py  # Transcript search
+│   │   ├── transcript_search.py  # Transcript search (with fuzzy matching)
+│   │   ├── search_export.py      # Export search results
+│   │   └── search_history.py     # Search history tracking
 │   ├── utils/          # Utility functions
-│   │   └── logger.py   # Rich-based logging
+│   │   ├── logger.py   # Rich-based logging
+│   │   └── timing.py   # Performance timing utilities
 │   └── cli.py          # Typer CLI interface
 ├── tests/              # Unit and integration tests
 ├── config.ini          # Default configuration
@@ -341,7 +397,7 @@ bash scripts/test.sh tests/test_output_manager.py
 bash scripts/test.sh --cov=lib --cov-report=html
 ```
 
-All tests must pass before committing. Currently: **135+ tests**.
+All tests must pass before committing. Currently: **172 tests** (100% passing).
 
 ### Adding New Output Formats
 
@@ -428,4 +484,71 @@ recordings/
 Each folder is named with a Unix timestamp and contains:
 - `meta.json`: Metadata including transcript, mode, datetime, etc.
 - `output.wav`: Audio file (optional, used for duration validation)
+
+## Common Workflows
+
+### Quick Check
+```bash
+# Just want to see what you have?
+python3 main.py summary
+```
+
+### Monthly Review
+```bash
+# Analyze last month's recordings
+python3 main.py analyse --month 2025-01 --outputs csv,insights
+
+# Or get just a summary
+python3 main.py summary --month 2025-01
+```
+
+### Find Something
+```bash
+# Can't remember the exact word?
+python3 main.py search "databse" --fuzzy
+
+# Export results for further analysis
+python3 main.py search "meeting" --export meetings.csv
+
+# Check what you've searched for before
+python3 main.py history
+```
+
+### Full Analysis
+```bash
+# Generate everything for a specific period
+python3 main.py analyse --month 2025-01 --outputs all
+
+# Interactive mode lets you choose step-by-step
+python3 main.py
+```
+
+## Tips & Tricks
+
+### Performance
+- Use `summary` for quick checks (fastest, no files)
+- Default outputs (`csv,json,insights`) are fast (~3-5 seconds for 8K recordings)
+- XLSX and Mermaid charts are slower (~10-15 seconds)
+- `--skip-charts` flag speeds up full analysis
+
+### Search
+- Fuzzy search is excellent for typos: `bigqery` → `bigquery`
+- Adjust `--similarity` threshold for looser (70) or stricter (90) matching
+- Export to CSV for analysis in Excel/Numbers
+- Search history is saved automatically
+
+### Output Control
+- Generate only what you need: `--outputs csv,insights`
+- Skip charts when you don't need visualizations: `--skip-charts`
+- Use `summary` when you just want numbers, not files
+
+### Date Filters
+- Combine filters: `--month 2025-01 --date-from 2025-01-15`
+- Use `--date` for single-day analysis
+- Date ranges are inclusive: `--date-from X --date-to Y`
+
+### Interactive Mode
+- Keyboard shortcuts make it faster: press `q` instead of typing `1`
+- Fuzzy search option is available in interactive search flow
+- Summary view (`v`) is perfect for daily checks
 
