@@ -50,70 +50,50 @@ def generate_duckdb_file(
         # Create connection
         con = duckdb.connect(str(db_path))
 
-        # Create recordings table
-        con.execute("""
-            CREATE TABLE recordings AS
-            SELECT * FROM recordings_data
-        """, {"recordings_data": recordings_data})
+        # Create recordings table using DuckDB's from_records API
+        if recordings_data:
+            con.from_records(recordings_data).create("recordings")
 
         # Create daily summary table
-        con.execute("""
-            CREATE TABLE daily_summary AS
-            SELECT * FROM daily_data
-        """, {"daily_data": daily_summary})
+        if daily_summary:
+            con.from_records(daily_summary).create("daily_summary")
 
         # Create hourly patterns table
-        con.execute("""
-            CREATE TABLE hourly_patterns AS
-            SELECT * FROM hourly_data
-        """, {"hourly_data": hourly_data})
+        if hourly_data:
+            con.from_records(hourly_data).create("hourly_patterns")
 
         # Create word frequency table
-        word_freq_data = [{"word": word, "count": count} for word, count in word_freq]
-        con.execute("""
-            CREATE TABLE word_frequency AS
-            SELECT * FROM word_data
-        """, {"word_data": word_freq_data})
+        if word_freq:
+            word_freq_data = [{"word": word, "count": count} for word, count in word_freq]
+            con.from_records(word_freq_data).create("word_frequency")
 
         # Create mode usage table
-        con.execute("""
-            CREATE TABLE mode_usage AS
-            SELECT * FROM mode_data
-        """, {"mode_data": mode_data})
+        if mode_data:
+            con.from_records(mode_data).create("mode_usage")
 
         # Create topic distribution table
-        con.execute("""
-            CREATE TABLE topic_distribution AS
-            SELECT * FROM topic_data
-        """, {"topic_data": topic_data})
+        if topic_data:
+            con.from_records(topic_data).create("topic_distribution")
 
         # Create filler words table
-        filler_data_list = [{"phrase": phrase, "count": count} for phrase, count in filler_data]
-        con.execute("""
-            CREATE TABLE filler_words AS
-            SELECT * FROM filler_data
-        """, {"filler_data": filler_data_list})
+        if filler_data:
+            filler_data_list = [{"phrase": phrase, "count": count} for phrase, count in filler_data]
+            con.from_records(filler_data_list).create("filler_words")
 
         # Create bigrams table
-        bigram_data = [{"bigram": phrase, "count": count} for phrase, count in bigram_freq]
-        con.execute("""
-            CREATE TABLE bigrams AS
-            SELECT * FROM bigram_data
-        """, {"bigram_data": bigram_data})
+        if bigram_freq:
+            bigram_data = [{"bigram": phrase, "count": count} for phrase, count in bigram_freq]
+            con.from_records(bigram_data).create("bigrams")
 
         # Create trigrams table
-        trigram_data = [{"trigram": phrase, "count": count} for phrase, count in trigram_freq]
-        con.execute("""
-            CREATE TABLE trigrams AS
-            SELECT * FROM trigram_data
-        """, {"trigram_data": trigram_data})
+        if trigram_freq:
+            trigram_data = [{"trigram": phrase, "count": count} for phrase, count in trigram_freq]
+            con.from_records(trigram_data).create("trigrams")
 
         # Create sentence metrics table (single row summary)
-        sentence_data = [sentence_summary]
-        con.execute("""
-            CREATE TABLE sentence_metrics AS
-            SELECT * FROM sentence_data
-        """, {"sentence_data": sentence_data})
+        if sentence_summary:
+            sentence_data = [sentence_summary]
+            con.from_records(sentence_data).create("sentence_metrics")
 
         # Close connection
         con.close()
