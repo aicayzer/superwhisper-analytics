@@ -45,3 +45,10 @@ Thumbs.db
 dist/
 build/
 *.egg-info/
+
+# Next.js / Web prototypes
+prototypes/web/node_modules/
+prototypes/web/.next/
+prototypes/web/out/
+prototypes/web/.env*.local
+prototypes/web/next-env.d.ts
