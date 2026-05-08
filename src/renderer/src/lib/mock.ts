@@ -14,11 +14,14 @@ import type {
   Heatmap,
   HourlyPattern,
   LanguageStats,
+  ModeByDay,
   ModeStat,
   OverviewStats,
   Recording,
   Segment,
   SentenceBucket,
+  SparkSeries,
+  StreakCell,
   TrendPoint,
   UsageStats,
   WordFrequency
@@ -598,6 +601,73 @@ const language: LanguageStats = {
   avgSentenceLength: totalSentences > 0 ? +(totalWords / totalSentences).toFixed(1) : 0
 }
 
+// ---- Wave 2 additions ---------------------------------------------------
+
+/** Trailing 30-day sparkline for each headline KPI. Used by KpiRow.
+ *  Values run oldest → newest so the spark line reads left-to-right. */
+const SPARK_DAYS = 30
+const sparkRecent = sortedDays.slice(-SPARK_DAYS)
+
+const sparklines: Record<'recordings' | 'words' | 'duration' | 'wpm', SparkSeries> = {
+  recordings: {
+    values: sparkRecent.map((d) => d.count),
+    labels: sparkRecent.map((d) => d.date)
+  },
+  words: {
+    values: sparkRecent.map((d) => d.totalWords),
+    labels: sparkRecent.map((d) => d.date)
+  },
+  duration: {
+    values: sparkRecent.map((d) => Math.round(d.totalDurationSec)),
+    labels: sparkRecent.map((d) => d.date)
+  },
+  // Daily WPM, computed from the day's totals; fall back to the rolling avg
+  // so the line stays continuous on quiet days.
+  wpm: {
+    values: sparkRecent.map((d) =>
+      d.totalDurationSec > 0
+        ? Math.round((d.totalWords / d.totalDurationSec) * 60)
+        : overview.avgWPM
+    ),
+    labels: sparkRecent.map((d) => d.date)
+  }
+}
+
+/** GitHub-style streak grid: every day in the last 365, with its count.
+ *  Pads the head to align week boundaries (Mon-start). */
+const STREAK_DAYS = 365
+const streakStart = new Date(NOW.getTime() - (STREAK_DAYS - 1) * 24 * 3600 * 1000)
+const streakCells: StreakCell[] = []
+for (let i = 0; i < STREAK_DAYS; i++) {
+  const d = new Date(streakStart.getTime() + i * 24 * 3600 * 1000)
+  const key = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  streakCells.push({ date: key, count: dailyMap.get(key)?.count ?? 0 })
+}
+
+/** Per-day count by mode, for stacked-area / bar visualisations. */
+const TOP_MODES_FOR_STACK = modeStats.slice(0, 5).map((m) => m.modeName)
+const modeByDayMap = new Map<string, ModeByDay>()
+for (const r of recordings) {
+  const key = r.datetime.slice(0, 10)
+  let cur = modeByDayMap.get(key)
+  if (!cur) {
+    cur = { date: key, modes: {} }
+    modeByDayMap.set(key, cur)
+  }
+  const bucket = TOP_MODES_FOR_STACK.includes(r.modeName) ? r.modeName : 'Other'
+  cur.modes[bucket] = (cur.modes[bucket] ?? 0) + 1
+}
+// Fill in zero-rows for empty days so the stack chart has dense X.
+for (const d of sortedDays) {
+  if (!modeByDayMap.has(d.date)) {
+    modeByDayMap.set(d.date, { date: d.date, modes: {} })
+  }
+}
+const modeByDay: ModeByDay[] = Array.from(modeByDayMap.values()).sort((a, b) =>
+  a.date.localeCompare(b.date)
+)
+const stackModeKeys: string[] = [...TOP_MODES_FOR_STACK, 'Other']
+
 export const mock = {
   recordings,
   overview,
@@ -615,5 +685,10 @@ export const mock = {
   fillerTrend,
   sentenceDist,
   vocabGrowth,
-  language
+  language,
+  // wave 2
+  sparklines,
+  streakCells,
+  modeByDay,
+  stackModeKeys
 }

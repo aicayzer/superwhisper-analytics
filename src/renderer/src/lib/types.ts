@@ -114,3 +114,24 @@ export interface LanguageStats {
 
 /** 7×24 number matrix — rows are days (0=Sun), cols are hours. */
 export type Heatmap = number[][]
+
+/** Single cell of the GitHub-style streak calendar. */
+export interface StreakCell {
+  date: string // YYYY-MM-DD
+  count: number
+}
+
+/** A KPI's trailing series — used by the inline sparkline. */
+export interface SparkSeries {
+  /** Recent values, oldest → newest. */
+  values: number[]
+  /** Optional period labels for the values (length must match). */
+  labels?: string[]
+}
+
+/** Per-day breakdown of recordings by mode, for stacked-area / bar charts. */
+export interface ModeByDay {
+  date: string // YYYY-MM-DD
+  /** Counts per mode keyed by mode name. */
+  modes: Record<string, number>
+}
