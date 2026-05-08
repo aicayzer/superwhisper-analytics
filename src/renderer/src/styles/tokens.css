@@ -1,0 +1,127 @@
+/**
+ * Design tokens for SuperWhisper Analytics.
+ *
+ * Two layers:
+ *   1. Source values in :root / .dark — single source of truth
+ *   2. @theme inline mapping — exposes them as Tailwind utilities
+ *
+ * ShadCN-compatible tokens (--background, --foreground, --primary, etc.)
+ * sit alongside foundation aliases (--window, --floating, --fg-muted)
+ * so both component sets work side by side.
+ *
+ * Theme switching: toggle the `.dark` class on <html> via themeStore.
+ */
+
+:root {
+  /* Surfaces */
+  --window: #f5f5f4;
+  --floating: #fdfdfc;
+
+  /* ShadCN base (greyscale, neutral) */
+  --background: var(--window);
+  --foreground: #0a0a0a;
+  --card: var(--floating);
+  --card-foreground: #0a0a0a;
+  --popover: var(--floating);
+  --popover-foreground: #0a0a0a;
+  --primary: #0a0a0a;
+  --primary-foreground: #fafafa;
+  --secondary: #f4f4f5;
+  --secondary-foreground: #0a0a0a;
+  --muted: #f4f4f5;
+  --muted-foreground: #737373;
+  --accent: #f4f4f5;
+  --accent-foreground: #0a0a0a;
+  --destructive: #ef4444;
+  --destructive-foreground: #fafafa;
+  --border: #e5e5e5;
+  --input: #e5e5e5;
+  --ring: #a3a3a3;
+  --radius: 0.5rem;
+
+  /* Chart palette — monotone ramp from darkest to lightest */
+  --chart-1: #0a0a0a;
+  --chart-2: #404040;
+  --chart-3: #737373;
+  --chart-4: #a3a3a3;
+  --chart-5: #d4d4d4;
+
+  /* Elevation */
+  --shadow-float: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px -4px rgba(0, 0, 0, 0.08);
+}
+
+.dark {
+  --window: #1c1c1c;
+  --floating: #262626;
+
+  --background: var(--window);
+  --foreground: #fafaf9;
+  --card: var(--floating);
+  --card-foreground: #fafaf9;
+  --popover: var(--floating);
+  --popover-foreground: #fafaf9;
+  --primary: #fafaf9;
+  --primary-foreground: #0a0a0a;
+  --secondary: #2a2a2a;
+  --secondary-foreground: #fafaf9;
+  --muted: #2a2a2a;
+  --muted-foreground: #a8a29e;
+  --accent: #2a2a2a;
+  --accent-foreground: #fafaf9;
+  --destructive: #b91c1c;
+  --destructive-foreground: #fafaf9;
+  --border: #2a2a2a;
+  --input: #2a2a2a;
+  --ring: #525252;
+
+  --chart-1: #fafaf9;
+  --chart-2: #d4d4d4;
+  --chart-3: #a3a3a3;
+  --chart-4: #737373;
+  --chart-5: #404040;
+
+  --shadow-float: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px -6px rgba(0, 0, 0, 0.5);
+}
+
+@theme inline {
+  /* ShadCN — Tailwind v4 utility generation */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  /* Foundation aliases (kept so layout primitives still compile) */
+  --color-window: var(--window);
+  --color-floating: var(--floating);
+  --color-fg: var(--foreground);
+  --color-fg-muted: var(--muted-foreground);
+  --color-line: var(--border);
+
+  --shadow-float: var(--shadow-float);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
