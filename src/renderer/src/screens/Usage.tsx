@@ -1,8 +1,8 @@
 import { ActivityArea } from '@renderer/components/charts/ActivityArea'
+import { ChartCard } from '@renderer/components/charts/ChartCard'
 import { DistBar } from '@renderer/components/charts/DistBar'
 import { Heatmap } from '@renderer/components/charts/Heatmap'
 import { HourRadial } from '@renderer/components/charts/HourRadial'
-import { Card } from '@renderer/components/ui/card'
 import { formatDurationSec } from '@renderer/lib/format'
 import { mock } from '@renderer/lib/mock'
 
@@ -34,54 +34,34 @@ export function Usage(): React.JSX.Element {
         />
       </div>
 
-      <Card className="flex flex-col px-4 py-3" style={{ height: 280 }}>
-        <h3 className="mb-0.5 text-[13px] font-semibold tracking-tight text-foreground">
-          Volume over time
-        </h3>
-        <div className="min-h-0 flex-1">
-          <ActivityArea
-            data={daily as unknown as Array<Record<string, unknown>>}
-            xKey="date"
-            yKey="count"
-            formatTick={(v) => {
-              const d = new Date(String(v))
-              return isNaN(d.getTime())
-                ? ''
-                : d.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' })
-            }}
-          />
-        </div>
-      </Card>
+      <ChartCard title="Volume over time" slug="volume-over-time" className="h-[280px]">
+        <ActivityArea
+          data={daily as unknown as Array<Record<string, unknown>>}
+          xKey="date"
+          yKey="count"
+          formatTick={(v) => {
+            const d = new Date(String(v))
+            return isNaN(d.getTime())
+              ? ''
+              : d.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' })
+          }}
+        />
+      </ChartCard>
 
       <div className="grid grid-cols-[1.4fr_1fr_1fr] gap-3" style={{ height: 240 }}>
-        <Card className="flex flex-col px-4 py-3">
-          <h3 className="mb-0.5 text-[13px] font-semibold tracking-tight text-foreground">
-            When you record
-          </h3>
-          <div className="min-h-0 flex-1">
-            <Heatmap matrix={heatmap} cellHeight={20} />
-          </div>
-        </Card>
-        <Card className="flex flex-col px-4 py-3">
-          <h3 className="mb-0.5 text-[13px] font-semibold tracking-tight text-foreground">
-            By hour of day
-          </h3>
-          <div className="min-h-0 flex-1">
-            <HourRadial data={hourly} />
-          </div>
-        </Card>
-        <Card className="flex flex-col px-4 py-3">
-          <h3 className="mb-0.5 text-[13px] font-semibold tracking-tight text-foreground">
-            Duration mix
-          </h3>
-          <div className="min-h-0 flex-1">
-            <DistBar
-              data={durationDist as unknown as Array<Record<string, unknown>>}
-              xKey="label"
-              yKey="count"
-            />
-          </div>
-        </Card>
+        <ChartCard title="When you record" slug="when-you-record">
+          <Heatmap matrix={heatmap} cellHeight={20} />
+        </ChartCard>
+        <ChartCard title="By hour of day" slug="by-hour-of-day">
+          <HourRadial data={hourly} />
+        </ChartCard>
+        <ChartCard title="Duration mix" slug="duration-mix">
+          <DistBar
+            data={durationDist as unknown as Array<Record<string, unknown>>}
+            xKey="label"
+            yKey="count"
+          />
+        </ChartCard>
       </div>
     </div>
   )

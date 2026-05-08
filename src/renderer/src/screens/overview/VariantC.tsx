@@ -1,4 +1,5 @@
 import { ActivityArea } from '@renderer/components/charts/ActivityArea'
+import { ChartCard } from '@renderer/components/charts/ChartCard'
 import { VBar } from '@renderer/components/charts/VBar'
 import { Card } from '@renderer/components/ui/card'
 import { formatCompact, formatDateOnly, formatDurationSec } from '@renderer/lib/format'
@@ -44,31 +45,21 @@ export function VariantC(): React.JSX.Element {
 
       {/* Charts — shorter */}
       <div className="grid grid-cols-[2fr_1fr] gap-2" style={{ height: 180 }}>
-        <Card className="flex flex-col px-3 py-2">
-          <h3 className="mb-0.5 text-[12px] font-semibold tracking-tight text-foreground">
-            Activity
-          </h3>
-          <div className="min-h-0 flex-1">
-            <ActivityArea
-              data={daily as unknown as Array<Record<string, unknown>>}
-              xKey="date"
-              yKey="count"
-              formatTick={formatActivityTick}
-            />
-          </div>
-        </Card>
-        <Card className="flex flex-col px-3 py-2">
-          <h3 className="mb-0.5 text-[12px] font-semibold tracking-tight text-foreground">
-            By day of week
-          </h3>
-          <div className="min-h-0 flex-1">
-            <VBar
-              data={dayOfWeek as unknown as Array<Record<string, unknown>>}
-              xKey="dayName"
-              yKey="count"
-            />
-          </div>
-        </Card>
+        <ChartCard title="Activity" slug="activity" className="px-3 py-2">
+          <ActivityArea
+            data={daily as unknown as Array<Record<string, unknown>>}
+            xKey="date"
+            yKey="count"
+            formatTick={formatActivityTick}
+          />
+        </ChartCard>
+        <ChartCard title="By day of week" slug="by-day-of-week" className="px-3 py-2">
+          <VBar
+            data={dayOfWeek as unknown as Array<Record<string, unknown>>}
+            xKey="dayName"
+            yKey="count"
+          />
+        </ChartCard>
       </div>
 
       <Card className="flex min-h-0 flex-1 flex-col gap-0 px-3 py-2">

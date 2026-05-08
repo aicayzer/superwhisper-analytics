@@ -1,4 +1,5 @@
 import { ActivityArea } from '@renderer/components/charts/ActivityArea'
+import { ChartCard } from '@renderer/components/charts/ChartCard'
 import { VBar } from '@renderer/components/charts/VBar'
 import { Card } from '@renderer/components/ui/card'
 import { formatCompact, formatDateOnly, formatDurationSec } from '@renderer/lib/format'
@@ -44,31 +45,21 @@ export function VariantA(): React.JSX.Element {
 
       {/* Charts */}
       <div className="grid grid-cols-[2fr_1fr] gap-3" style={{ height: 220 }}>
-        <Card className="flex flex-col px-4 py-3">
-          <h3 className="mb-0.5 text-[13px] font-semibold tracking-tight text-foreground">
-            Activity
-          </h3>
-          <div className="min-h-0 flex-1">
-            <ActivityArea
-              data={daily as unknown as Array<Record<string, unknown>>}
-              xKey="date"
-              yKey="count"
-              formatTick={formatActivityTick}
-            />
-          </div>
-        </Card>
-        <Card className="flex flex-col px-4 py-3">
-          <h3 className="mb-0.5 text-[13px] font-semibold tracking-tight text-foreground">
-            By day of week
-          </h3>
-          <div className="min-h-0 flex-1">
-            <VBar
-              data={dayOfWeek as unknown as Array<Record<string, unknown>>}
-              xKey="dayName"
-              yKey="count"
-            />
-          </div>
-        </Card>
+        <ChartCard title="Activity" slug="activity">
+          <ActivityArea
+            data={daily as unknown as Array<Record<string, unknown>>}
+            xKey="date"
+            yKey="count"
+            formatTick={formatActivityTick}
+          />
+        </ChartCard>
+        <ChartCard title="By day of week" slug="by-day-of-week">
+          <VBar
+            data={dayOfWeek as unknown as Array<Record<string, unknown>>}
+            xKey="dayName"
+            yKey="count"
+          />
+        </ChartCard>
       </div>
 
       {/* Recent — fills remaining viewport */}

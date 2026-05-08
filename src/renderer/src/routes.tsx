@@ -1,5 +1,6 @@
 import { createHashRouter } from 'react-router-dom'
 import { RootLayout } from './components/layout/RootLayout'
+import { ChartView } from './screens/ChartView'
 import { Language } from './screens/Language'
 import { Overview } from './screens/overview'
 import { Placeholder } from './screens/Placeholder'
@@ -17,6 +18,7 @@ export const router = createHashRouter([
       { path: 'transcripts/:id', element: <TranscriptDetail /> },
       { path: 'usage', element: <Usage /> },
       { path: 'language', element: <Language /> },
+      { path: 'chart/:slug', element: <ChartView /> },
       { path: 'settings', element: <Placeholder name="Settings" /> }
     ]
   }

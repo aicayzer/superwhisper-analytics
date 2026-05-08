@@ -1,7 +1,8 @@
 import { useLayoutStore } from '@renderer/state/layoutStore'
-import { Outlet, useLocation } from 'react-router-dom'
+import { chartBreadcrumb } from '@renderer/screens/chartRegistry'
+import { Outlet, useLocation, useSearchParams } from 'react-router-dom'
 import { CommandPalette } from '../command-palette/CommandPalette'
-import { MainHeader } from './MainHeader'
+import { MainHeader, type Breadcrumb } from './MainHeader'
 import { Sidebar } from './Sidebar'
 import { Window } from './Window'
 
@@ -38,18 +39,32 @@ export function RootLayout(): React.JSX.Element {
   const sidebarOpen = useLayoutStore((s) => s.sidebarOpen)
   const sidebarWidth = useLayoutStore((s) => s.sidebarWidth)
   const location = useLocation()
+  const [params] = useSearchParams()
 
   const leftPad =
     (sidebarOpen ? sidebarWidth + SIDEBAR_GAP /* sidebar's own left-2 */ + SIDEBAR_GAP : 0) +
     CONTENT_GUTTER
   const onTranscripts =
     location.pathname === '/transcripts' || location.pathname === '/transcripts/'
-  const title = titleFor(location.pathname)
+
+  // /chart/:slug renders a breadcrumb instead of a plain title; backTo
+  // points at the screen the chart was launched from when supplied.
+  const chartMatch = location.pathname.match(/^\/chart\/([^/]+)/)
+  const chartCrumb = chartMatch ? chartBreadcrumb(chartMatch[1]) : null
+  const fromParam = params.get('from')
+  const backTo = chartCrumb
+    ? fromParam
+      ? decodeURIComponent(fromParam)
+      : chartCrumb.sectionPath
+    : undefined
+  const title: string | Breadcrumb[] = chartCrumb
+    ? [{ label: chartCrumb.section, to: chartCrumb.sectionPath }, { label: chartCrumb.title }]
+    : titleFor(location.pathname)
 
   return (
     <Window>
       <Sidebar />
-      <MainHeader title={title} showSearch={onTranscripts} />
+      <MainHeader title={title} showSearch={onTranscripts} backTo={backTo} />
       <main
         className="absolute inset-0 overflow-y-auto bg-background transition-[padding] duration-200 ease-out"
         style={{
