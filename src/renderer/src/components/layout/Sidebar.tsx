@@ -1,7 +1,15 @@
 import { useResize } from '@renderer/hooks/useResize'
 import { cn } from '@renderer/lib/cn'
 import { SIDEBAR_MAX_WIDTH, SIDEBAR_MIN_WIDTH, useLayoutStore } from '@renderer/state/layoutStore'
-import { AudioLines, House, Languages, RefreshCw, Settings, TextSearch } from 'lucide-react'
+import {
+  AudioLines,
+  House,
+  Languages,
+  PanelLeft,
+  RefreshCw,
+  Settings,
+  TextSearch
+} from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { ResizeHandle } from './ResizeHandle'
@@ -37,15 +45,21 @@ function useNow(intervalMs: number): number {
 }
 
 /**
- * Floating sidebar overlay. Sits *below* the TopStrip so the toggle on the
- * topbar is always reachable. Starts with nav directly — no header, no
- * brand wordmark — and ends with a thin footer (indexed-at + refresh +
- * settings cog). Drag-resizes from the right edge.
+ * Floating sidebar overlay — Claude-desktop pattern.
+ *
+ * Sits at top-2 / left-2 / bottom-2. Internal padding-top reserves room
+ * for the macOS traffic lights (positioned by Electron at x=18 y=18, which
+ * land inside the sidebar's top-left). The toggle button lives in the
+ * sidebar's header row, just to the right of the traffic-light area.
+ *
+ * When the sidebar is hidden, the toggle hops to the MainHeader so traffic
+ * lights and toggle always travel together.
  */
 export function Sidebar(): React.JSX.Element {
   const sidebarOpen = useLayoutStore((s) => s.sidebarOpen)
   const sidebarWidth = useLayoutStore((s) => s.sidebarWidth)
   const setSidebarWidth = useLayoutStore((s) => s.setSidebarWidth)
+  const toggleSidebar = useLayoutStore((s) => s.toggleSidebar)
 
   const { startResize, isResizing } = useResize({
     direction: 'grow-right',
@@ -55,20 +69,35 @@ export function Sidebar(): React.JSX.Element {
     onChange: setSidebarWidth
   })
 
-  useNow(30_000) // re-render every 30s so the indexer label refreshes
+  useNow(30_000)
 
   return (
     <aside
       style={{ width: sidebarWidth }}
       aria-hidden={!sidebarOpen}
       className={cn(
-        'absolute bottom-2 left-2 top-14 z-20',
-        'flex flex-col rounded-xl border border-border bg-floating shadow-[var(--shadow-float)]',
+        'absolute bottom-2 left-2 top-2 z-20',
+        'flex flex-col rounded-xl border border-border bg-floating shadow-[var(--shadow-float)] [-webkit-app-region:drag]',
         !isResizing && 'transition-[transform,opacity] duration-200 ease-out',
         !sidebarOpen && '-translate-x-[calc(100%+0.5rem)] opacity-0 pointer-events-none'
       )}
     >
-      <nav className="flex-1 overflow-y-auto px-2 pt-3 pb-2 text-[13px]">
+      {/* Header band — traffic lights live in the left third (Electron-native,
+          x=18 y=18). The toggle sits just past them. h-9 / py-1.5 puts the
+          toggle's centre at y≈22, near-flush with the traffic lights' centre. */}
+      <div className="flex h-9 items-center gap-1 pl-[68px] pr-2">
+        <button
+          type="button"
+          onClick={toggleSidebar}
+          aria-label="Hide sidebar"
+          title="Hide sidebar"
+          className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground [-webkit-app-region:no-drag]"
+        >
+          <PanelLeft className="h-4 w-4" strokeWidth={1.8} />
+        </button>
+      </div>
+
+      <nav className="flex-1 overflow-y-auto px-2 pt-1 pb-2 text-[13px] [-webkit-app-region:no-drag]">
         <ul className="space-y-px">
           {NAV.map(({ to, label, icon: Icon }) => (
             <li key={to}>
@@ -77,7 +106,7 @@ export function Sidebar(): React.JSX.Element {
                 end={to === '/'}
                 className={({ isActive }) =>
                   cn(
-                    'flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors [-webkit-app-region:no-drag] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/40',
+                    'flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/40',
                     isActive
                       ? 'bg-foreground/[0.05] font-medium text-foreground'
                       : 'text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground'

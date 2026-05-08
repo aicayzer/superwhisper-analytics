@@ -1,13 +1,14 @@
 import { useLayoutStore } from '@renderer/state/layoutStore'
 import { Outlet, useLocation } from 'react-router-dom'
 import { CommandPalette } from '../command-palette/CommandPalette'
+import { MainHeader } from './MainHeader'
 import { Sidebar } from './Sidebar'
-import { TopStrip } from './TopStrip'
 import { Window } from './Window'
 
-const SIDEBAR_GAP = 8 // gap to the right of the sidebar
-const CONTENT_GUTTER = 24 // generous breathing on both sides of page content
-const TOP_STRIP_H = 48 // px (h-12)
+const SIDEBAR_GAP = 8
+const CONTENT_GUTTER = 24
+const HEADER_TOP = 8 // sidebar + header both at top-2
+const HEADER_H = 36
 
 const TITLES: Record<string, string> = {
   '/': 'Overview',
@@ -23,15 +24,15 @@ function titleFor(pathname: string): string {
 }
 
 /**
- * Root of the app. Layers:
- *   • Window     — full-screen, --window backdrop colour
- *   • TopStrip   — full-width, h-12, drag region, page title + controls
- *   • Sidebar    — floats below TopStrip on the left, gap-2 on three sides
- *   • Outlet     — page content fills the rest of the window
+ * Root of the app. Layers (z-order):
+ *   • Window     — full-screen, --window backdrop
+ *   • main       — fills the right-of-sidebar area; scroll happens here
+ *   • Sidebar    — floats at top-2 left-2 bottom-2, hosts traffic lights and toggle
+ *   • MainHeader — overlays the top of the main area; hosts breadcrumb + range
  *
- * Sidebar floats *below* TopStrip so the toggle on the left of the topbar
- * is always reachable, regardless of sidebar state. Generous gutters on
- * both sides of the content area keep things from feeling cramped.
+ * The header and sidebar both start at top-2 and are 36px tall, so the
+ * traffic lights (Electron-native at y=18) sit visually inside whichever
+ * surface is to their right (sidebar when open, header when closed).
  */
 export function RootLayout(): React.JSX.Element {
   const sidebarOpen = useLayoutStore((s) => s.sidebarOpen)
@@ -47,14 +48,15 @@ export function RootLayout(): React.JSX.Element {
 
   return (
     <Window>
-      <TopStrip title={title} showSearch={onTranscripts} />
       <Sidebar />
+      <MainHeader title={title} showSearch={onTranscripts} />
       <main
         className="absolute inset-0 overflow-y-auto bg-background transition-[padding] duration-200 ease-out"
         style={{
-          paddingTop: TOP_STRIP_H,
+          paddingTop: HEADER_TOP + HEADER_H + 8, // header bottom + 8px gap to content
           paddingLeft: leftPad,
-          paddingRight: CONTENT_GUTTER
+          paddingRight: CONTENT_GUTTER,
+          paddingBottom: 16
         }}
       >
         <Outlet />
