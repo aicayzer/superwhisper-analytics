@@ -142,7 +142,7 @@ function DetailView({ rec, onPrev, onNext }: DetailViewProps): React.JSX.Element
   const fillerPct = rec.wordCount > 0 ? (rec.fillerCount / rec.wordCount) * 100 : 0
 
   return (
-    <div className="space-y-3 py-3">
+    <div className="flex h-full flex-col gap-3 py-3">
       {/* Header */}
       <div className="flex items-center gap-3">
         <Link
@@ -205,12 +205,12 @@ function DetailView({ rec, onPrev, onNext }: DetailViewProps): React.JSX.Element
         </div>
       </Card>
 
-      {/* Detail grid */}
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_280px]">
-        <Card className="p-5">
+      {/* Detail grid — fills the rest of the viewport */}
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[1fr_280px]">
+        <Card className="flex min-h-0 flex-col p-5">
           <div
             ref={transcriptRef}
-            className="max-h-[calc(100vh-280px)] overflow-y-auto text-[13.5px] leading-relaxed text-foreground"
+            className="min-h-0 flex-1 overflow-y-auto text-[13.5px] leading-relaxed text-foreground"
           >
             {rec.segments.length === 0 ? (
               <p>{rec.result}</p>
@@ -247,7 +247,7 @@ function DetailView({ rec, onPrev, onNext }: DetailViewProps): React.JSX.Element
           </div>
         </Card>
 
-        <div className="space-y-3">
+        <div className="flex min-h-0 flex-col gap-3 overflow-y-auto">
           <DetailsCard rec={rec} fillerPct={fillerPct} />
           <FillerCard breakdown={rec.fillerBreakdown} />
         </div>
@@ -259,8 +259,8 @@ function DetailView({ rec, onPrev, onNext }: DetailViewProps): React.JSX.Element
 function DetailsCard({ rec, fillerPct }: { rec: Recording; fillerPct: number }): React.JSX.Element {
   return (
     <Card className="p-4 text-[12px]">
-      <div className="mb-2 text-[12px] font-semibold tracking-tight text-foreground">Details</div>
-      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5">
+      <div className="mb-1 text-[12px] font-semibold tracking-tight text-foreground">Details</div>
+      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
         <Row k="Recorded" v={formatTimestamp(rec.datetime)} />
         <Row k="Mode" v={rec.modeName} />
         <Row k="Duration" v={formatDurationSec(rec.duration / 1000)} />
@@ -304,7 +304,7 @@ function FillerCard({
   const top = breakdown.slice(0, 6)
   return (
     <Card className="p-4 text-[12px]">
-      <div className="mb-2 text-[12px] font-semibold tracking-tight text-foreground">
+      <div className="mb-1 text-[12px] font-semibold tracking-tight text-foreground">
         Fillers in this recording
       </div>
       <div className="space-y-1.5">
