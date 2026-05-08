@@ -7,6 +7,8 @@ interface HeatmapProps {
   dayLabels?: readonly string[]
   /** Cell height in px. */
   cellHeight?: number
+  /** Hide left day-name column (for compact embeds). */
+  compact?: boolean
 }
 
 const DEFAULT_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
@@ -15,14 +17,15 @@ const HOUR_TICKS = [0, 6, 12, 18]
 /**
  * Hand-rolled day × hour heatmap. CSS grid; one div per cell.
  *
- * Cell colour ramps from the muted background to chart-1 by relative
- * intensity (max value in the matrix). Recharts has no first-class
- * heatmap and the visual we want is a plain grid, so we render directly.
+ * Cell colour ramps from `--muted` (empty) to `--chart-1` by relative
+ * intensity (max value in the matrix), via `color-mix`. Because both
+ * tokens flip with theme, the ramp stays readable in dark mode.
  */
 export function Heatmap({
   matrix,
   dayLabels = DEFAULT_DAYS,
-  cellHeight = 14
+  cellHeight = 14,
+  compact = false
 }: HeatmapProps): React.JSX.Element {
   const max = useMemo(() => {
     let m = 0
@@ -30,20 +33,23 @@ export function Heatmap({
     return m || 1
   }, [matrix])
 
+  const labelCol = compact ? '0' : '32px'
+
   return (
     <div className="text-[10px] text-muted-foreground">
-      <div className="grid gap-px" style={{ gridTemplateColumns: '32px repeat(24, 1fr)' }}>
+      <div className="grid gap-px" style={{ gridTemplateColumns: `${labelCol} repeat(24, 1fr)` }}>
         {matrix.map((row, dayIdx) => (
           <RowFragment
             key={dayIdx}
-            day={dayLabels[dayIdx] ?? ''}
+            day={compact ? '' : (dayLabels[dayIdx] ?? '')}
             row={row}
             max={max}
             cellHeight={cellHeight}
+            showLabel={!compact}
           />
         ))}
         {/* Hour axis */}
-        <div />
+        {!compact && <div />}
         {Array.from({ length: 24 }, (_, h) => (
           <div key={h} className="pt-1 text-center">
             {HOUR_TICKS.includes(h) ? h : ''}
@@ -58,24 +64,31 @@ function RowFragment({
   day,
   row,
   max,
-  cellHeight
+  cellHeight,
+  showLabel
 }: {
   day: string
   row: number[]
   max: number
   cellHeight: number
+  showLabel: boolean
 }): React.JSX.Element {
   return (
     <>
-      <div className="flex items-center pr-2 text-right text-muted-foreground">{day}</div>
+      {showLabel && (
+        <div className="flex items-center pr-2 text-right text-muted-foreground">{day}</div>
+      )}
       {row.map((v, h) => (
         <div
           key={h}
-          title={`${day} ${h}:00 — ${v}`}
+          title={`${day || ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][(h + 24 - 24) % 7]} ${h}:00 — ${v}`}
           className="rounded-[2px]"
           style={{
             height: cellHeight,
-            backgroundColor: v === 0 ? 'var(--muted)' : `hsl(0 0% ${90 - (v / max) * 80}%)`
+            backgroundColor:
+              v === 0
+                ? 'var(--muted)'
+                : `color-mix(in oklab, var(--chart-1) ${Math.round((v / max) * 100)}%, var(--muted))`
           }}
         />
       ))}

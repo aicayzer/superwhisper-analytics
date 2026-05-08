@@ -31,82 +31,94 @@ export function Language(): React.JSX.Element {
         <Kpi label="Avg sentence" value={`${language.avgSentenceLength}`} sub="words / sentence" />
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <Card className="px-4 py-3">
-          <h3 className="mb-1 text-[13px] font-semibold tracking-tight text-foreground">
+      <div className="grid grid-cols-2 gap-3" style={{ height: 260 }}>
+        <Card className="flex flex-col px-4 py-3">
+          <h3 className="mb-0.5 text-[13px] font-semibold tracking-tight text-foreground">
             Top words
           </h3>
-          <HBar
-            data={topWords as unknown as Array<Record<string, unknown>>}
-            xKey="count"
-            yKey="label"
-          />
+          <div className="min-h-0 flex-1">
+            <HBar
+              data={topWords as unknown as Array<Record<string, unknown>>}
+              xKey="count"
+              yKey="label"
+            />
+          </div>
         </Card>
-        <Card className="px-4 py-3">
-          <h3 className="mb-1 text-[13px] font-semibold tracking-tight text-foreground">
+        <Card className="flex flex-col px-4 py-3">
+          <h3 className="mb-0.5 text-[13px] font-semibold tracking-tight text-foreground">
             Filler words
           </h3>
-          <HBar
-            data={topFillers as unknown as Array<Record<string, unknown>>}
-            xKey="count"
-            yKey="label"
-          />
+          <div className="min-h-0 flex-1">
+            <HBar
+              data={topFillers as unknown as Array<Record<string, unknown>>}
+              xKey="count"
+              yKey="label"
+            />
+          </div>
         </Card>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <Card className="px-4 py-3">
-          <h3 className="mb-1 text-[13px] font-semibold tracking-tight text-foreground">
+      <div className="grid grid-cols-2 gap-3" style={{ height: 220 }}>
+        <Card className="flex flex-col px-4 py-3">
+          <h3 className="mb-0.5 text-[13px] font-semibold tracking-tight text-foreground">
             Speaking pace
           </h3>
-          <LineTrend
-            data={wpmTrend as unknown as Array<Record<string, unknown>>}
-            xKey="period"
-            yKey="value"
-            reference={{ value: WPM_TARGET, label: `${WPM_TARGET}` }}
-            formatTick={(v) => {
-              const [y, m] = String(v).split('-')
-              if (!y || !m) return String(v)
-              const d = new Date(Number(y), Number(m) - 1, 1)
-              return d.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' })
-            }}
-          />
+          <div className="min-h-0 flex-1">
+            <LineTrend
+              data={wpmTrend as unknown as Array<Record<string, unknown>>}
+              xKey="period"
+              yKey="value"
+              reference={{ value: WPM_TARGET, label: `${WPM_TARGET}` }}
+              formatTick={(v) => {
+                const [y, m] = String(v).split('-')
+                if (!y || !m) return String(v)
+                const d = new Date(Number(y), Number(m) - 1, 1)
+                return d.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' })
+              }}
+            />
+          </div>
         </Card>
-        <Card className="px-4 py-3">
-          <h3 className="mb-1 text-[13px] font-semibold tracking-tight text-foreground">
+        <Card className="flex flex-col px-4 py-3">
+          <h3 className="mb-0.5 text-[13px] font-semibold tracking-tight text-foreground">
             Filler rate over time
           </h3>
-          <LineTrend
-            data={fillerTrend as unknown as Array<Record<string, unknown>>}
-            xKey="period"
-            yKey="value"
-            formatTick={(v) => String(v).replace(/^\d{4}-/, '')}
-          />
+          <div className="min-h-0 flex-1">
+            <LineTrend
+              data={fillerTrend as unknown as Array<Record<string, unknown>>}
+              xKey="period"
+              yKey="value"
+              formatTick={(v) => String(v).replace(/^\d{4}-/, '')}
+            />
+          </div>
         </Card>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <Card className="px-4 py-3">
-          <h3 className="mb-1 text-[13px] font-semibold tracking-tight text-foreground">
+      <div className="grid grid-cols-2 gap-3" style={{ height: 220 }}>
+        <Card className="flex flex-col px-4 py-3">
+          <h3 className="mb-0.5 text-[13px] font-semibold tracking-tight text-foreground">
             Sentence length
           </h3>
-          <DistBar
-            data={sentenceDist as unknown as Array<Record<string, unknown>>}
-            xKey="label"
-            yKey="count"
-          />
+          <div className="min-h-0 flex-1">
+            <DistBar
+              data={sentenceDist as unknown as Array<Record<string, unknown>>}
+              xKey="label"
+              yKey="count"
+            />
+          </div>
         </Card>
-        <Card className="px-4 py-3">
-          <h3 className="mb-1 text-[13px] font-semibold tracking-tight text-foreground">
+        <Card className="flex flex-col px-4 py-3">
+          <h3 className="mb-0.5 text-[13px] font-semibold tracking-tight text-foreground">
             Vocabulary growth
           </h3>
-          <ActivityArea
-            data={vocabGrowth as unknown as Array<Record<string, unknown>>}
-            xKey="period"
-            yKey="value"
-            formatTick={(v) => String(v).replace(/^\d{4}-/, '')}
-            tickCount={5}
-          />
+          <div className="min-h-0 flex-1">
+            <ActivityArea
+              data={vocabGrowth as unknown as Array<Record<string, unknown>>}
+              xKey="period"
+              yKey="value"
+              formatTick={(v) => String(v).replace(/^\d{4}-/, '')}
+              tickCount={5}
+            />
+          </div>
         </Card>
       </div>
     </div>

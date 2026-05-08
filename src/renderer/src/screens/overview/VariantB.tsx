@@ -51,7 +51,6 @@ export function VariantB(): React.JSX.Element {
             xKey="date"
             yKey="count"
             formatTick={formatActivityTick}
-            height={170}
           />
         </Section>
         <Section title="By day of week">
@@ -59,7 +58,6 @@ export function VariantB(): React.JSX.Element {
             data={dayOfWeek as unknown as Array<Record<string, unknown>>}
             xKey="dayName"
             yKey="count"
-            height={170}
           />
         </Section>
       </div>

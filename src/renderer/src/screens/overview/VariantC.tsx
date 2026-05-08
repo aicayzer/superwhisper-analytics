@@ -44,28 +44,30 @@ export function VariantC(): React.JSX.Element {
 
       {/* Charts — shorter */}
       <div className="grid grid-cols-[2fr_1fr] gap-2" style={{ height: 180 }}>
-        <Card className="px-3 py-2">
+        <Card className="flex flex-col px-3 py-2">
           <h3 className="mb-0.5 text-[12px] font-semibold tracking-tight text-foreground">
             Activity
           </h3>
-          <ActivityArea
-            data={daily as unknown as Array<Record<string, unknown>>}
-            xKey="date"
-            yKey="count"
-            formatTick={formatActivityTick}
-            height={140}
-          />
+          <div className="min-h-0 flex-1">
+            <ActivityArea
+              data={daily as unknown as Array<Record<string, unknown>>}
+              xKey="date"
+              yKey="count"
+              formatTick={formatActivityTick}
+            />
+          </div>
         </Card>
-        <Card className="px-3 py-2">
+        <Card className="flex flex-col px-3 py-2">
           <h3 className="mb-0.5 text-[12px] font-semibold tracking-tight text-foreground">
             By day of week
           </h3>
-          <VBar
-            data={dayOfWeek as unknown as Array<Record<string, unknown>>}
-            xKey="dayName"
-            yKey="count"
-            height={140}
-          />
+          <div className="min-h-0 flex-1">
+            <VBar
+              data={dayOfWeek as unknown as Array<Record<string, unknown>>}
+              xKey="dayName"
+              yKey="count"
+            />
+          </div>
         </Card>
       </div>
 

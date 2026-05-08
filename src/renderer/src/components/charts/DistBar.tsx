@@ -7,17 +7,16 @@ interface DistBarProps {
   xKey: string
   /** Numeric value key */
   yKey: string
-  height?: number
 }
 
 /**
  * Vertical bar chart over labelled buckets — duration distribution,
- * sentence-length distribution etc. Slightly muted fill to distinguish
- * from the primary VBar.
+ * sentence-length distribution etc. Fills its container. Slightly muted
+ * fill to distinguish from the primary VBar.
  */
-export function DistBar({ data, xKey, yKey, height = 220 }: DistBarProps): React.JSX.Element {
+export function DistBar({ data, xKey, yKey }: DistBarProps): React.JSX.Element {
   return (
-    <ResponsiveContainer width="100%" height={height}>
+    <ResponsiveContainer width="100%" height="100%">
       <BarChart data={data} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
         <CartesianGrid stroke="var(--border)" strokeDasharray="2 4" vertical={false} />
         <XAxis

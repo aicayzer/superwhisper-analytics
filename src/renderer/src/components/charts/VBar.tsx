@@ -5,25 +5,23 @@ interface VBarProps {
   data: Array<Record<string, unknown>>
   xKey: string
   yKey: string
-  height?: number
   /** Bar fill — defaults to monotone foreground */
   fill?: string
   maxBarSize?: number
 }
 
 /**
- * Vertical bar chart, single series. Simple and dense.
+ * Vertical bar chart, single series. Fills its container.
  */
 export function VBar({
   data,
   xKey,
   yKey,
-  height = 220,
   fill = 'var(--chart-1)',
   maxBarSize = 32
 }: VBarProps): React.JSX.Element {
   return (
-    <ResponsiveContainer width="100%" height={height}>
+    <ResponsiveContainer width="100%" height="100%">
       <BarChart data={data} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
         <CartesianGrid stroke="var(--border)" strokeDasharray="2 4" vertical={false} />
         <XAxis

@@ -17,23 +17,22 @@ interface LineTrendProps {
   /** Optional horizontal target line (e.g. WPM goal). */
   reference?: { value: number; label?: string }
   formatTick?: (raw: string) => string
-  height?: number
 }
 
 /**
  * Sparse line chart for trends over time. Single series, no dots, monotone.
- * Optional dashed reference line for a target value (e.g. 140 WPM).
+ * Optional dashed reference line for a target value (e.g. 140 WPM). Fills
+ * its container.
  */
 export function LineTrend({
   data,
   xKey,
   yKey,
   reference,
-  formatTick,
-  height = 220
+  formatTick
 }: LineTrendProps): React.JSX.Element {
   return (
-    <ResponsiveContainer width="100%" height={height}>
+    <ResponsiveContainer width="100%" height="100%">
       <LineChart data={data} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
         <CartesianGrid stroke="var(--border)" strokeDasharray="2 4" vertical={false} />
         <XAxis
