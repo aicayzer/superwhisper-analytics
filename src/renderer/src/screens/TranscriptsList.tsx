@@ -10,16 +10,27 @@ import { Link } from 'react-router-dom'
 type SortKey = 'datetime' | 'modeName' | 'duration' | 'wordCount' | 'wordsPerMinute'
 type Direction = 'asc' | 'desc'
 
-const COLS: Array<{ key: SortKey; label: string; align: 'left' | 'right'; width?: string }> = [
-  { key: 'datetime', label: 'When', align: 'left', width: '180px' },
-  { key: 'modeName', label: 'Mode', align: 'left', width: '120px' }
-  // Snippet column has no sort; left blank in COLS
-]
+interface ColSpec {
+  key: SortKey | null
+  label: string
+  align: 'left' | 'right'
+  width?: string
+  /** Snippet cell uses flex sizing — no width and no sort. */
+  flex?: boolean
+}
 
-const NUMERIC_COLS: Array<{ key: SortKey; label: string }> = [
-  { key: 'duration', label: 'Duration' },
-  { key: 'wordCount', label: 'Words' },
-  { key: 'wordsPerMinute', label: 'WPM' }
+/**
+ * Column order: When → Mode → Duration → Words → WPM → Snippet (flex).
+ * Snippet is last so the table reads as a fixed-key panel on the left and a
+ * detail blurb that flexes to fill remaining width.
+ */
+const COLS: ColSpec[] = [
+  { key: 'datetime', label: 'When', align: 'left', width: '170px' },
+  { key: 'modeName', label: 'Mode', align: 'left', width: '100px' },
+  { key: 'duration', label: 'Duration', align: 'right', width: '80px' },
+  { key: 'wordCount', label: 'Words', align: 'right', width: '70px' },
+  { key: 'wordsPerMinute', label: 'WPM', align: 'right', width: '60px' },
+  { key: null, label: 'Snippet', align: 'left', flex: true }
 ]
 
 function sortRecordings(records: Recording[], key: SortKey, dir: Direction): Recording[] {
@@ -50,42 +61,39 @@ export function TranscriptsList(): React.JSX.Element {
   }
 
   return (
-    <div className="py-3">
-      <Card className="overflow-hidden p-0">
-        <div className="max-h-[calc(100vh-128px)] overflow-y-auto">
+    <div className="flex h-full flex-col py-3">
+      <Card className="flex min-h-0 flex-1 flex-col overflow-hidden p-0">
+        <div className="min-h-0 flex-1 overflow-y-auto">
           <table className="w-full text-[13px]">
             <thead className="sticky top-0 z-10 bg-card">
-              <tr className="text-left text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                {COLS.map((c) => (
-                  <SortHeader
-                    key={c.key}
-                    label={c.label}
-                    active={sortKey === c.key}
-                    direction={dir}
-                    onClick={() => toggle(c.key)}
-                    align={c.align}
-                    width={c.width}
-                  />
-                ))}
-                <th className="border-b border-border px-4 py-2.5 font-medium">Snippet</th>
-                {NUMERIC_COLS.map((c) => (
-                  <SortHeader
-                    key={c.key}
-                    label={c.label}
-                    active={sortKey === c.key}
-                    direction={dir}
-                    onClick={() => toggle(c.key)}
-                    align="right"
-                    width="100px"
-                  />
-                ))}
+              <tr className="text-[12px] font-medium text-foreground">
+                {COLS.map((c) =>
+                  c.key ? (
+                    <SortHeader
+                      key={c.label}
+                      label={c.label}
+                      active={sortKey === c.key}
+                      direction={dir}
+                      onClick={() => toggle(c.key as SortKey)}
+                      align={c.align}
+                      width={c.width}
+                    />
+                  ) : (
+                    <th
+                      key={c.label}
+                      className="border-b border-border px-4 py-2.5 text-left font-medium"
+                    >
+                      {c.label}
+                    </th>
+                  )
+                )}
               </tr>
             </thead>
             <tbody>
               {rows.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={COLS.length}
                     className="px-4 py-10 text-center text-[13px] text-muted-foreground"
                   >
                     No transcripts match.
@@ -97,7 +105,7 @@ export function TranscriptsList(): React.JSX.Element {
                     key={r.id}
                     className="border-t border-border/60 transition-colors hover:bg-foreground/[0.02]"
                   >
-                    <td className="px-4 py-2 align-middle tabular-nums text-muted-foreground whitespace-nowrap">
+                    <td className="whitespace-nowrap px-4 py-2 align-middle tabular-nums text-muted-foreground">
                       <Link
                         to={`/transcripts/${r.id}`}
                         className="rounded hover:text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-ring/40"
@@ -110,14 +118,6 @@ export function TranscriptsList(): React.JSX.Element {
                         {r.modeName}
                       </span>
                     </td>
-                    <td className="max-w-0 truncate px-4 py-2 align-middle text-foreground">
-                      <Link
-                        to={`/transcripts/${r.id}`}
-                        className="rounded hover:underline focus:outline-none focus-visible:ring-1 focus-visible:ring-ring/40"
-                      >
-                        {truncate(r.excerpt, 140)}
-                      </Link>
-                    </td>
                     <td className="px-4 py-2 text-right align-middle tabular-nums text-muted-foreground">
                       {formatDurationSec(r.duration / 1000)}
                     </td>
@@ -126,6 +126,14 @@ export function TranscriptsList(): React.JSX.Element {
                     </td>
                     <td className="px-4 py-2 text-right align-middle tabular-nums text-muted-foreground">
                       {r.wordsPerMinute}
+                    </td>
+                    <td className="max-w-0 truncate px-4 py-2 align-middle text-foreground">
+                      <Link
+                        to={`/transcripts/${r.id}`}
+                        className="rounded hover:underline focus:outline-none focus-visible:ring-1 focus-visible:ring-ring/40"
+                      >
+                        {truncate(r.excerpt, 140)}
+                      </Link>
                     </td>
                   </tr>
                 ))
