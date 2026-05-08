@@ -83,9 +83,9 @@ export function Sidebar(): React.JSX.Element {
       )}
     >
       {/* Header band — traffic lights live in the left third (Electron-native,
-          x=18 y=18). The toggle sits just past them. h-9 / py-1.5 puts the
-          toggle's centre at y≈22, near-flush with the traffic lights' centre. */}
-      <div className="flex h-9 items-center gap-1 pl-[68px] pr-2">
+          x=18 y=18). The hide-sidebar toggle is right-aligned so it sits
+          opposite the traffic lights, balancing the band visually. */}
+      <div className="flex h-9 items-center justify-end pl-[68px] pr-2">
         <button
           type="button"
           onClick={toggleSidebar}

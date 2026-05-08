@@ -135,7 +135,7 @@ function FlatSearch({
   return (
     <div className="relative">
       <Search
-        className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
+        className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
         strokeWidth={1.8}
       />
       <input
@@ -143,7 +143,7 @@ function FlatSearch({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="Search transcripts"
-        className="h-7 w-[280px] border-b border-transparent bg-transparent pl-7 pr-2 text-[13px] text-foreground placeholder:text-muted-foreground transition-colors hover:border-border focus:border-foreground/40 focus:outline-none"
+        className="h-7 w-[280px] rounded-md border border-border bg-transparent pl-7 pr-2 text-[13px] text-foreground placeholder:text-muted-foreground transition-colors hover:border-foreground/30 focus:border-foreground/40 focus:outline-none focus:ring-1 focus:ring-ring/30"
       />
     </div>
   )
