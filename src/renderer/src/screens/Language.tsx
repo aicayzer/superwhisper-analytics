@@ -3,6 +3,7 @@ import { ChartCard } from '@renderer/components/charts/ChartCard'
 import { DistBar } from '@renderer/components/charts/DistBar'
 import { HBar } from '@renderer/components/charts/HBar'
 import { LineTrend } from '@renderer/components/charts/LineTrend'
+import { KpiRow } from '@renderer/components/KpiRow'
 import { formatNumber } from '@renderer/lib/format'
 import { mock } from '@renderer/lib/mock'
 
@@ -16,7 +17,8 @@ export function Language(): React.JSX.Element {
     wpmTrend,
     fillerTrend,
     sentenceDist,
-    vocabGrowth
+    vocabGrowth,
+    sparklines
   } = mock
 
   const topWords = wordFrequency.slice(0, 12).map((w) => ({ label: w.word, count: w.count }))
@@ -24,12 +26,31 @@ export function Language(): React.JSX.Element {
 
   return (
     <div className="space-y-3 py-3">
-      <div className="grid grid-cols-4 divide-x divide-border rounded-xl border border-border bg-card">
-        <Kpi label="Words / minute" value={String(language.avgWPM)} sub="rolling average" />
-        <Kpi label="Filler rate" value={`${language.fillerRatePct}%`} sub="of total words" />
-        <Kpi label="Vocabulary" value={formatNumber(language.vocabularyCount)} sub="unique words" />
-        <Kpi label="Avg sentence" value={`${language.avgSentenceLength}`} sub="words / sentence" />
-      </div>
+      <KpiRow
+        items={[
+          {
+            label: 'Words / minute',
+            value: String(language.avgWPM),
+            sub: 'rolling average',
+            spark: sparklines.wpm.values
+          },
+          {
+            label: 'Filler rate',
+            value: `${language.fillerRatePct}%`,
+            sub: 'of total words'
+          },
+          {
+            label: 'Vocabulary',
+            value: formatNumber(language.vocabularyCount),
+            sub: 'unique words'
+          },
+          {
+            label: 'Avg sentence',
+            value: `${language.avgSentenceLength}`,
+            sub: 'words / sentence'
+          }
+        ]}
+      />
 
       <div className="grid grid-cols-2 gap-3" style={{ height: 260 }}>
         <ChartCard title="Top words" slug="top-words">
@@ -91,26 +112,6 @@ export function Language(): React.JSX.Element {
           />
         </ChartCard>
       </div>
-    </div>
-  )
-}
-
-function Kpi({
-  label,
-  value,
-  sub
-}: {
-  label: string
-  value: string
-  sub: string
-}): React.JSX.Element {
-  return (
-    <div className="px-5 py-3">
-      <div className="text-[12px] font-medium text-foreground">{label}</div>
-      <div className="mt-0.5 text-[26px] font-semibold leading-tight tracking-tight tabular-nums text-foreground">
-        {value}
-      </div>
-      <div className="mt-0.5 text-[11.5px] text-muted-foreground">{sub}</div>
     </div>
   )
 }

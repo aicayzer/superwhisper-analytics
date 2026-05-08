@@ -3,36 +3,42 @@ import { ChartCard } from '@renderer/components/charts/ChartCard'
 import { DistBar } from '@renderer/components/charts/DistBar'
 import { Heatmap } from '@renderer/components/charts/Heatmap'
 import { HourRadial } from '@renderer/components/charts/HourRadial'
+import { KpiRow } from '@renderer/components/KpiRow'
 import { formatDurationSec } from '@renderer/lib/format'
 import { mock } from '@renderer/lib/mock'
 
 export function Usage(): React.JSX.Element {
-  const { overview, usage, daily, hourly, heatmap, durationDist } = mock
+  const { overview, usage, daily, hourly, heatmap, durationDist, sparklines } = mock
 
   return (
     <div className="space-y-3 py-3">
-      <div className="grid grid-cols-4 divide-x divide-border rounded-xl border border-border bg-card">
-        <Kpi
-          label="Active days"
-          value={String(overview.activeDays)}
-          sub={`of ${daily.length} in window`}
-        />
-        <Kpi
-          label="Current streak"
-          value={`${usage.currentStreak}d`}
-          sub={`longest ${usage.longestStreak}d`}
-        />
-        <Kpi
-          label="Avg per active day"
-          value={String(Math.round(usage.avgPerActiveDay))}
-          sub="recordings"
-        />
-        <Kpi
-          label="Time per day"
-          value={formatDurationSec(usage.timePerActiveDaySec)}
-          sub="active days"
-        />
-      </div>
+      <KpiRow
+        items={[
+          {
+            label: 'Active days',
+            value: String(overview.activeDays),
+            sub: `of ${daily.length} in window`,
+            spark: sparklines.recordings.values
+          },
+          {
+            label: 'Current streak',
+            value: `${usage.currentStreak}d`,
+            sub: `longest ${usage.longestStreak}d`
+          },
+          {
+            label: 'Avg per active day',
+            value: String(Math.round(usage.avgPerActiveDay)),
+            sub: 'recordings',
+            spark: sparklines.recordings.values
+          },
+          {
+            label: 'Time per day',
+            value: formatDurationSec(usage.timePerActiveDaySec),
+            sub: 'active days',
+            spark: sparklines.duration.values
+          }
+        ]}
+      />
 
       <ChartCard title="Volume over time" slug="volume-over-time" className="h-[280px]">
         <ActivityArea
@@ -63,26 +69,6 @@ export function Usage(): React.JSX.Element {
           />
         </ChartCard>
       </div>
-    </div>
-  )
-}
-
-function Kpi({
-  label,
-  value,
-  sub
-}: {
-  label: string
-  value: string
-  sub: string
-}): React.JSX.Element {
-  return (
-    <div className="px-5 py-3">
-      <div className="text-[12px] font-medium text-foreground">{label}</div>
-      <div className="mt-0.5 text-[26px] font-semibold leading-tight tracking-tight tabular-nums text-foreground">
-        {value}
-      </div>
-      <div className="mt-0.5 text-[11.5px] text-muted-foreground">{sub}</div>
     </div>
   )
 }

@@ -2,6 +2,7 @@ import { ActivityArea } from '@renderer/components/charts/ActivityArea'
 import { ChartCard } from '@renderer/components/charts/ChartCard'
 import { VBar } from '@renderer/components/charts/VBar'
 import { Card } from '@renderer/components/ui/card'
+import { KpiRow } from '@renderer/components/KpiRow'
 import { formatCompact, formatDateOnly, formatDurationSec } from '@renderer/lib/format'
 import { mock } from '@renderer/lib/mock'
 import { ChevronRight } from 'lucide-react'
@@ -17,31 +18,40 @@ import { formatActivityTick } from './format'
  * in a row, no chrome — to keep the eye on numbers, not boxes.
  */
 export function VariantA(): React.JSX.Element {
-  const { overview, recordings, daily, dayOfWeek } = mock
+  const { overview, recordings, daily, dayOfWeek, sparklines } = mock
   const recent = recordings.slice(0, 12)
   const avgPerRec = Math.round(overview.totalWords / overview.totalRecordings)
 
   return (
     <div className="flex h-full flex-col gap-3 py-3">
-      {/* Flat KPI row */}
-      <div className="grid grid-cols-4 divide-x divide-border rounded-xl border border-border bg-card">
-        <Kpi
-          label="Recordings"
-          value={formatCompact(overview.totalRecordings)}
-          sub={`${overview.activeDays} active days`}
-        />
-        <Kpi
-          label="Total words"
-          value={formatCompact(overview.totalWords)}
-          sub={`${avgPerRec} avg / recording`}
-        />
-        <Kpi
-          label="Time spoken"
-          value={formatDurationSec(overview.totalDurationSec)}
-          sub={`${formatDurationSec(overview.avgDurationSec)} avg`}
-        />
-        <Kpi label="Words / minute" value={String(overview.avgWPM)} sub="rolling average" />
-      </div>
+      <KpiRow
+        items={[
+          {
+            label: 'Recordings',
+            value: formatCompact(overview.totalRecordings),
+            sub: `${overview.activeDays} active days`,
+            spark: sparklines.recordings.values
+          },
+          {
+            label: 'Total words',
+            value: formatCompact(overview.totalWords),
+            sub: `${avgPerRec} avg / recording`,
+            spark: sparklines.words.values
+          },
+          {
+            label: 'Time spoken',
+            value: formatDurationSec(overview.totalDurationSec),
+            sub: `${formatDurationSec(overview.avgDurationSec)} avg`,
+            spark: sparklines.duration.values
+          },
+          {
+            label: 'Words / minute',
+            value: String(overview.avgWPM),
+            sub: 'rolling average',
+            spark: sparklines.wpm.values
+          }
+        ]}
+      />
 
       {/* Charts */}
       <div className="grid grid-cols-[2fr_1fr] gap-3" style={{ height: 220 }}>
@@ -113,26 +123,6 @@ export function VariantA(): React.JSX.Element {
           </table>
         </div>
       </Card>
-    </div>
-  )
-}
-
-function Kpi({
-  label,
-  value,
-  sub
-}: {
-  label: string
-  value: string
-  sub: string
-}): React.JSX.Element {
-  return (
-    <div className="px-5 py-3">
-      <div className="text-[12px] font-medium text-foreground">{label}</div>
-      <div className="mt-0.5 text-[26px] font-semibold leading-tight tracking-tight tabular-nums text-foreground">
-        {value}
-      </div>
-      <div className="mt-0.5 text-[11.5px] text-muted-foreground">{sub}</div>
     </div>
   )
 }
