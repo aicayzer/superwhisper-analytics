@@ -27,7 +27,7 @@ export function Language(): React.JSX.Element {
   const topFillers = fillerSummary.slice(0, 8).map((f) => ({ label: f.phrase, count: f.count }))
 
   return (
-    <div className="space-y-3 py-3">
+    <div className="space-y-3">
       <KpiRow
         items={[
           {

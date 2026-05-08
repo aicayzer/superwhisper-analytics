@@ -12,7 +12,7 @@ export function Usage(): React.JSX.Element {
   const { overview, usage, daily, hourly, heatmap, durationDist, sparklines, streakCells } = mock
 
   return (
-    <div className="space-y-3 py-3">
+    <div className="space-y-3">
       <KpiRow
         items={[
           {

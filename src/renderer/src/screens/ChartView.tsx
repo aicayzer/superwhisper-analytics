@@ -27,7 +27,7 @@ export function ChartView(): React.JSX.Element {
   const backTo = fromParam ? decodeURIComponent(fromParam) : spec.sectionPath
 
   return (
-    <div className="flex h-full flex-col gap-3 py-3">
+    <div className="flex h-full flex-col gap-3">
       {spec.description && (
         <p className="text-[12.5px] text-muted-foreground">{spec.description}</p>
       )}

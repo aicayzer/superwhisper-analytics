@@ -142,7 +142,7 @@ function DetailView({ rec, onPrev, onNext }: DetailViewProps): React.JSX.Element
   const fillerPct = rec.wordCount > 0 ? (rec.fillerCount / rec.wordCount) * 100 : 0
 
   return (
-    <div className="flex h-full flex-col gap-3 py-3">
+    <div className="flex h-full flex-col gap-3">
       {/* Header */}
       <div className="flex items-center gap-3">
         <Link

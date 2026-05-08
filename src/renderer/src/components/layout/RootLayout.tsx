@@ -10,6 +10,7 @@ const SIDEBAR_GAP = 8
 const CONTENT_GUTTER = 24
 const HEADER_TOP = 8 // sidebar + header both at top-2
 const HEADER_H = 36
+const FRAME_GAP = 8 // matches sidebar's bottom-2 — content sits at 8px from the window bottom
 
 const TITLES: Record<string, string> = {
   '/': 'Overview',
@@ -68,10 +69,12 @@ export function RootLayout(): React.JSX.Element {
       <main
         className="absolute inset-0 overflow-y-auto bg-background transition-[padding] duration-200 ease-out"
         style={{
-          paddingTop: HEADER_TOP + HEADER_H + 8, // header bottom + 8px gap to content
+          // Matches the floating frame: 8px window gap + header height +
+          // 8px gap to content above; same 8px gap to window bottom.
+          paddingTop: HEADER_TOP + HEADER_H + FRAME_GAP,
           paddingLeft: leftPad,
           paddingRight: CONTENT_GUTTER,
-          paddingBottom: 16
+          paddingBottom: FRAME_GAP
         }}
       >
         <Outlet />
