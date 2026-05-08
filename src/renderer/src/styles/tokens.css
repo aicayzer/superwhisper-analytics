@@ -17,8 +17,9 @@
  *   --card       slightly lifted from --background — used by cards
  *
  * Light mode: --background == --window (off-white), cards are pure white.
- * Dark mode:  --background = #1F1F1E, sidebar = #262626, cards = #2A2A2A.
- * The colour difference replaces shadow as the elevation cue in dark mode.
+ * Dark mode:  window #1F1F1E < card #232322 < sidebar #262626. The card sits
+ * just above the window so it reads as a quiet container; the sidebar
+ * dominates as the floating chrome.
  */
 
 :root {
@@ -66,7 +67,7 @@
 
   --background: var(--window);
   --foreground: #fafaf9;
-  --card: #2a2a2a;
+  --card: #232322;
   --card-foreground: #fafaf9;
   --popover: var(--floating);
   --popover-foreground: #fafaf9;
