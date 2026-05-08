@@ -98,7 +98,10 @@ export function TranscriptsList(): React.JSX.Element {
                     className="border-t border-border/60 transition-colors hover:bg-foreground/[0.02]"
                   >
                     <td className="px-4 py-2 align-middle tabular-nums text-muted-foreground whitespace-nowrap">
-                      <Link to={`/transcripts/${r.id}`} className="hover:text-foreground">
+                      <Link
+                        to={`/transcripts/${r.id}`}
+                        className="rounded hover:text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-ring/40"
+                      >
                         {formatTimestamp(r.datetime)}
                       </Link>
                     </td>
@@ -108,7 +111,10 @@ export function TranscriptsList(): React.JSX.Element {
                       </span>
                     </td>
                     <td className="max-w-0 truncate px-4 py-2 align-middle text-foreground">
-                      <Link to={`/transcripts/${r.id}`} className="hover:underline">
+                      <Link
+                        to={`/transcripts/${r.id}`}
+                        className="rounded hover:underline focus:outline-none focus-visible:ring-1 focus-visible:ring-ring/40"
+                      >
                         {truncate(r.excerpt, 140)}
                       </Link>
                     </td>

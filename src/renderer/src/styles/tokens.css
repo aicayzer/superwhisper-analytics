@@ -5,11 +5,20 @@
  *   1. Source values in :root / .dark — single source of truth
  *   2. @theme inline mapping — exposes them as Tailwind utilities
  *
- * ShadCN-compatible tokens (--background, --foreground, --primary, etc.)
- * sit alongside foundation aliases (--window, --floating, --fg-muted)
+ * ShadCN tokens (--background, --foreground, --primary, etc.) sit
+ * alongside foundation aliases (--window, --floating, --fg-muted)
  * so both component sets work side by side.
  *
  * Theme switching: toggle the `.dark` class on <html> via themeStore.
+ *
+ * Surface system:
+ *   --window     the cream/charcoal backdrop visible around floating overlays
+ *   --floating   the surface used by the sidebar (sits on --window)
+ *   --card       slightly lifted from --background — used by cards
+ *
+ * Light mode: --background == --window (off-white), cards are pure white.
+ * Dark mode:  --background = #1F1F1E, sidebar = #262626, cards = #2A2A2A.
+ * The colour difference replaces shadow as the elevation cue in dark mode.
  */
 
 :root {
@@ -20,7 +29,7 @@
   /* ShadCN base (greyscale, neutral) */
   --background: var(--window);
   --foreground: #0a0a0a;
-  --card: var(--floating);
+  --card: #ffffff;
   --card-foreground: #0a0a0a;
   --popover: var(--floating);
   --popover-foreground: #0a0a0a;
@@ -46,32 +55,33 @@
   --chart-4: #a3a3a3;
   --chart-5: #d4d4d4;
 
-  /* Elevation */
+  /* Elevation — used only by floating overlays (sidebar, palette). Cards
+     get their lift from a brighter --card colour, not shadow. */
   --shadow-float: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px -4px rgba(0, 0, 0, 0.08);
 }
 
 .dark {
-  --window: #1c1c1c;
+  --window: #1f1f1e;
   --floating: #262626;
 
   --background: var(--window);
   --foreground: #fafaf9;
-  --card: var(--floating);
+  --card: #2a2a2a;
   --card-foreground: #fafaf9;
   --popover: var(--floating);
   --popover-foreground: #fafaf9;
   --primary: #fafaf9;
   --primary-foreground: #0a0a0a;
-  --secondary: #2a2a2a;
+  --secondary: #2e2e2e;
   --secondary-foreground: #fafaf9;
-  --muted: #2a2a2a;
+  --muted: #2e2e2e;
   --muted-foreground: #a8a29e;
-  --accent: #2a2a2a;
+  --accent: #2e2e2e;
   --accent-foreground: #fafaf9;
   --destructive: #b91c1c;
   --destructive-foreground: #fafaf9;
-  --border: #2a2a2a;
-  --input: #2a2a2a;
+  --border: #2e2e2e;
+  --input: #2e2e2e;
   --ring: #525252;
 
   --chart-1: #fafaf9;
@@ -80,7 +90,9 @@
   --chart-4: #737373;
   --chart-5: #404040;
 
-  --shadow-float: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px -6px rgba(0, 0, 0, 0.5);
+  /* Pulled right back in dark mode — the brighter --card and --floating
+     colours carry the elevation cue. Just enough to avoid a hard outline. */
+  --shadow-float: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
 @theme inline {

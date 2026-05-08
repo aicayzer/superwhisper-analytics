@@ -1,8 +1,8 @@
+import { useLayoutStore } from '@renderer/state/layoutStore'
 import { PanelLeft, Search } from 'lucide-react'
 import { useState } from 'react'
-import { useLayoutStore } from '@renderer/state/layoutStore'
 
-interface TopbarProps {
+interface TopStripProps {
   title: string
   showSearch: boolean
 }
@@ -16,38 +16,41 @@ const RANGE_OPTIONS = [
 ]
 
 /**
- * The horizontal bar beneath the titlebar.
+ * Single top strip spanning the full window. Replaces the foundation's
+ * Titlebar + a separate Topbar.
  *
- * Page title sits left. When viewing /transcripts the search input is
- * absolutely centred. Date range select sits right.
+ * Drag region (so the user can drag the window) with no-drag overrides on
+ * interactive elements. `pl-[88px]` reserves room for the native macOS
+ * traffic lights — h-12 + items-center puts every control's vertical centre
+ * at y=24, the same as `trafficLightPosition: { y: 18 }`.
  *
- * No divider underneath — the shell uses elevation, not lines.
+ * The sidebar floats *below* this strip, so the toggle on the left always
+ * has a clear hit area regardless of sidebar state.
  */
-export function Topbar({ title, showSearch }: TopbarProps): React.JSX.Element {
+export function TopStrip({ title, showSearch }: TopStripProps): React.JSX.Element {
+  const toggleSidebar = useLayoutStore((s) => s.toggleSidebar)
   const sidebarOpen = useLayoutStore((s) => s.sidebarOpen)
-  const setSidebarOpen = useLayoutStore((s) => s.setSidebarOpen)
   const [range, setRange] = useState('90')
   const [search, setSearch] = useState('')
 
   return (
-    <div className="relative flex h-12 shrink-0 items-center gap-2 px-4">
-      <div className="flex min-w-0 flex-1 items-center gap-2">
-        {!sidebarOpen && (
-          <button
-            type="button"
-            onClick={() => setSidebarOpen(true)}
-            aria-label="Show sidebar"
-            title="Show sidebar"
-            className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground"
-          >
-            <PanelLeft className="h-4 w-4" strokeWidth={1.8} />
-          </button>
-        )}
-        <h1 className="text-[15px] font-semibold tracking-tight text-foreground">{title}</h1>
-      </div>
+    <div className="absolute left-0 right-0 top-0 z-30 flex h-12 items-center gap-2 bg-background pl-[88px] pr-3 [-webkit-app-region:drag]">
+      <button
+        type="button"
+        onClick={toggleSidebar}
+        aria-label={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
+        title={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
+        className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground [-webkit-app-region:no-drag]"
+      >
+        <PanelLeft className="h-4 w-4" strokeWidth={1.8} />
+      </button>
+
+      <h1 className="select-none text-[14px] font-semibold tracking-tight text-foreground">
+        {title}
+      </h1>
 
       {showSearch && (
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 [-webkit-app-region:no-drag]">
           <div className="relative">
             <Search
               className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
@@ -64,7 +67,7 @@ export function Topbar({ title, showSearch }: TopbarProps): React.JSX.Element {
         </div>
       )}
 
-      <div className="ml-auto">
+      <div className="ml-auto [-webkit-app-region:no-drag]">
         <select
           value={range}
           onChange={(e) => setRange(e.target.value)}

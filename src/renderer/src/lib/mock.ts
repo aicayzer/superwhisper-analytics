@@ -10,10 +10,17 @@
 import type {
   DailySummary,
   DayOfWeekPattern,
+  DurationBucket,
+  Heatmap,
+  HourlyPattern,
+  LanguageStats,
   ModeStat,
   OverviewStats,
   Recording,
   Segment,
+  SentenceBucket,
+  TrendPoint,
+  UsageStats,
   WordFrequency
 } from './types'
 
@@ -450,6 +457,147 @@ const fillerSummary = Array.from(fillerTotals.entries())
   .map(([phrase, count]) => ({ phrase, count }))
   .sort((a, b) => b.count - a.count)
 
+// ---- Usage aggregates ----------------------------------------------------
+
+const hourly: HourlyPattern[] = Array.from({ length: 24 }, (_, h) => ({
+  hour: h,
+  count: 0,
+  totalDurationSec: 0
+}))
+for (const r of recordings) {
+  const h = new Date(r.datetime).getHours()
+  hourly[h]!.count++
+  hourly[h]!.totalDurationSec += r.duration / 1000
+}
+
+const heatmap: Heatmap = Array.from({ length: 7 }, () => Array(24).fill(0) as number[])
+for (const r of recordings) {
+  const d = new Date(r.datetime)
+  const row = heatmap[d.getDay()]
+  if (!row) continue
+  row[d.getHours()] = (row[d.getHours()] ?? 0) + 1
+}
+
+const DURATION_BUCKET_DEFS = [
+  { label: '<10s', min: 0, max: 10 },
+  { label: '10–30s', min: 10, max: 30 },
+  { label: '30–60s', min: 30, max: 60 },
+  { label: '1–2m', min: 60, max: 120 },
+  { label: '2–5m', min: 120, max: 300 },
+  { label: '5m+', min: 300, max: Infinity }
+] as const
+const durationDist: DurationBucket[] = DURATION_BUCKET_DEFS.map((b) => ({ ...b, count: 0 }))
+for (const r of recordings) {
+  const sec = r.duration / 1000
+  const b = durationDist.find((b) => sec >= b.min && sec < b.max)
+  if (b) b.count++
+}
+
+// Streaks ----------------------------------------------------------------
+
+const sortedDays = Array.from(dailyMap.values()).sort((a, b) => a.date.localeCompare(b.date))
+let longestStreak = 0
+{
+  let run = 0
+  for (const d of sortedDays) {
+    if (d.count > 0) {
+      run++
+      if (run > longestStreak) longestStreak = run
+    } else {
+      run = 0
+    }
+  }
+}
+let currentStreak = 0
+for (let i = sortedDays.length - 1; i >= 0; i--) {
+  if ((sortedDays[i]?.count ?? 0) > 0) currentStreak++
+  else break
+}
+
+const usage: UsageStats = {
+  currentStreak,
+  longestStreak,
+  avgPerActiveDay: overview.totalRecordings / Math.max(1, overview.activeDays),
+  timePerActiveDaySec: overview.totalDurationSec / Math.max(1, overview.activeDays)
+}
+
+// ---- Language aggregates -------------------------------------------------
+
+function isoWeek(dt: Date): string {
+  const d = new Date(Date.UTC(dt.getFullYear(), dt.getMonth(), dt.getDate()))
+  const dayNum = d.getUTCDay() || 7
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum)
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
+  const weekNum = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7)
+  return `${d.getUTCFullYear()}-W${pad(weekNum)}`
+}
+
+const wpmByMonth = new Map<string, { sumWords: number; sumSec: number }>()
+for (const r of recordings) {
+  const m = r.datetime.slice(0, 7) // YYYY-MM
+  const cur = wpmByMonth.get(m) ?? { sumWords: 0, sumSec: 0 }
+  cur.sumWords += r.wordCount
+  cur.sumSec += r.duration / 1000
+  wpmByMonth.set(m, cur)
+}
+const wpmTrend: TrendPoint[] = Array.from(wpmByMonth.entries())
+  .sort(([a], [b]) => a.localeCompare(b))
+  .map(([period, v]) => ({ period, value: Math.round((v.sumWords / v.sumSec) * 60) }))
+
+const fillerByWeek = new Map<string, { fillers: number; words: number }>()
+for (const r of recordings) {
+  const period = isoWeek(new Date(r.datetime))
+  const cur = fillerByWeek.get(period) ?? { fillers: 0, words: 0 }
+  cur.fillers += r.fillerCount
+  cur.words += r.wordCount
+  fillerByWeek.set(period, cur)
+}
+const fillerTrend: TrendPoint[] = Array.from(fillerByWeek.entries())
+  .sort(([a], [b]) => a.localeCompare(b))
+  .map(([period, v]) => ({
+    period,
+    value: v.words > 0 ? +((v.fillers / v.words) * 100).toFixed(2) : 0
+  }))
+
+const SENTENCE_BUCKET_DEFS = [
+  { label: '≤5', min: 0, max: 6 },
+  { label: '6–10', min: 6, max: 11 },
+  { label: '11–15', min: 11, max: 16 },
+  { label: '16–20', min: 16, max: 21 },
+  { label: '21–25', min: 21, max: 26 },
+  { label: '25+', min: 26, max: Infinity }
+] as const
+const sentenceDist: SentenceBucket[] = SENTENCE_BUCKET_DEFS.map((b) => ({ ...b, count: 0 }))
+for (const r of recordings) {
+  if (r.sentenceCount > 0) {
+    const avg = r.wordCount / r.sentenceCount
+    const b = sentenceDist.find((b) => avg >= b.min && avg < b.max)
+    if (b) b.count++
+  }
+}
+
+// Vocabulary growth — cumulative unique words over time (by ISO week).
+const recordingsByDate = recordings.slice().sort((a, b) => a.datetime.localeCompare(b.datetime))
+const vocabSet = new Set<string>()
+const vocabByWeek = new Map<string, number>()
+for (const r of recordingsByDate) {
+  const period = isoWeek(new Date(r.datetime))
+  for (const w of tokenise(r.result)) vocabSet.add(w)
+  vocabByWeek.set(period, vocabSet.size)
+}
+const vocabGrowth: TrendPoint[] = Array.from(vocabByWeek.entries())
+  .sort(([a], [b]) => a.localeCompare(b))
+  .map(([period, value]) => ({ period, value }))
+
+const totalSentences = recordings.reduce((s, r) => s + r.sentenceCount, 0)
+const totalFillerCount = recordings.reduce((s, r) => s + r.fillerCount, 0)
+const language: LanguageStats = {
+  avgWPM: overview.avgWPM,
+  fillerRatePct: totalWords > 0 ? +((totalFillerCount / totalWords) * 100).toFixed(2) : 0,
+  vocabularyCount: wordCounts.size,
+  avgSentenceLength: totalSentences > 0 ? +(totalWords / totalSentences).toFixed(1) : 0
+}
+
 export const mock = {
   recordings,
   overview,
@@ -457,5 +605,15 @@ export const mock = {
   dayOfWeek,
   modeStats,
   wordFrequency,
-  fillerSummary
+  fillerSummary,
+  // wave 1.5
+  hourly,
+  heatmap,
+  durationDist,
+  usage,
+  wpmTrend,
+  fillerTrend,
+  sentenceDist,
+  vocabGrowth,
+  language
 }

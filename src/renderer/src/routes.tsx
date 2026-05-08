@@ -1,9 +1,11 @@
 import { createHashRouter } from 'react-router-dom'
 import { RootLayout } from './components/layout/RootLayout'
-import { Overview } from './screens/Overview'
+import { Language } from './screens/Language'
+import { Overview } from './screens/overview'
 import { Placeholder } from './screens/Placeholder'
 import { TranscriptDetail } from './screens/TranscriptDetail'
 import { TranscriptsList } from './screens/TranscriptsList'
+import { Usage } from './screens/Usage'
 
 export const router = createHashRouter([
   {
@@ -13,8 +15,8 @@ export const router = createHashRouter([
       { index: true, element: <Overview /> },
       { path: 'transcripts', element: <TranscriptsList /> },
       { path: 'transcripts/:id', element: <TranscriptDetail /> },
-      { path: 'usage', element: <Placeholder name="Usage" /> },
-      { path: 'language', element: <Placeholder name="Language" /> },
+      { path: 'usage', element: <Usage /> },
+      { path: 'language', element: <Language /> },
       { path: 'settings', element: <Placeholder name="Settings" /> }
     ]
   }

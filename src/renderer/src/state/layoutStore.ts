@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 
-export const SIDEBAR_DEFAULT_WIDTH = 240
-export const SIDEBAR_MIN_WIDTH = 200
+export const SIDEBAR_DEFAULT_WIDTH = 220
+export const SIDEBAR_MIN_WIDTH = 180
 export const SIDEBAR_MAX_WIDTH = 360
 
 interface LayoutState {

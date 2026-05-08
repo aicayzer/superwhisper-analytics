@@ -5,7 +5,6 @@ import { AudioLines, House, Languages, RefreshCw, Settings, TextSearch } from 'l
 import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { ResizeHandle } from './ResizeHandle'
-import { SidebarHeader } from './SidebarHeader'
 
 const NAV = [
   { to: '/', label: 'Overview', icon: House },
@@ -38,8 +37,10 @@ function useNow(intervalMs: number): number {
 }
 
 /**
- * Floating sidebar overlay. Holds nav items + indexer footer with refresh
- * and settings cog. Drag-resizes from its right edge.
+ * Floating sidebar overlay. Sits *below* the TopStrip so the toggle on the
+ * topbar is always reachable. Starts with nav directly — no header, no
+ * brand wordmark — and ends with a thin footer (indexed-at + refresh +
+ * settings cog). Drag-resizes from the right edge.
  */
 export function Sidebar(): React.JSX.Element {
   const sidebarOpen = useLayoutStore((s) => s.sidebarOpen)
@@ -61,15 +62,13 @@ export function Sidebar(): React.JSX.Element {
       style={{ width: sidebarWidth }}
       aria-hidden={!sidebarOpen}
       className={cn(
-        'absolute top-2 bottom-2 left-2 z-20',
-        'flex flex-col rounded-xl border border-border bg-card shadow-[var(--shadow-float)]',
+        'absolute bottom-2 left-2 top-14 z-20',
+        'flex flex-col rounded-xl border border-border bg-floating shadow-[var(--shadow-float)]',
         !isResizing && 'transition-[transform,opacity] duration-200 ease-out',
         !sidebarOpen && '-translate-x-[calc(100%+0.5rem)] opacity-0 pointer-events-none'
       )}
     >
-      <SidebarHeader />
-
-      <nav className="flex-1 overflow-y-auto px-2 pb-2 text-[13px]">
+      <nav className="flex-1 overflow-y-auto px-2 pt-3 pb-2 text-[13px]">
         <ul className="space-y-px">
           {NAV.map(({ to, label, icon: Icon }) => (
             <li key={to}>
@@ -78,10 +77,10 @@ export function Sidebar(): React.JSX.Element {
                 end={to === '/'}
                 className={({ isActive }) =>
                   cn(
-                    'flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors [-webkit-app-region:no-drag]',
+                    'flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors [-webkit-app-region:no-drag] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/40',
                     isActive
-                      ? 'bg-foreground/8 font-medium text-foreground'
-                      : 'text-muted-foreground hover:bg-foreground/5 hover:text-foreground'
+                      ? 'bg-foreground/[0.05] font-medium text-foreground'
+                      : 'text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground'
                   )
                 }
               >
@@ -101,7 +100,7 @@ export function Sidebar(): React.JSX.Element {
           type="button"
           aria-label="Refresh"
           title="Refresh (placeholder)"
-          className="rounded p-1 transition-colors hover:bg-foreground/8 hover:text-foreground"
+          className="rounded p-1 transition-colors hover:bg-foreground/5 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/40"
         >
           <RefreshCw className="h-3 w-3" strokeWidth={1.8} />
         </button>
@@ -111,8 +110,8 @@ export function Sidebar(): React.JSX.Element {
           title="Settings"
           className={({ isActive }) =>
             cn(
-              'rounded p-1 transition-colors hover:bg-foreground/8 hover:text-foreground',
-              isActive && 'bg-foreground/8 text-foreground'
+              'rounded p-1 transition-colors hover:bg-foreground/5 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/40',
+              isActive && 'bg-foreground/5 text-foreground'
             )
           }
         >

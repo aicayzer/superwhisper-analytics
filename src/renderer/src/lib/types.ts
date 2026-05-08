@@ -70,3 +70,47 @@ export interface WordFrequency {
   word: string
   count: number
 }
+
+// ---- New for wave 1.5: Usage + Language aggregates ----------------------
+
+export interface HourlyPattern {
+  hour: number // 0-23
+  count: number
+  totalDurationSec: number
+}
+
+export interface DurationBucket {
+  label: string
+  min: number // seconds, inclusive
+  max: number // seconds, exclusive (Infinity for last bucket)
+  count: number
+}
+
+export interface SentenceBucket {
+  label: string
+  min: number // words/sentence, inclusive
+  max: number // exclusive
+  count: number
+}
+
+export interface TrendPoint {
+  period: string // YYYY-MM or YYYY-Www
+  value: number
+}
+
+export interface UsageStats {
+  currentStreak: number
+  longestStreak: number
+  avgPerActiveDay: number
+  timePerActiveDaySec: number
+}
+
+export interface LanguageStats {
+  avgWPM: number
+  fillerRatePct: number
+  vocabularyCount: number
+  avgSentenceLength: number
+}
+
+/** 7×24 number matrix — rows are days (0=Sun), cols are hours. */
+export type Heatmap = number[][]

@@ -259,9 +259,7 @@ function DetailView({ rec, onPrev, onNext }: DetailViewProps): React.JSX.Element
 function DetailsCard({ rec, fillerPct }: { rec: Recording; fillerPct: number }): React.JSX.Element {
   return (
     <Card className="p-4 text-[12px]">
-      <div className="mb-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-        Details
-      </div>
+      <div className="mb-2 text-[12px] font-semibold tracking-tight text-foreground">Details</div>
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5">
         <Row k="Recorded" v={formatTimestamp(rec.datetime)} />
         <Row k="Mode" v={rec.modeName} />
@@ -295,7 +293,7 @@ function FillerCard({
   if (breakdown.length === 0) {
     return (
       <Card className="p-4 text-[12px] text-muted-foreground">
-        <div className="mb-1 text-[10px] font-medium uppercase tracking-wider">
+        <div className="mb-1 text-[12px] font-semibold tracking-tight text-foreground">
           Fillers in this recording
         </div>
         No filler phrases detected.
@@ -306,7 +304,7 @@ function FillerCard({
   const top = breakdown.slice(0, 6)
   return (
     <Card className="p-4 text-[12px]">
-      <div className="mb-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+      <div className="mb-2 text-[12px] font-semibold tracking-tight text-foreground">
         Fillers in this recording
       </div>
       <div className="space-y-1.5">
