@@ -18,6 +18,11 @@ import type {
 const LEGACY_DIR = path.join(process.cwd(), 'data', 'legacy')
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const DAY_NAME_TO_INDEX: Record<string, number> = {
+  sunday: 0, sun: 0, monday: 1, mon: 1, tuesday: 2, tue: 2,
+  wednesday: 3, wed: 3, thursday: 4, thu: 4, friday: 5, fri: 5,
+  saturday: 6, sat: 6,
+}
 
 async function readCSV<T extends object>(filename: string): Promise<T[]> {
   const filePath = path.join(LEGACY_DIR, filename)
@@ -77,15 +82,17 @@ export async function getLegacyProfile(): Promise<LegacyProfile> {
 
   const topicStats: TopicStat[] = (topics as Record<string, unknown>[]).map((r) => ({
     topic: String(r.primary_topic ?? r.topic ?? ''),
-    count: Number(r.count ?? 0),
-    pct: Number(r.percentage ?? 0),
+    count: Number(r.recording_count ?? r.count ?? 0),
+    pct: Number(r.percentage_of_recordings ?? r.percentage ?? 0),
   }))
 
-  // Build day-of-week from recordings_detail
+  // Build day-of-week from recordings_detail (day_of_week may be numeric or name string)
   const dowCounts = new Array(7).fill(0)
   for (const r of detail) {
-    const dow = Number(r.day_of_week)
-    if (!isNaN(dow) && dow >= 0 && dow < 7) dowCounts[dow]++
+    const raw = r.day_of_week
+    const dowNum = Number(raw)
+    const dow = !isNaN(dowNum) ? dowNum : DAY_NAME_TO_INDEX[String(raw).toLowerCase()]
+    if (dow !== undefined && dow >= 0 && dow < 7) dowCounts[dow]++
   }
   const dayOfWeek: DayOfWeekPattern[] = DAYS.map((dayName, day) => ({ day, dayName, count: dowCounts[day] }))
 
