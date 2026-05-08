@@ -1,6 +1,6 @@
 import { ActivityArea } from '@renderer/components/charts/ActivityArea'
 import { ChartCard } from '@renderer/components/charts/ChartCard'
-import { VBar } from '@renderer/components/charts/VBar'
+import { StackedAreaPercent } from '@renderer/components/charts/StackedAreaPercent'
 import { Card } from '@renderer/components/ui/card'
 import { KpiRow } from '@renderer/components/KpiRow'
 import { formatCompact, formatDateOnly, formatDurationSec } from '@renderer/lib/format'
@@ -18,7 +18,7 @@ import { formatActivityTick } from './format'
  * in a row, no chrome — to keep the eye on numbers, not boxes.
  */
 export function VariantA(): React.JSX.Element {
-  const { overview, recordings, daily, dayOfWeek, sparklines } = mock
+  const { overview, recordings, daily, modeByWeekFlat, stackModeKeys, sparklines } = mock
   const recent = recordings.slice(0, 12)
   const avgPerRec = Math.round(overview.totalWords / overview.totalRecordings)
 
@@ -54,7 +54,7 @@ export function VariantA(): React.JSX.Element {
       />
 
       {/* Charts */}
-      <div className="grid grid-cols-[2fr_1fr] gap-3" style={{ height: 220 }}>
+      <div className="grid grid-cols-[3fr_2fr] gap-3" style={{ height: 240 }}>
         <ChartCard title="Activity" slug="activity">
           <ActivityArea
             data={daily as unknown as Array<Record<string, unknown>>}
@@ -63,11 +63,12 @@ export function VariantA(): React.JSX.Element {
             formatTick={formatActivityTick}
           />
         </ChartCard>
-        <ChartCard title="By day of week" slug="by-day-of-week">
-          <VBar
-            data={dayOfWeek as unknown as Array<Record<string, unknown>>}
-            xKey="dayName"
-            yKey="count"
+        <ChartCard title="Mode mix" slug="mode-mix">
+          <StackedAreaPercent
+            data={modeByWeekFlat}
+            xKey="date"
+            keys={stackModeKeys}
+            formatTick={(v) => String(v).replace(/^\d{4}-/, '')}
           />
         </ChartCard>
       </div>

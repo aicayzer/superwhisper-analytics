@@ -668,6 +668,31 @@ const modeByDay: ModeByDay[] = Array.from(modeByDayMap.values()).sort((a, b) =>
 )
 const stackModeKeys: string[] = [...TOP_MODES_FOR_STACK, 'Other']
 
+/** Same shape as modeByDay but aggregated by ISO week — fewer points so it
+ *  reads in a narrow column. */
+const modeByWeekMap = new Map<string, ModeByDay>()
+for (const day of modeByDay) {
+  const period = isoWeek(new Date(day.date))
+  let cur = modeByWeekMap.get(period)
+  if (!cur) {
+    cur = { date: period, modes: {} }
+    modeByWeekMap.set(period, cur)
+  }
+  for (const [k, v] of Object.entries(day.modes)) {
+    cur.modes[k] = (cur.modes[k] ?? 0) + v
+  }
+}
+const modeByWeek: ModeByDay[] = Array.from(modeByWeekMap.values()).sort((a, b) =>
+  a.date.localeCompare(b.date)
+)
+
+/** Flat shape Recharts wants — { date, [modeKey]: count, ... }. */
+const modeByWeekFlat: Array<Record<string, unknown>> = modeByWeek.map((w) => {
+  const row: Record<string, unknown> = { date: w.date }
+  for (const k of stackModeKeys) row[k] = w.modes[k] ?? 0
+  return row
+})
+
 export const mock = {
   recordings,
   overview,
@@ -690,5 +715,7 @@ export const mock = {
   sparklines,
   streakCells,
   modeByDay,
+  modeByWeek,
+  modeByWeekFlat,
   stackModeKeys
 }

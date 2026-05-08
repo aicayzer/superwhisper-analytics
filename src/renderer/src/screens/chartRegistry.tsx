@@ -4,6 +4,7 @@ import { HBar } from '@renderer/components/charts/HBar'
 import { Heatmap } from '@renderer/components/charts/Heatmap'
 import { HourRadial } from '@renderer/components/charts/HourRadial'
 import { LineTrend } from '@renderer/components/charts/LineTrend'
+import { StackedAreaPercent } from '@renderer/components/charts/StackedAreaPercent'
 import { StreakCalendar } from '@renderer/components/charts/StreakCalendar'
 import { VBar } from '@renderer/components/charts/VBar'
 import { mock } from '@renderer/lib/mock'
@@ -188,6 +189,20 @@ export const CHART_REGISTRY: Record<string, ChartSpec> = {
         data={mock.dayOfWeek as unknown as Array<Record<string, unknown>>}
         xKey="dayName"
         yKey="count"
+      />
+    )
+  },
+  'mode-mix': {
+    section: 'Overview',
+    sectionPath: '/',
+    title: 'Mode mix',
+    description: 'Recording share per mode, week by week.',
+    render: () => (
+      <StackedAreaPercent
+        data={mock.modeByWeekFlat}
+        xKey="date"
+        keys={mock.stackModeKeys}
+        formatTick={(v) => String(v).replace(/^\d{4}-/, '')}
       />
     )
   }
