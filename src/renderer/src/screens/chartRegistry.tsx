@@ -4,6 +4,7 @@ import { HBar } from '@renderer/components/charts/HBar'
 import { Heatmap } from '@renderer/components/charts/Heatmap'
 import { HourRadial } from '@renderer/components/charts/HourRadial'
 import { LineTrend } from '@renderer/components/charts/LineTrend'
+import { StreakCalendar } from '@renderer/components/charts/StreakCalendar'
 import { VBar } from '@renderer/components/charts/VBar'
 import { mock } from '@renderer/lib/mock'
 
@@ -51,6 +52,17 @@ export const CHART_REGISTRY: Record<string, ChartSpec> = {
     title: 'When you record',
     description: 'Day of week × hour of day. Brighter cells are busier.',
     render: () => <Heatmap matrix={mock.heatmap} cellHeight={36} />
+  },
+  'recording-streak': {
+    section: 'Usage',
+    sectionPath: '/usage',
+    title: 'Recording streak',
+    description: 'Daily activity for the last twelve months.',
+    render: () => (
+      <div className="flex h-full items-center justify-center overflow-auto">
+        <StreakCalendar data={mock.streakCells} cellSize={16} />
+      </div>
+    )
   },
   'by-hour-of-day': {
     section: 'Usage',

@@ -3,12 +3,13 @@ import { ChartCard } from '@renderer/components/charts/ChartCard'
 import { DistBar } from '@renderer/components/charts/DistBar'
 import { Heatmap } from '@renderer/components/charts/Heatmap'
 import { HourRadial } from '@renderer/components/charts/HourRadial'
+import { StreakCalendar } from '@renderer/components/charts/StreakCalendar'
 import { KpiRow } from '@renderer/components/KpiRow'
 import { formatDurationSec } from '@renderer/lib/format'
 import { mock } from '@renderer/lib/mock'
 
 export function Usage(): React.JSX.Element {
-  const { overview, usage, daily, hourly, heatmap, durationDist, sparklines } = mock
+  const { overview, usage, daily, hourly, heatmap, durationDist, sparklines, streakCells } = mock
 
   return (
     <div className="space-y-3 py-3">
@@ -40,7 +41,13 @@ export function Usage(): React.JSX.Element {
         ]}
       />
 
-      <ChartCard title="Volume over time" slug="volume-over-time" className="h-[280px]">
+      <ChartCard title="Recording streak" slug="recording-streak" className="h-[148px]">
+        <div className="flex h-full items-center overflow-x-auto">
+          <StreakCalendar data={streakCells} />
+        </div>
+      </ChartCard>
+
+      <ChartCard title="Volume over time" slug="volume-over-time" className="h-[260px]">
         <ActivityArea
           data={daily as unknown as Array<Record<string, unknown>>}
           xKey="date"
