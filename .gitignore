@@ -1,54 +1,45 @@
-# Output directories (generated data, not source code)
-/outputs/
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# Log files
-/logs/
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
 
-# Temporary files
-tmp/
+# testing
+/coverage
 
-# Virtual environment
-venv/
-env/
-*.virtualenv
+# next.js
+/.next/
+/out/
 
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
+# production
+/build
 
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
-
-# Linting
-.ruff_cache/
-
-# Local configuration
-config.local.ini
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS
+# misc
 .DS_Store
-Thumbs.db
+*.pem
 
-# Distribution / packaging
-dist/
-build/
-*.egg-info/
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
 
-# Next.js / Web prototypes
-prototypes/web/node_modules/
-prototypes/web/.next/
-prototypes/web/out/
-prototypes/web/.env*.local
-prototypes/web/next-env.d.ts
+# env files (can opt-in for committing if needed)
+.env*
+!.env.local.example
+
+# legacy profile data (OakNorth CSVs — local only)
+/data/legacy/
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
