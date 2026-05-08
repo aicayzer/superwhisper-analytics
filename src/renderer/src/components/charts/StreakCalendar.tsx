@@ -85,8 +85,7 @@ export function StreakCalendar({
       aria-label="Recording streak calendar"
       viewBox={`0 0 ${width} ${height}`}
       preserveAspectRatio="xMidYMid meet"
-      className="w-full"
-      style={{ maxWidth: width }}
+      className="block h-full w-full"
     >
       {/* Day labels (left column) */}
       {DAY_LABELS.map((label, i) =>

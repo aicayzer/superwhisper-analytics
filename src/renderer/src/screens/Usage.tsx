@@ -41,10 +41,8 @@ export function Usage(): React.JSX.Element {
         ]}
       />
 
-      <ChartCard title="Recording streak" slug="recording-streak" className="h-[148px]">
-        <div className="flex h-full items-center overflow-x-auto">
-          <StreakCalendar data={streakCells} />
-        </div>
+      <ChartCard title="Recording streak" slug="recording-streak" className="h-[160px]">
+        <StreakCalendar data={streakCells} />
       </ChartCard>
 
       <ChartCard title="Volume over time" slug="volume-over-time" className="h-[260px]">
