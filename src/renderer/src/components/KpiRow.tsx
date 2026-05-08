@@ -24,10 +24,7 @@ interface KpiRowProps {
 export function KpiRow({ items, className }: KpiRowProps): React.JSX.Element {
   return (
     <div
-      className={cn(
-        'grid divide-x divide-border rounded-xl border border-border bg-card',
-        className
-      )}
+      className={cn('grid rounded-xl border border-border bg-card', className)}
       style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}
     >
       {items.map((it) => (
