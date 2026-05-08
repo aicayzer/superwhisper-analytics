@@ -24,7 +24,7 @@ interface KpiRowProps {
 export function KpiRow({ items, className }: KpiRowProps): React.JSX.Element {
   return (
     <div
-      className={cn('grid rounded-xl border border-border bg-card', className)}
+      className={cn('grid gap-3', className)}
       style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}
     >
       {items.map((it) => (
@@ -36,7 +36,7 @@ export function KpiRow({ items, className }: KpiRowProps): React.JSX.Element {
 
 function Cell({ label, value, sub, spark }: KpiSpec): React.JSX.Element {
   return (
-    <div className="px-5 py-3">
+    <div className="rounded-xl border border-border bg-card px-4 py-3">
       <div className="text-[12px] font-medium text-foreground">{label}</div>
       <div className="mt-1 flex items-end justify-between gap-3">
         <div className="text-[22px] font-semibold leading-none tracking-tight tabular-nums text-foreground">
