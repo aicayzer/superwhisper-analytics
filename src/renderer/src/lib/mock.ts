@@ -693,6 +693,12 @@ const modeByWeekFlat: Array<Record<string, unknown>> = modeByWeek.map((w) => {
   return row
 })
 
+/** Per-recording WPM scatter, keyed by month period to align with the
+ *  monthly LineTrend on Speaking pace. */
+const wpmDots: Array<{ period: string; value: number }> = recordings
+  .map((r) => ({ period: r.datetime.slice(0, 7), value: r.wordsPerMinute }))
+  .sort((a, b) => a.period.localeCompare(b.period))
+
 export const mock = {
   recordings,
   overview,
@@ -717,5 +723,6 @@ export const mock = {
   modeByDay,
   modeByWeek,
   modeByWeekFlat,
-  stackModeKeys
+  stackModeKeys,
+  wpmDots
 }

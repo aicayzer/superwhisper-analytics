@@ -4,6 +4,7 @@ import { HBar } from '@renderer/components/charts/HBar'
 import { Heatmap } from '@renderer/components/charts/Heatmap'
 import { HourRadial } from '@renderer/components/charts/HourRadial'
 import { LineTrend } from '@renderer/components/charts/LineTrend'
+import { PaceTrend } from '@renderer/components/charts/PaceTrend'
 import { StackedAreaPercent } from '@renderer/components/charts/StackedAreaPercent'
 import { StreakCalendar } from '@renderer/components/charts/StreakCalendar'
 import { VBar } from '@renderer/components/charts/VBar'
@@ -111,10 +112,11 @@ export const CHART_REGISTRY: Record<string, ChartSpec> = {
     section: 'Language',
     sectionPath: '/language',
     title: 'Speaking pace',
-    description: 'Words per minute, monthly average.',
+    description: 'Words per minute, monthly average over per-recording dots.',
     render: () => (
-      <LineTrend
-        data={mock.wpmTrend as unknown as Array<Record<string, unknown>>}
+      <PaceTrend
+        trend={mock.wpmTrend as unknown as Array<Record<string, unknown>>}
+        dots={mock.wpmDots}
         xKey="period"
         yKey="value"
         reference={{ value: 140, label: '140' }}

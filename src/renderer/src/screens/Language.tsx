@@ -3,6 +3,7 @@ import { ChartCard } from '@renderer/components/charts/ChartCard'
 import { DistBar } from '@renderer/components/charts/DistBar'
 import { HBar } from '@renderer/components/charts/HBar'
 import { LineTrend } from '@renderer/components/charts/LineTrend'
+import { PaceTrend } from '@renderer/components/charts/PaceTrend'
 import { KpiRow } from '@renderer/components/KpiRow'
 import { formatNumber } from '@renderer/lib/format'
 import { mock } from '@renderer/lib/mock'
@@ -15,6 +16,7 @@ export function Language(): React.JSX.Element {
     wordFrequency,
     fillerSummary,
     wpmTrend,
+    wpmDots,
     fillerTrend,
     sentenceDist,
     vocabGrowth,
@@ -71,8 +73,9 @@ export function Language(): React.JSX.Element {
 
       <div className="grid grid-cols-2 gap-3" style={{ height: 220 }}>
         <ChartCard title="Speaking pace" slug="speaking-pace">
-          <LineTrend
-            data={wpmTrend as unknown as Array<Record<string, unknown>>}
+          <PaceTrend
+            trend={wpmTrend as unknown as Array<Record<string, unknown>>}
+            dots={wpmDots}
             xKey="period"
             yKey="value"
             reference={{ value: WPM_TARGET, label: `${WPM_TARGET}` }}
