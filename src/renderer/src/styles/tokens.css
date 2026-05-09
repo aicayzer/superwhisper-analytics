@@ -47,7 +47,9 @@
   --border: #e5e5e5;
   --input: #e5e5e5;
   --ring: #a3a3a3;
-  --radius: 0.5rem;
+  /* Base radius — Tailwind v4 sm/md/lg/xl scale derived from this. Drops
+     2px from the original 0.5rem so cards land at 10px instead of 12px. */
+  --radius: 0.375rem;
 
   /* Chart palette — monotone ramp from darkest to lightest */
   --chart-1: #0a0a0a;
