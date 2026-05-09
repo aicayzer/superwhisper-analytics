@@ -50,7 +50,7 @@ export function RangePill({ value, onChange }: RangePillProps): React.JSX.Elemen
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
-        className="inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-[12.5px] text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/40 [-webkit-app-region:no-drag]"
+        className="inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-[12.5px] text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/40 [-webkit-app-region:no-drag]"
         aria-label="Date range"
       >
         <CalendarRange className="h-3.5 w-3.5" strokeWidth={1.8} />
