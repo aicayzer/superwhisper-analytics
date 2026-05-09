@@ -191,7 +191,7 @@ function DetailView({ rec }: { rec: Recording }): React.JSX.Element {
         <Card className="flex min-h-0 flex-col p-5">
           <div
             ref={transcriptRef}
-            className="min-h-0 flex-1 overflow-y-auto text-[13.5px] leading-relaxed text-foreground"
+            className="fade-y-mask min-h-0 flex-1 overflow-y-auto text-[13.5px] leading-relaxed text-foreground"
           >
             {rec.segments.length === 0 ? (
               <p>{highlightWord(rec.result, hoveredWord)}</p>

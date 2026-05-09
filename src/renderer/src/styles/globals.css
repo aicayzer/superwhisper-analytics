@@ -56,3 +56,31 @@
 .tabular-nums {
   font-variant-numeric: tabular-nums;
 }
+
+/**
+ * Fade-mask utility: text inside fades to transparent at the top and
+ * bottom edges instead of cutting off abruptly under the card padding.
+ * Used on the transcript scroll container so segments visually blend
+ * into the card frame as they scroll past.
+ *
+ * The 16px stops are tuned to match the Card's vertical padding — the
+ * fade band starts where the card begins and ends where the card edge
+ * is. Override per-element with custom properties if other widgets need
+ * a different fade depth.
+ */
+.fade-y-mask {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    black 16px,
+    black calc(100% - 16px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    black 16px,
+    black calc(100% - 16px),
+    transparent 100%
+  );
+}
