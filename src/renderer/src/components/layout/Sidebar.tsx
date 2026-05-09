@@ -1,3 +1,4 @@
+import { IconButton } from '@renderer/components/ui/IconButton'
 import { useResize } from '@renderer/hooks/useResize'
 import { cn } from '@renderer/lib/cn'
 import { SIDEBAR_MAX_WIDTH, SIDEBAR_MIN_WIDTH, useLayoutStore } from '@renderer/state/layoutStore'
@@ -92,24 +93,16 @@ export function Sidebar(): React.JSX.Element {
       {/* Header band — traffic lights live in the left third (Electron-native,
           x=18 y=18). Hide-toggle and Search sit on the right, in that order. */}
       <div className="flex h-9 items-center justify-end gap-0.5 pl-[68px] pr-1.5">
-        <button
-          type="button"
-          onClick={toggleSidebar}
-          aria-label="Hide sidebar"
-          title="Hide sidebar"
-          className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground [-webkit-app-region:no-drag]"
-        >
-          <PanelLeft className="h-4 w-4" strokeWidth={1.8} />
-        </button>
-        <button
-          type="button"
+        <IconButton onClick={toggleSidebar} aria-label="Hide sidebar" title="Hide sidebar">
+          <PanelLeft className="h-3.5 w-3.5" strokeWidth={1.8} />
+        </IconButton>
+        <IconButton
           onClick={() => openPalette('search')}
           aria-label="Search transcripts"
           title="Search transcripts"
-          className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground [-webkit-app-region:no-drag]"
         >
-          <Search className="h-4 w-4" strokeWidth={1.8} />
-        </button>
+          <Search className="h-3.5 w-3.5" strokeWidth={1.8} />
+        </IconButton>
       </div>
 
       <nav className="flex-1 overflow-y-auto px-2 pt-1 pb-2 text-[13px] [-webkit-app-region:no-drag]">
@@ -136,32 +129,15 @@ export function Sidebar(): React.JSX.Element {
         </ul>
       </nav>
 
-      <footer className="flex items-center gap-1 border-t border-border px-2.5 py-1.5 text-[11px] text-muted-foreground [-webkit-app-region:no-drag]">
-        <span className="flex-1 truncate" title={new Date(INDEXED_AT).toLocaleString()}>
+      <footer className="flex items-center gap-0.5 border-t border-border px-1.5 py-1 text-[11px] text-muted-foreground [-webkit-app-region:no-drag]">
+        <span className="flex-1 truncate px-1" title={new Date(INDEXED_AT).toLocaleString()}>
           Indexed {relativeTime(INDEXED_AT)}
         </span>
-        <button
-          type="button"
-          aria-label="Refresh"
-          title="Refresh (placeholder)"
-          className="rounded p-1 transition-colors hover:bg-foreground/5 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/40"
-        >
-          <RefreshCw className="h-3 w-3" strokeWidth={1.8} />
-        </button>
+        <IconButton aria-label="Refresh" title="Refresh (placeholder)">
+          <RefreshCw className="h-3.5 w-3.5" strokeWidth={1.8} />
+        </IconButton>
         <ThemeToggle />
-        <NavLink
-          to="/settings"
-          aria-label="Settings"
-          title="Settings"
-          className={({ isActive }) =>
-            cn(
-              'rounded p-1 transition-colors hover:bg-foreground/5 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/40',
-              isActive && 'bg-foreground/5 text-foreground'
-            )
-          }
-        >
-          <Settings className="h-3 w-3" strokeWidth={1.8} />
-        </NavLink>
+        <SettingsLink />
       </footer>
 
       <ResizeHandle edge="right" onPointerDown={startResize} />
@@ -181,14 +157,26 @@ function ThemeToggle(): React.JSX.Element {
   const cyclePref = useThemeStore((s) => s.cyclePref)
   const Icon = pref === 'system' ? Monitor : pref === 'light' ? Sun : Moon
   return (
-    <button
-      type="button"
-      onClick={cyclePref}
-      aria-label={PREF_LABEL[pref]}
-      title={PREF_LABEL[pref]}
-      className="rounded p-1 transition-colors hover:bg-foreground/5 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/40"
+    <IconButton onClick={cyclePref} aria-label={PREF_LABEL[pref]} title={PREF_LABEL[pref]}>
+      <Icon className="h-3.5 w-3.5" strokeWidth={1.8} />
+    </IconButton>
+  )
+}
+
+/** Settings tab in the footer — IconButton wrapping a NavLink so we keep
+ *  active-state styling while inheriting the shared chrome. NavLink stamps
+ *  `aria-current="page"` when on /settings; we pick it up via Tailwind's
+ *  aria-current variant so we don't need a function-form className that
+ *  Slot can't merge. */
+function SettingsLink(): React.JSX.Element {
+  return (
+    <IconButton
+      asChild
+      className="aria-[current=page]:bg-foreground/5 aria-[current=page]:text-foreground"
     >
-      <Icon className="h-3 w-3" strokeWidth={1.8} />
-    </button>
+      <NavLink to="/settings" aria-label="Settings" title="Settings">
+        <Settings className="h-3.5 w-3.5" strokeWidth={1.8} />
+      </NavLink>
+    </IconButton>
   )
 }
