@@ -37,5 +37,13 @@ export default defineConfig(
       'react/prop-types': 'off'
     }
   },
+  // Recharts wrappers — TS prop types are sufficient; the plugin can't see
+  // them through Recharts' content-render-prop call signatures.
+  {
+    files: ['src/renderer/src/components/charts/**'],
+    rules: {
+      'react/prop-types': 'off'
+    }
+  },
   eslintConfigPrettier
 )
