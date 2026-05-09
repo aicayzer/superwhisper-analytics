@@ -39,6 +39,13 @@ function createWindow(): void {
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.aicayzer.superwhisper-analytics')
 
+  // In dev, the dock icon comes from Electron's bundled framework .app —
+  // not from build/icon.icns (which only applies to packaged builds).
+  // Force the dock icon at runtime so dev matches production.
+  if (process.platform === 'darwin' && app.dock) {
+    app.dock.setIcon(icon)
+  }
+
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
