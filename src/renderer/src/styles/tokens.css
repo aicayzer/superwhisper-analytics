@@ -16,15 +16,15 @@
  *   --floating   the surface used by the sidebar (sits on --window)
  *   --card       slightly lifted from --background — used by cards
  *
- * Light mode: --background == --window (off-white), cards are pure white.
- * Dark mode:  window #1F1F1E < card #232322 < sidebar #262626. The card sits
- * just above the window so it reads as a quiet container; the sidebar
- * dominates as the floating chrome.
+ * Light mode: window and sidebar share the same off-white (#FDFDFC); cards
+ * lift to pure white. Dark mode: window #1F1F1E < card #232322 < sidebar
+ * #262626 — the card sits just above the window, sidebar dominates as the
+ * floating chrome.
  */
 
 :root {
-  /* Surfaces */
-  --window: #f5f5f4;
+  /* Surfaces — window and sidebar share the same off-white in light mode. */
+  --window: #fdfdfc;
   --floating: #fdfdfc;
 
   /* ShadCN base (greyscale, neutral) */
