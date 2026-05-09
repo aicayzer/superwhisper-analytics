@@ -1,36 +1,30 @@
 import { Card } from '@renderer/components/ui/card'
 import { cn } from '@renderer/lib/cn'
-import { formatDurationSec, formatTimestamp, truncate } from '@renderer/lib/format'
+import { formatDurationSec, formatTimestamp } from '@renderer/lib/format'
 import { mock } from '@renderer/lib/mock'
 import type { Recording } from '@renderer/lib/types'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 
 type SortKey = 'datetime' | 'modeName' | 'duration' | 'wordCount' | 'wordsPerMinute'
 type Direction = 'asc' | 'desc'
 
 interface ColSpec {
-  key: SortKey | null
+  key: SortKey
   label: string
   align: 'left' | 'right'
+  /** Snippet column is gone — recordings are identified by timestamp.
+   *  When column flexes to fill remaining width. */
   width?: string
-  /** Snippet cell uses flex sizing — no width and no sort. */
-  flex?: boolean
 }
 
-/**
- * Column order: When → Mode → Duration → Words → WPM → Snippet (flex).
- * Snippet is last so the table reads as a fixed-key panel on the left and a
- * detail blurb that flexes to fill remaining width.
- */
 const COLS: ColSpec[] = [
-  { key: 'datetime', label: 'When', align: 'left', width: '170px' },
-  { key: 'modeName', label: 'Mode', align: 'left', width: '100px' },
-  { key: 'duration', label: 'Duration', align: 'right', width: '80px' },
-  { key: 'wordCount', label: 'Words', align: 'right', width: '70px' },
-  { key: 'wordsPerMinute', label: 'WPM', align: 'right', width: '60px' },
-  { key: null, label: 'Snippet', align: 'left', flex: true }
+  { key: 'datetime', label: 'When', align: 'left' },
+  { key: 'modeName', label: 'Mode', align: 'left', width: '120px' },
+  { key: 'duration', label: 'Duration', align: 'right', width: '100px' },
+  { key: 'wordCount', label: 'Words', align: 'right', width: '90px' },
+  { key: 'wordsPerMinute', label: 'WPM', align: 'right', width: '80px' }
 ]
 
 function sortRecordings(records: Recording[], key: SortKey, dir: Direction): Recording[] {
@@ -48,6 +42,7 @@ function sortRecordings(records: Recording[], key: SortKey, dir: Direction): Rec
 export function TranscriptsList(): React.JSX.Element {
   const [sortKey, setSortKey] = useState<SortKey>('datetime')
   const [dir, setDir] = useState<Direction>('desc')
+  const navigate = useNavigate()
 
   const rows = useMemo(() => sortRecordings(mock.recordings, sortKey, dir), [sortKey, dir])
 
@@ -67,26 +62,17 @@ export function TranscriptsList(): React.JSX.Element {
           <table className="w-full text-[13px]">
             <thead className="sticky top-0 z-10 bg-card">
               <tr className="text-[12px] font-medium text-foreground">
-                {COLS.map((c) =>
-                  c.key ? (
-                    <SortHeader
-                      key={c.label}
-                      label={c.label}
-                      active={sortKey === c.key}
-                      direction={dir}
-                      onClick={() => toggle(c.key as SortKey)}
-                      align={c.align}
-                      width={c.width}
-                    />
-                  ) : (
-                    <th
-                      key={c.label}
-                      className="border-b border-border px-4 py-2.5 text-left font-medium"
-                    >
-                      {c.label}
-                    </th>
-                  )
-                )}
+                {COLS.map((c) => (
+                  <SortHeader
+                    key={c.label}
+                    label={c.label}
+                    active={sortKey === c.key}
+                    direction={dir}
+                    onClick={() => toggle(c.key)}
+                    align={c.align}
+                    width={c.width}
+                  />
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -103,12 +89,14 @@ export function TranscriptsList(): React.JSX.Element {
                 rows.map((r) => (
                   <tr
                     key={r.id}
-                    className="border-t border-border/60 transition-colors hover:bg-foreground/[0.02]"
+                    onClick={() => navigate(`/transcripts/${r.id}`)}
+                    className="cursor-pointer border-t border-border/60 transition-colors hover:bg-foreground/[0.03]"
                   >
-                    <td className="whitespace-nowrap px-4 py-2 align-middle tabular-nums text-muted-foreground">
+                    <td className="whitespace-nowrap px-4 py-2 align-middle tabular-nums text-foreground">
                       <Link
                         to={`/transcripts/${r.id}`}
-                        className="rounded hover:text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-ring/40"
+                        onClick={(e) => e.stopPropagation()}
+                        className="rounded focus:outline-none focus-visible:ring-1 focus-visible:ring-ring/40"
                       >
                         {formatTimestamp(r.datetime)}
                       </Link>
@@ -126,14 +114,6 @@ export function TranscriptsList(): React.JSX.Element {
                     </td>
                     <td className="px-4 py-2 text-right align-middle tabular-nums text-muted-foreground">
                       {r.wordsPerMinute}
-                    </td>
-                    <td className="max-w-0 truncate px-4 py-2 align-middle text-foreground">
-                      <Link
-                        to={`/transcripts/${r.id}`}
-                        className="rounded hover:underline focus:outline-none focus-visible:ring-1 focus-visible:ring-ring/40"
-                      >
-                        {truncate(r.excerpt, 140)}
-                      </Link>
                     </td>
                   </tr>
                 ))

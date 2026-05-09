@@ -1,7 +1,7 @@
 import { Waveform } from '@renderer/components/charts/Waveform'
 import { Card } from '@renderer/components/ui/card'
 import { cn } from '@renderer/lib/cn'
-import { formatClock, formatDurationSec, formatTimestamp, truncate } from '@renderer/lib/format'
+import { formatClock, formatDurationSec, formatTimestamp } from '@renderer/lib/format'
 import { mock } from '@renderer/lib/mock'
 import type { Recording } from '@renderer/lib/types'
 import { ArrowLeft, ChevronLeft, ChevronRight, Pause, Play } from 'lucide-react'
@@ -133,11 +133,9 @@ function DetailView({ rec, onPrev, onNext }: DetailViewProps): React.JSX.Element
     }
   }, [activeSegmentIndex, playing])
 
-  const title = useMemo(() => {
-    const firstSentence = rec.result.split(/[.?!]/)[0]?.trim() ?? ''
-    if (firstSentence.length > 0) return truncate(firstSentence, 80)
-    return `${rec.modeName} recording`
-  }, [rec])
+  // Recordings are referred to by timestamp, not snippet — keeps the
+  // header neutral and predictable across modes / languages.
+  const title = useMemo(() => formatTimestamp(rec.datetime), [rec])
 
   const fillerPct = rec.wordCount > 0 ? (rec.fillerCount / rec.wordCount) * 100 : 0
 
