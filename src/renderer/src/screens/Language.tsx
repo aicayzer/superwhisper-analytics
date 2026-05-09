@@ -27,7 +27,7 @@ export function Language(): React.JSX.Element {
   const topFillers = fillerSummary.slice(0, 8).map((f) => ({ label: f.phrase, count: f.count }))
 
   return (
-    <div className="space-y-3">
+    <div className="flex h-full flex-col gap-3">
       <KpiRow
         items={[
           {
@@ -54,7 +54,7 @@ export function Language(): React.JSX.Element {
         ]}
       />
 
-      <div className="grid grid-cols-2 gap-3" style={{ height: 260 }}>
+      <div className="grid min-h-0 flex-1 grid-cols-2 gap-3">
         <ChartCard title="Top words" slug="top-words">
           <HBar
             data={topWords as unknown as Array<Record<string, unknown>>}
@@ -71,7 +71,7 @@ export function Language(): React.JSX.Element {
         </ChartCard>
       </div>
 
-      <div className="grid grid-cols-2 gap-3" style={{ height: 220 }}>
+      <div className="grid min-h-0 flex-1 grid-cols-2 gap-3">
         <ChartCard title="Speaking pace" slug="speaking-pace">
           <PaceTrend
             trend={wpmTrend as unknown as Array<Record<string, unknown>>}
@@ -97,7 +97,7 @@ export function Language(): React.JSX.Element {
         </ChartCard>
       </div>
 
-      <div className="grid grid-cols-2 gap-3" style={{ height: 220 }}>
+      <div className="grid min-h-0 flex-1 grid-cols-2 gap-3">
         <ChartCard title="Sentence length" slug="sentence-length">
           <DistBar
             data={sentenceDist as unknown as Array<Record<string, unknown>>}
