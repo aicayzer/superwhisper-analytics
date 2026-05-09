@@ -128,6 +128,17 @@ function CommandModeBody({ close }: { close: () => void }): React.JSX.Element {
         No results.
       </Command.Empty>
 
+      <PaletteGroup heading="Navigation">
+        {DESTINATIONS.map((d) => (
+          <PaletteItem
+            key={d.to}
+            icon={d.icon}
+            label={d.label}
+            onSelect={() => run(() => navigate(d.to))}
+          />
+        ))}
+      </PaletteGroup>
+
       <PaletteGroup heading="Appearance">
         <PaletteItem
           icon={Sun}
@@ -144,17 +155,6 @@ function CommandModeBody({ close }: { close: () => void }): React.JSX.Element {
           label={pref === 'system' ? 'System (current)' : 'System'}
           onSelect={() => run(() => setPref('system'))}
         />
-      </PaletteGroup>
-
-      <PaletteGroup heading="Navigation">
-        {DESTINATIONS.map((d) => (
-          <PaletteItem
-            key={d.to}
-            icon={d.icon}
-            label={d.label}
-            onSelect={() => run(() => navigate(d.to))}
-          />
-        ))}
       </PaletteGroup>
     </Command.List>
   )
