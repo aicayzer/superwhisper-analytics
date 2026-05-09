@@ -1,18 +1,32 @@
-import { ActivityArea } from '@renderer/components/charts/ActivityArea'
 import { ChartCard } from '@renderer/components/charts/ChartCard'
-import { DistBar } from '@renderer/components/charts/DistBar'
-import { Heatmap } from '@renderer/components/charts/Heatmap'
 import { HourRadial } from '@renderer/components/charts/HourRadial'
-import { StreakCalendar } from '@renderer/components/charts/StreakCalendar'
+import { ModePie } from '@renderer/components/charts/ModePie'
 import { KpiRow } from '@renderer/components/KpiRow'
 import { formatDurationSec } from '@renderer/lib/format'
 import { mock } from '@renderer/lib/mock'
 
+/**
+ * Usage — recording cadence + mode breakdown. Two rows:
+ *   1. KPI strip (active days, current/longest streak, avg per active day,
+ *      time per active day).
+ *   2. By-hour-of-day radial (left) + Mode share donut (right). Both
+ *      flex to fill remaining viewport — no scroll.
+ *
+ * StreakCalendar moved out (still available via chart full-screen view if
+ * needed); the day×hour heatmap and duration distribution live on the
+ * Overview now.
+ */
 export function Usage(): React.JSX.Element {
-  const { overview, usage, daily, hourly, heatmap, durationDist, sparklines, streakCells } = mock
+  const { overview, usage, daily, hourly, modeStats, sparklines } = mock
+
+  const modePieData = modeStats.map((m) => ({ name: m.modeName, value: m.count }))
+  const dominantMode = modeStats[0]
+  const dominantPct = dominantMode
+    ? Math.round((dominantMode.count / overview.totalRecordings) * 100)
+    : 0
 
   return (
-    <div className="space-y-3">
+    <div className="flex h-full flex-col gap-3">
       <KpiRow
         items={[
           {
@@ -41,36 +55,15 @@ export function Usage(): React.JSX.Element {
         ]}
       />
 
-      <ChartCard title="Recording streak" slug="recording-streak" className="h-[160px]">
-        <StreakCalendar data={streakCells} />
-      </ChartCard>
-
-      <ChartCard title="Volume over time" slug="volume-over-time" className="h-[260px]">
-        <ActivityArea
-          data={daily as unknown as Array<Record<string, unknown>>}
-          xKey="date"
-          yKey="count"
-          formatTick={(v) => {
-            const d = new Date(String(v))
-            return isNaN(d.getTime())
-              ? ''
-              : d.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' })
-          }}
-        />
-      </ChartCard>
-
-      <div className="grid grid-cols-[1.4fr_1fr_1fr] gap-3" style={{ height: 240 }}>
-        <ChartCard title="When you record" slug="when-you-record">
-          <Heatmap matrix={heatmap} cellHeight={20} />
-        </ChartCard>
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-2">
         <ChartCard title="By hour of day" slug="by-hour-of-day">
           <HourRadial data={hourly} />
         </ChartCard>
-        <ChartCard title="Duration mix" slug="duration-mix">
-          <DistBar
-            data={durationDist as unknown as Array<Record<string, unknown>>}
-            xKey="label"
-            yKey="count"
+        <ChartCard title="Mode share" slug="mode-pie">
+          <ModePie
+            data={modePieData}
+            centreLabel={dominantMode?.modeName}
+            centreSubLabel={dominantMode ? `${dominantPct}%` : undefined}
           />
         </ChartCard>
       </div>
