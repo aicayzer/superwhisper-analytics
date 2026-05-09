@@ -37,7 +37,10 @@ function DetailView({ rec }: { rec: Recording }): React.JSX.Element {
   const totalSec = rec.duration / 1000
   const [playing, setPlaying] = useState(false)
   const [currentSec, setCurrentSec] = useState(0)
-  const [viewMode, setViewMode] = useState<ViewMode>('inline')
+  // Block view (segments with [m:ss] prefixes) is the default — segment
+  // timestamps are usually what users want when scanning a transcript.
+  // The navbar toggle still flips back to flowing inline prose.
+  const [viewMode, setViewMode] = useState<ViewMode>('block')
   const [hoveredWord, setHoveredWord] = useState<string | null>(null)
   const lastTickRef = useRef<number | null>(null)
   const transcriptRef = useRef<HTMLDivElement>(null)
@@ -236,10 +239,14 @@ function InlineTranscript({
   hoveredWord,
   onSeek
 }: TranscriptViewProps): React.JSX.Element {
+  // When a word is hovered the per-token highlight is the visual cue;
+  // suppress the segment-level active style so the two don't fight.
+  const wordHover = hoveredWord !== null
   return (
     <p>
       {segments.map((seg, i) => {
         const isActive = i === activeIndex
+        const showActive = isActive && !wordHover
         const isUpcoming = currentSec < seg.start
         return (
           <Fragment key={i}>
@@ -249,9 +256,9 @@ function InlineTranscript({
               onClick={() => onSeek(seg.start)}
               className={cn(
                 'cursor-pointer transition-colors',
-                isActive && 'rounded bg-accent-blue-bg px-0.5 py-0 text-accent-blue',
-                !isActive && isUpcoming && 'text-muted-foreground/70',
-                !isActive && !isUpcoming && 'hover:bg-foreground/5'
+                showActive && 'rounded bg-accent-blue-bg px-0.5 py-0 text-accent-blue',
+                !showActive && isUpcoming && 'text-muted-foreground/70',
+                !showActive && !isUpcoming && 'hover:bg-foreground/5'
               )}
             >
               {highlightWord(seg.text, hoveredWord)}
@@ -270,10 +277,12 @@ function BlockTranscript({
   hoveredWord,
   onSeek
 }: TranscriptViewProps): React.JSX.Element {
+  const wordHover = hoveredWord !== null
   return (
     <div className="flex flex-col gap-1">
       {segments.map((seg, i) => {
         const isActive = i === activeIndex
+        const showActive = isActive && !wordHover
         const isUpcoming = currentSec < seg.start
         return (
           <button
@@ -283,15 +292,15 @@ function BlockTranscript({
             onClick={() => onSeek(seg.start)}
             className={cn(
               'flex items-start gap-3 rounded px-2 py-1.5 text-left transition-colors',
-              isActive && 'bg-accent-blue-bg text-accent-blue',
-              !isActive && isUpcoming && 'text-muted-foreground/70 hover:bg-foreground/5',
-              !isActive && !isUpcoming && 'text-foreground hover:bg-foreground/5'
+              showActive && 'bg-accent-blue-bg text-accent-blue',
+              !showActive && isUpcoming && 'text-muted-foreground/70 hover:bg-foreground/5',
+              !showActive && !isUpcoming && 'text-foreground hover:bg-foreground/5'
             )}
           >
             <span
               className={cn(
                 'shrink-0 pt-px tabular-nums text-[11.5px]',
-                isActive ? 'text-accent-blue/80' : 'text-muted-foreground'
+                showActive ? 'text-accent-blue/80' : 'text-muted-foreground'
               )}
             >
               {formatClock(seg.start)}
