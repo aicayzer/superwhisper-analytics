@@ -1,22 +1,23 @@
 import { Waveform } from '@renderer/components/charts/Waveform'
+import { WordsCard } from '@renderer/components/transcripts/WordsCard'
 import { Card } from '@renderer/components/ui/card'
+import { IconButton } from '@renderer/components/ui/IconButton'
 import { cn } from '@renderer/lib/cn'
-import { formatClock, formatDurationSec, formatTimestamp, truncate } from '@renderer/lib/format'
+import { formatClock, formatDurationSec, formatTimestamp } from '@renderer/lib/format'
 import { mock } from '@renderer/lib/mock'
 import type { Recording } from '@renderer/lib/types'
-import { ArrowLeft, ChevronLeft, ChevronRight, Pause, Play } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useHeaderActions } from '@renderer/state/headerStore'
+import { AlignJustify, AlignLeft, Copy, Pause, Play } from 'lucide-react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useParams } from 'react-router-dom'
 
 const SCRUB_STEP_SEC = 5
 
+type ViewMode = 'inline' | 'block'
+
 export function TranscriptDetail(): React.JSX.Element {
   const { id } = useParams<{ id: string }>()
-  const navigate = useNavigate()
-
-  const ordered = mock.recordings // sorted by datetime desc in mock.ts
-  const idx = ordered.findIndex((r) => r.id === id)
-  const rec: Recording | undefined = idx >= 0 ? ordered[idx] : undefined
+  const rec: Recording | undefined = mock.recordings.find((r) => r.id === id)
 
   if (!rec) {
     return (
@@ -29,29 +30,15 @@ export function TranscriptDetail(): React.JSX.Element {
     )
   }
 
-  const prev = idx > 0 ? ordered[idx - 1] : null
-  const next = idx < ordered.length - 1 ? ordered[idx + 1] : null
-
-  return (
-    <DetailView
-      key={rec.id}
-      rec={rec}
-      onPrev={prev ? () => navigate(`/transcripts/${prev.id}`) : null}
-      onNext={next ? () => navigate(`/transcripts/${next.id}`) : null}
-    />
-  )
+  return <DetailView key={rec.id} rec={rec} />
 }
 
-interface DetailViewProps {
-  rec: Recording
-  onPrev: (() => void) | null
-  onNext: (() => void) | null
-}
-
-function DetailView({ rec, onPrev, onNext }: DetailViewProps): React.JSX.Element {
+function DetailView({ rec }: { rec: Recording }): React.JSX.Element {
   const totalSec = rec.duration / 1000
   const [playing, setPlaying] = useState(false)
   const [currentSec, setCurrentSec] = useState(0)
+  const [viewMode, setViewMode] = useState<ViewMode>('inline')
+  const [hoveredWord, setHoveredWord] = useState<string | null>(null)
   const lastTickRef = useRef<number | null>(null)
   const transcriptRef = useRef<HTMLDivElement>(null)
 
@@ -87,7 +74,7 @@ function DetailView({ rec, onPrev, onNext }: DetailViewProps): React.JSX.Element
     return () => cancelAnimationFrame(raf)
   }, [playing, totalSec])
 
-  // Keyboard shortcuts — Space play/pause, ←/→ scrub. Skip when typing in inputs.
+  // Keyboard shortcuts: Space play/pause, arrow keys scrub. Ignore typing.
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       const target = e.target as HTMLElement | null
@@ -133,50 +120,41 @@ function DetailView({ rec, onPrev, onNext }: DetailViewProps): React.JSX.Element
     }
   }, [activeSegmentIndex, playing])
 
-  const title = useMemo(() => {
-    const firstSentence = rec.result.split(/[.?!]/)[0]?.trim() ?? ''
-    if (firstSentence.length > 0) return truncate(firstSentence, 80)
-    return `${rec.modeName} recording`
-  }, [rec])
+  // Register Copy + view-toggle into the navbar slot. Recreated when the
+  // recording or view mode changes; useHeaderActions handles cleanup.
+  const headerActions = useMemo(
+    () => (
+      <>
+        <IconButton
+          onClick={() => {
+            void navigator.clipboard.writeText(rec.result)
+          }}
+          aria-label="Copy transcript"
+          title="Copy transcript"
+        >
+          <Copy className="h-3.5 w-3.5" strokeWidth={1.8} />
+        </IconButton>
+        <IconButton
+          onClick={() => setViewMode((v) => (v === 'inline' ? 'block' : 'inline'))}
+          aria-label={viewMode === 'inline' ? 'Show segment timestamps' : 'Show inline view'}
+          title={viewMode === 'inline' ? 'Show segment timestamps' : 'Show inline view'}
+        >
+          {viewMode === 'inline' ? (
+            <AlignJustify className="h-3.5 w-3.5" strokeWidth={1.8} />
+          ) : (
+            <AlignLeft className="h-3.5 w-3.5" strokeWidth={1.8} />
+          )}
+        </IconButton>
+      </>
+    ),
+    [rec.result, viewMode]
+  )
+  useHeaderActions(headerActions)
 
   const fillerPct = rec.wordCount > 0 ? (rec.fillerCount / rec.wordCount) * 100 : 0
 
   return (
-    <div className="space-y-3 py-3">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <Link
-          to="/transcripts"
-          className="flex items-center gap-1 rounded px-2 py-1 text-[12px] text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" strokeWidth={1.8} />
-          Transcripts
-        </Link>
-        <h2 className="min-w-0 flex-1 truncate text-[15px] font-semibold tracking-tight text-foreground">
-          {title}
-        </h2>
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={onPrev ?? undefined}
-            disabled={!onPrev}
-            aria-label="Previous"
-            className="rounded p-1 text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground disabled:opacity-30 disabled:hover:bg-transparent"
-          >
-            <ChevronLeft className="h-4 w-4" strokeWidth={1.8} />
-          </button>
-          <button
-            type="button"
-            onClick={onNext ?? undefined}
-            disabled={!onNext}
-            aria-label="Next"
-            className="rounded p-1 text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground disabled:opacity-30 disabled:hover:bg-transparent"
-          >
-            <ChevronRight className="h-4 w-4" strokeWidth={1.8} />
-          </button>
-        </div>
-      </div>
-
+    <div className="flex h-full flex-col gap-3">
       {/* Audio player */}
       <Card className="p-3">
         <div className="flex items-center gap-3">
@@ -205,62 +183,161 @@ function DetailView({ rec, onPrev, onNext }: DetailViewProps): React.JSX.Element
         </div>
       </Card>
 
-      {/* Detail grid */}
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_280px]">
-        <Card className="p-5">
+      {/* Detail grid: fills the rest of the viewport */}
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[1fr_280px]">
+        <Card className="flex min-h-0 flex-col p-5">
           <div
             ref={transcriptRef}
-            className="max-h-[calc(100vh-280px)] overflow-y-auto text-[13.5px] leading-relaxed text-foreground"
+            className="min-h-0 flex-1 overflow-y-auto text-[13.5px] leading-relaxed text-foreground"
           >
             {rec.segments.length === 0 ? (
-              <p>{rec.result}</p>
+              <p>{highlightWord(rec.result, hoveredWord)}</p>
+            ) : viewMode === 'inline' ? (
+              <InlineTranscript
+                segments={rec.segments}
+                activeIndex={activeSegmentIndex}
+                currentSec={currentSec}
+                hoveredWord={hoveredWord}
+                onSeek={seekTo}
+              />
             ) : (
-              <p>
-                {rec.segments
-                  .map((seg, i) => {
-                    const isActive = i === activeSegmentIndex
-                    const isUpcoming = currentSec < seg.start
-                    return (
-                      <span
-                        key={i}
-                        data-seg={i}
-                        onClick={() => seekTo(seg.start)}
-                        className={cn(
-                          'cursor-pointer transition-colors',
-                          isActive &&
-                            'rounded bg-yellow-200/80 px-0.5 py-0 text-foreground dark:bg-yellow-300/30',
-                          !isActive && isUpcoming && 'text-muted-foreground/70',
-                          !isActive && !isUpcoming && 'hover:bg-foreground/5'
-                        )}
-                      >
-                        {seg.text}
-                      </span>
-                    )
-                  })
-                  .reduce<React.ReactNode[]>((acc, node, i) => {
-                    if (i > 0) acc.push(' ')
-                    acc.push(node)
-                    return acc
-                  }, [])}
-              </p>
+              <BlockTranscript
+                segments={rec.segments}
+                activeIndex={activeSegmentIndex}
+                currentSec={currentSec}
+                hoveredWord={hoveredWord}
+                onSeek={seekTo}
+              />
             )}
           </div>
         </Card>
 
-        <div className="space-y-3">
+        <div className="flex min-h-0 flex-col gap-3">
           <DetailsCard rec={rec} fillerPct={fillerPct} />
-          <FillerCard breakdown={rec.fillerBreakdown} />
+          <WordsCard rec={rec} hoveredWord={hoveredWord} onHover={setHoveredWord} />
         </div>
       </div>
     </div>
   )
 }
 
+interface TranscriptViewProps {
+  segments: Recording['segments']
+  activeIndex: number
+  currentSec: number
+  hoveredWord: string | null
+  onSeek: (sec: number) => void
+}
+
+function InlineTranscript({
+  segments,
+  activeIndex,
+  currentSec,
+  hoveredWord,
+  onSeek
+}: TranscriptViewProps): React.JSX.Element {
+  return (
+    <p>
+      {segments.map((seg, i) => {
+        const isActive = i === activeIndex
+        const isUpcoming = currentSec < seg.start
+        return (
+          <Fragment key={i}>
+            {i > 0 && ' '}
+            <span
+              data-seg={i}
+              onClick={() => onSeek(seg.start)}
+              className={cn(
+                'cursor-pointer transition-colors',
+                isActive && 'rounded bg-accent-blue-bg px-0.5 py-0 text-accent-blue',
+                !isActive && isUpcoming && 'text-muted-foreground/70',
+                !isActive && !isUpcoming && 'hover:bg-foreground/5'
+              )}
+            >
+              {highlightWord(seg.text, hoveredWord)}
+            </span>
+          </Fragment>
+        )
+      })}
+    </p>
+  )
+}
+
+function BlockTranscript({
+  segments,
+  activeIndex,
+  currentSec,
+  hoveredWord,
+  onSeek
+}: TranscriptViewProps): React.JSX.Element {
+  return (
+    <div className="flex flex-col gap-1">
+      {segments.map((seg, i) => {
+        const isActive = i === activeIndex
+        const isUpcoming = currentSec < seg.start
+        return (
+          <button
+            key={i}
+            type="button"
+            data-seg={i}
+            onClick={() => onSeek(seg.start)}
+            className={cn(
+              'flex items-start gap-3 rounded px-2 py-1.5 text-left transition-colors',
+              isActive && 'bg-accent-blue-bg text-accent-blue',
+              !isActive && isUpcoming && 'text-muted-foreground/70 hover:bg-foreground/5',
+              !isActive && !isUpcoming && 'text-foreground hover:bg-foreground/5'
+            )}
+          >
+            <span
+              className={cn(
+                'shrink-0 pt-px tabular-nums text-[11.5px]',
+                isActive ? 'text-accent-blue/80' : 'text-muted-foreground'
+              )}
+            >
+              {formatClock(seg.start)}
+            </span>
+            <span className="min-w-0 flex-1">{highlightWord(seg.text, hoveredWord)}</span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+/**
+ * Wraps every case-insensitive whole-word match of `word` in a <mark> with
+ * accent-blue styling. Returns the raw string when no word is hovered.
+ *
+ * Word-boundary regex avoids highlighting partials (so hovering "cat"
+ * doesn't light up "category"). The hovered word arrives already
+ * lowercase from tokenise().
+ */
+function highlightWord(text: string, word: string | null): React.ReactNode {
+  if (!word) return text
+  // Defensive escape in case tokenise leaves apostrophes in.
+  const safe = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const re = new RegExp(`\\b(${safe})\\b`, 'gi')
+  const parts: React.ReactNode[] = []
+  let last = 0
+  let m: RegExpExecArray | null
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) parts.push(text.slice(last, m.index))
+    parts.push(
+      <mark key={`${m.index}-${m[0]}`} className="bg-accent-blue-bg text-accent-blue">
+        {m[0]}
+      </mark>
+    )
+    last = m.index + m[0].length
+  }
+  if (last < text.length) parts.push(text.slice(last))
+  return parts.length > 0 ? parts : text
+}
+
 function DetailsCard({ rec, fillerPct }: { rec: Recording; fillerPct: number }): React.JSX.Element {
   return (
     <Card className="p-4 text-[12px]">
-      <div className="mb-2 text-[12px] font-semibold tracking-tight text-foreground">Details</div>
-      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5">
+      <div className="mb-1 text-[12px] font-semibold tracking-tight text-foreground">Details</div>
+      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
         <Row k="Recorded" v={formatTimestamp(rec.datetime)} />
         <Row k="Mode" v={rec.modeName} />
         <Row k="Duration" v={formatDurationSec(rec.duration / 1000)} />
@@ -282,47 +359,5 @@ function Row({ k, v }: { k: string; v: string }): React.JSX.Element {
       <dt className="text-muted-foreground">{k}</dt>
       <dd className="text-right tabular-nums text-foreground">{v}</dd>
     </>
-  )
-}
-
-function FillerCard({
-  breakdown
-}: {
-  breakdown: Array<{ phrase: string; count: number }>
-}): React.JSX.Element {
-  if (breakdown.length === 0) {
-    return (
-      <Card className="p-4 text-[12px] text-muted-foreground">
-        <div className="mb-1 text-[12px] font-semibold tracking-tight text-foreground">
-          Fillers in this recording
-        </div>
-        No filler phrases detected.
-      </Card>
-    )
-  }
-  const max = breakdown[0]?.count ?? 1
-  const top = breakdown.slice(0, 6)
-  return (
-    <Card className="p-4 text-[12px]">
-      <div className="mb-2 text-[12px] font-semibold tracking-tight text-foreground">
-        Fillers in this recording
-      </div>
-      <div className="space-y-1.5">
-        {top.map((f) => (
-          <div key={f.phrase}>
-            <div className="flex items-center justify-between">
-              <span className="text-foreground">{f.phrase}</span>
-              <span className="tabular-nums text-muted-foreground">{f.count}</span>
-            </div>
-            <div className="mt-1 h-1 overflow-hidden rounded-full bg-secondary">
-              <div
-                className="h-full rounded-full bg-foreground"
-                style={{ width: `${(f.count / max) * 100}%` }}
-              />
-            </div>
-          </div>
-        ))}
-      </div>
-    </Card>
   )
 }

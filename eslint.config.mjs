@@ -33,7 +33,8 @@ export default defineConfig(
     files: ['src/renderer/src/components/ui/**'],
     rules: {
       '@typescript-eslint/explicit-function-return-type': 'off',
-      'react-refresh/only-export-components': 'off'
+      'react-refresh/only-export-components': 'off',
+      'react/prop-types': 'off'
     }
   },
   eslintConfigPrettier

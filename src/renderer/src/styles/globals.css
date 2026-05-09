@@ -1,6 +1,13 @@
 @import 'tailwindcss';
-@import 'tw-animate-css';
 @import './tokens.css';
+
+/**
+ * Class-based dark variant. Without this, Tailwind v4's default `dark:` variant
+ * resolves via `prefers-color-scheme` — which means the shadcn primitives'
+ * `dark:` utilities ignore our `.dark` toggle on <html> and follow the OS
+ * preference instead. This makes the toggle the single source of truth.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
 
 @layer base {
   * {

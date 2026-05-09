@@ -16,14 +16,15 @@
  *   --floating   the surface used by the sidebar (sits on --window)
  *   --card       slightly lifted from --background — used by cards
  *
- * Light mode: --background == --window (off-white), cards are pure white.
- * Dark mode:  --background = #1F1F1E, sidebar = #262626, cards = #2A2A2A.
- * The colour difference replaces shadow as the elevation cue in dark mode.
+ * Light mode: window and sidebar share the same off-white (#FDFDFC); cards
+ * lift to pure white. Dark mode: window #1F1F1E < card #232322 < sidebar
+ * #262626 — the card sits just above the window, sidebar dominates as the
+ * floating chrome.
  */
 
 :root {
-  /* Surfaces */
-  --window: #f5f5f4;
+  /* Surfaces — window and sidebar share the same off-white in light mode. */
+  --window: #fdfdfc;
   --floating: #fdfdfc;
 
   /* ShadCN base (greyscale, neutral) */
@@ -46,7 +47,9 @@
   --border: #e5e5e5;
   --input: #e5e5e5;
   --ring: #a3a3a3;
-  --radius: 0.5rem;
+  /* Base radius — Tailwind v4 sm/md/lg/xl scale derived from this. Drops
+     2px from the original 0.5rem so cards land at 10px instead of 12px. */
+  --radius: 0.375rem;
 
   /* Chart palette — monotone ramp from darkest to lightest */
   --chart-1: #0a0a0a;
@@ -54,6 +57,11 @@
   --chart-3: #737373;
   --chart-4: #a3a3a3;
   --chart-5: #d4d4d4;
+
+  /* Accent blue — used for active-segment + word-hover highlights. The
+     translucent bg sits behind the brighter accent text. */
+  --accent-blue: #0166cc;
+  --accent-blue-bg: #edf3fb;
 
   /* Elevation — used only by floating overlays (sidebar, palette). Cards
      get their lift from a brighter --card colour, not shadow. */
@@ -66,7 +74,7 @@
 
   --background: var(--window);
   --foreground: #fafaf9;
-  --card: #2a2a2a;
+  --card: #232322;
   --card-foreground: #fafaf9;
   --popover: var(--floating);
   --popover-foreground: #fafaf9;
@@ -89,6 +97,11 @@
   --chart-3: #a3a3a3;
   --chart-4: #737373;
   --chart-5: #404040;
+
+  /* Brighter accent + cooler bg in dark mode so the highlight reads against
+     the deeper window backdrop. */
+  --accent-blue: #0099ff;
+  --accent-blue-bg: #212b35;
 
   /* Pulled right back in dark mode — the brighter --card and --floating
      colours carry the elevation cue. Just enough to avoid a hard outline. */
@@ -122,6 +135,9 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+
+  --color-accent-blue: var(--accent-blue);
+  --color-accent-blue-bg: var(--accent-blue-bg);
 
   /* Foundation aliases (kept so layout primitives still compile) */
   --color-window: var(--window);

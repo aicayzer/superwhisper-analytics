@@ -7,6 +7,7 @@
  * screen should ever import from this file once real data flows.
  */
 
+import { tokenise } from './text'
 import type {
   DailySummary,
   DayOfWeekPattern,
@@ -14,11 +15,14 @@ import type {
   Heatmap,
   HourlyPattern,
   LanguageStats,
+  ModeByDay,
   ModeStat,
   OverviewStats,
   Recording,
   Segment,
   SentenceBucket,
+  SparkSeries,
+  StreakCell,
   TrendPoint,
   UsageStats,
   WordFrequency
@@ -136,108 +140,6 @@ const FILLER_PHRASES = [
   'actually'
 ] as const
 
-const STOP_WORDS = new Set([
-  'the',
-  'and',
-  'a',
-  'an',
-  'of',
-  'to',
-  'in',
-  'is',
-  'it',
-  'that',
-  'i',
-  'for',
-  'on',
-  'with',
-  'as',
-  'this',
-  'be',
-  'are',
-  'was',
-  'or',
-  'at',
-  'by',
-  'we',
-  'you',
-  'he',
-  'she',
-  'they',
-  'but',
-  'not',
-  'have',
-  'has',
-  'had',
-  'do',
-  'does',
-  'did',
-  'so',
-  'if',
-  'just',
-  'my',
-  'me',
-  'your',
-  'our',
-  'their',
-  'his',
-  'her',
-  'its',
-  'them',
-  'will',
-  'would',
-  'could',
-  'should',
-  'about',
-  'from',
-  'into',
-  'over',
-  'after',
-  'before',
-  'than',
-  'some',
-  'any',
-  'no',
-  'how',
-  'what',
-  'when',
-  'where',
-  'who',
-  'why',
-  'all',
-  'one',
-  'two',
-  'be',
-  'been',
-  'being',
-  'am',
-  'were',
-  'because',
-  'while',
-  'also',
-  'only',
-  'very',
-  'can',
-  'cant',
-  'dont',
-  'im',
-  'thats',
-  'whats',
-  'theres',
-  'its',
-  'ive',
-  'youre',
-  'were',
-  'theyre',
-  's',
-  't',
-  'd',
-  'll',
-  've',
-  're',
-  'm'
-])
-
 function pickWeightedMode(): string {
   const total = MODES.reduce((s, m) => s + m.weight, 0)
   let r = rand() * total
@@ -280,16 +182,6 @@ function buildWaveform(durationMs: number): number[] {
     peaks.push(Math.max(0.05, Math.min(1, base + jitter)))
   }
   return peaks
-}
-
-function tokenise(text: string): string[] {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z'\s]/g, ' ')
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((w) => w.replace(/^'+|'+$/g, ''))
-    .filter((w) => w.length > 2 && !STOP_WORDS.has(w))
 }
 
 function buildFillers(transcript: string): {
@@ -598,6 +490,104 @@ const language: LanguageStats = {
   avgSentenceLength: totalSentences > 0 ? +(totalWords / totalSentences).toFixed(1) : 0
 }
 
+// ---- Wave 2 additions ---------------------------------------------------
+
+/** Trailing 30-day sparkline for each headline KPI. Used by KpiRow.
+ *  Values run oldest → newest so the spark line reads left-to-right. */
+const SPARK_DAYS = 30
+const sparkRecent = sortedDays.slice(-SPARK_DAYS)
+
+const sparklines: Record<'recordings' | 'words' | 'duration' | 'wpm', SparkSeries> = {
+  recordings: {
+    values: sparkRecent.map((d) => d.count),
+    labels: sparkRecent.map((d) => d.date)
+  },
+  words: {
+    values: sparkRecent.map((d) => d.totalWords),
+    labels: sparkRecent.map((d) => d.date)
+  },
+  duration: {
+    values: sparkRecent.map((d) => Math.round(d.totalDurationSec)),
+    labels: sparkRecent.map((d) => d.date)
+  },
+  // Daily WPM, computed from the day's totals; fall back to the rolling avg
+  // so the line stays continuous on quiet days.
+  wpm: {
+    values: sparkRecent.map((d) =>
+      d.totalDurationSec > 0
+        ? Math.round((d.totalWords / d.totalDurationSec) * 60)
+        : overview.avgWPM
+    ),
+    labels: sparkRecent.map((d) => d.date)
+  }
+}
+
+/** GitHub-style streak grid: every day in the last 365, with its count.
+ *  Pads the head to align week boundaries (Mon-start). */
+const STREAK_DAYS = 365
+const streakStart = new Date(NOW.getTime() - (STREAK_DAYS - 1) * 24 * 3600 * 1000)
+const streakCells: StreakCell[] = []
+for (let i = 0; i < STREAK_DAYS; i++) {
+  const d = new Date(streakStart.getTime() + i * 24 * 3600 * 1000)
+  const key = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  streakCells.push({ date: key, count: dailyMap.get(key)?.count ?? 0 })
+}
+
+/** Per-day count by mode, for stacked-area / bar visualisations. */
+const TOP_MODES_FOR_STACK = modeStats.slice(0, 5).map((m) => m.modeName)
+const modeByDayMap = new Map<string, ModeByDay>()
+for (const r of recordings) {
+  const key = r.datetime.slice(0, 10)
+  let cur = modeByDayMap.get(key)
+  if (!cur) {
+    cur = { date: key, modes: {} }
+    modeByDayMap.set(key, cur)
+  }
+  const bucket = TOP_MODES_FOR_STACK.includes(r.modeName) ? r.modeName : 'Other'
+  cur.modes[bucket] = (cur.modes[bucket] ?? 0) + 1
+}
+// Fill in zero-rows for empty days so the stack chart has dense X.
+for (const d of sortedDays) {
+  if (!modeByDayMap.has(d.date)) {
+    modeByDayMap.set(d.date, { date: d.date, modes: {} })
+  }
+}
+const modeByDay: ModeByDay[] = Array.from(modeByDayMap.values()).sort((a, b) =>
+  a.date.localeCompare(b.date)
+)
+const stackModeKeys: string[] = [...TOP_MODES_FOR_STACK, 'Other']
+
+/** Same shape as modeByDay but aggregated by ISO week — fewer points so it
+ *  reads in a narrow column. */
+const modeByWeekMap = new Map<string, ModeByDay>()
+for (const day of modeByDay) {
+  const period = isoWeek(new Date(day.date))
+  let cur = modeByWeekMap.get(period)
+  if (!cur) {
+    cur = { date: period, modes: {} }
+    modeByWeekMap.set(period, cur)
+  }
+  for (const [k, v] of Object.entries(day.modes)) {
+    cur.modes[k] = (cur.modes[k] ?? 0) + v
+  }
+}
+const modeByWeek: ModeByDay[] = Array.from(modeByWeekMap.values()).sort((a, b) =>
+  a.date.localeCompare(b.date)
+)
+
+/** Flat shape Recharts wants — { date, [modeKey]: count, ... }. */
+const modeByWeekFlat: Array<Record<string, unknown>> = modeByWeek.map((w) => {
+  const row: Record<string, unknown> = { date: w.date }
+  for (const k of stackModeKeys) row[k] = w.modes[k] ?? 0
+  return row
+})
+
+/** Per-recording WPM scatter, keyed by month period to align with the
+ *  monthly LineTrend on Speaking pace. */
+const wpmDots: Array<{ period: string; value: number }> = recordings
+  .map((r) => ({ period: r.datetime.slice(0, 7), value: r.wordsPerMinute }))
+  .sort((a, b) => a.period.localeCompare(b.period))
+
 export const mock = {
   recordings,
   overview,
@@ -615,5 +605,13 @@ export const mock = {
   fillerTrend,
   sentenceDist,
   vocabGrowth,
-  language
+  language,
+  // wave 2
+  sparklines,
+  streakCells,
+  modeByDay,
+  modeByWeek,
+  modeByWeekFlat,
+  stackModeKeys,
+  wpmDots
 }

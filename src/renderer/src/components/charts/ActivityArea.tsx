@@ -17,23 +17,22 @@ interface ActivityAreaProps {
   formatTick?: (raw: string) => string
   /** Approximate number of ticks; Recharts decides the actual stride. */
   tickCount?: number
-  height?: number
 }
 
 /**
- * Smooth area chart for daily activity. Single series, monotone curve,
- * gradient fill from the foreground colour.
+ * Smooth area chart for daily activity. Fills its container — wrap it in a
+ * sized parent (e.g. flex-1 or a fixed-height div). Single series, monotone
+ * curve, gradient fill from the foreground colour.
  */
 export function ActivityArea({
   data,
   xKey,
   yKey,
   formatTick,
-  tickCount = 6,
-  height = 220
+  tickCount = 6
 }: ActivityAreaProps): React.JSX.Element {
   return (
-    <ResponsiveContainer width="100%" height={height}>
+    <ResponsiveContainer width="100%" height="100%">
       <AreaChart data={data} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
         <defs>
           <linearGradient id="grad-area" x1="0" y1="0" x2="0" y2="1">
