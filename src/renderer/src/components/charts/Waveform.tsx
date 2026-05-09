@@ -12,7 +12,7 @@ interface WaveformProps {
 
 /**
  * Hand-rolled SVG waveform. One rect per peak; rects to the left of the
- * cursor are filled "played", to the right are hairline. A 1.5px-wide
+ * cursor are filled "played", to the right are hairline. A hairline 1px
  * cursor sits at the progress fraction.
  */
 export function Waveform({ peaks, progress, onSeek, className }: WaveformProps): React.JSX.Element {
@@ -83,10 +83,10 @@ export function Waveform({ peaks, progress, onSeek, className }: WaveformProps):
       <line
         x1={progress * VB_W}
         x2={progress * VB_W}
-        y1={2}
-        y2={VB_H - 2}
+        y1={3}
+        y2={VB_H - 3}
         stroke="var(--foreground)"
-        strokeWidth={1.5}
+        strokeWidth={1}
       />
     </svg>
   )
