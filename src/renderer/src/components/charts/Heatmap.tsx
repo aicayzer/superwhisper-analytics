@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 
 interface HeatmapProps {
-  /** 7×24 matrix — rows are days (0=Sun), cols are hours. */
+  /** 7×24 matrix — rows are days (0=Mon), cols are hours. */
   matrix: number[][]
   /** Day labels in the same order as rows. */
   dayLabels?: readonly string[]
@@ -11,7 +11,7 @@ interface HeatmapProps {
   compact?: boolean
 }
 
-const DEFAULT_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
+const DEFAULT_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const
 const HOUR_TICKS = [0, 6, 12, 18]
 
 /**
@@ -81,7 +81,7 @@ function RowFragment({
       {row.map((v, h) => (
         <div
           key={h}
-          title={`${day || ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][(h + 24 - 24) % 7]} ${h}:00 — ${v}`}
+          title={`${day} ${h}:00 — ${v}`}
           className="rounded-[2px]"
           style={{
             height: cellHeight,
