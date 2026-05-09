@@ -1,6 +1,7 @@
 import { useResize } from '@renderer/hooks/useResize'
 import { cn } from '@renderer/lib/cn'
 import { SIDEBAR_MAX_WIDTH, SIDEBAR_MIN_WIDTH, useLayoutStore } from '@renderer/state/layoutStore'
+import { usePaletteStore } from '@renderer/state/paletteStore'
 import { useThemeStore, type ThemePref } from '@renderer/state/themeStore'
 import {
   AudioLines,
@@ -10,6 +11,7 @@ import {
   Moon,
   PanelLeft,
   RefreshCw,
+  Search,
   Settings,
   Sun,
   TextSearch
@@ -64,6 +66,7 @@ export function Sidebar(): React.JSX.Element {
   const sidebarWidth = useLayoutStore((s) => s.sidebarWidth)
   const setSidebarWidth = useLayoutStore((s) => s.setSidebarWidth)
   const toggleSidebar = useLayoutStore((s) => s.toggleSidebar)
+  const openPalette = usePaletteStore((s) => s.openWith)
 
   const { startResize, isResizing } = useResize({
     direction: 'grow-right',
@@ -87,9 +90,8 @@ export function Sidebar(): React.JSX.Element {
       )}
     >
       {/* Header band — traffic lights live in the left third (Electron-native,
-          x=18 y=18). The hide-sidebar toggle is right-aligned so it sits
-          opposite the traffic lights, balancing the band visually. */}
-      <div className="flex h-9 items-center justify-end pl-[68px] pr-2">
+          x=18 y=18). Hide-toggle and Search sit on the right, in that order. */}
+      <div className="flex h-9 items-center justify-end gap-0.5 pl-[68px] pr-1.5">
         <button
           type="button"
           onClick={toggleSidebar}
@@ -98,6 +100,15 @@ export function Sidebar(): React.JSX.Element {
           className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground [-webkit-app-region:no-drag]"
         >
           <PanelLeft className="h-4 w-4" strokeWidth={1.8} />
+        </button>
+        <button
+          type="button"
+          onClick={() => openPalette('search')}
+          aria-label="Search transcripts"
+          title="Search transcripts"
+          className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground [-webkit-app-region:no-drag]"
+        >
+          <Search className="h-4 w-4" strokeWidth={1.8} />
         </button>
       </div>
 

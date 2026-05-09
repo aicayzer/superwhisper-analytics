@@ -45,9 +45,6 @@ export function RootLayout(): React.JSX.Element {
   const leftPad =
     (sidebarOpen ? sidebarWidth + SIDEBAR_GAP /* sidebar's own left-2 */ + SIDEBAR_GAP : 0) +
     CONTENT_GUTTER
-  const onTranscripts =
-    location.pathname === '/transcripts' || location.pathname === '/transcripts/'
-
   // /chart/:slug renders a breadcrumb instead of a plain title; backTo
   // points at the screen the chart was launched from when supplied.
   const chartMatch = location.pathname.match(/^\/chart\/([^/]+)/)
@@ -65,13 +62,7 @@ export function RootLayout(): React.JSX.Element {
   return (
     <Window>
       <Sidebar />
-      <MainHeader
-        title={title}
-        showSearch={onTranscripts}
-        backTo={backTo}
-        leftPad={leftPad}
-        rightPad={CONTENT_GUTTER}
-      />
+      <MainHeader title={title} backTo={backTo} leftPad={leftPad} rightPad={CONTENT_GUTTER} />
       <main
         className="absolute inset-0 overflow-y-auto bg-background transition-[padding] duration-200 ease-out"
         style={{
