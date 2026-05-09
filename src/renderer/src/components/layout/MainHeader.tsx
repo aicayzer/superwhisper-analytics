@@ -1,3 +1,5 @@
+import { IconButton } from '@renderer/components/ui/IconButton'
+import { useHeaderStore } from '@renderer/state/headerStore'
 import { useLayoutStore } from '@renderer/state/layoutStore'
 import { ChevronRight, PanelLeft } from 'lucide-react'
 import { useState } from 'react'
@@ -37,6 +39,7 @@ export function MainHeader({
 }: MainHeaderProps): React.JSX.Element {
   const sidebarOpen = useLayoutStore((s) => s.sidebarOpen)
   const toggleSidebar = useLayoutStore((s) => s.toggleSidebar)
+  const headerActions = useHeaderStore((s) => s.actions)
   const [range, setRange] = useState<RangeValue>(DEFAULT_RANGE)
 
   return (
@@ -45,31 +48,26 @@ export function MainHeader({
       className="absolute top-2 z-30 flex h-9 items-center gap-2 [-webkit-app-region:drag]"
     >
       {!sidebarOpen && (
-        <button
-          type="button"
-          onClick={toggleSidebar}
-          aria-label="Show sidebar"
-          title="Show sidebar"
-          className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground [-webkit-app-region:no-drag]"
-        >
-          <PanelLeft className="h-4 w-4" strokeWidth={1.8} />
-        </button>
+        <IconButton onClick={toggleSidebar} aria-label="Show sidebar" title="Show sidebar">
+          <PanelLeft className="h-3.5 w-3.5" strokeWidth={1.8} />
+        </IconButton>
       )}
 
       {backTo && (
-        <Link
-          to={backTo}
-          aria-label="Back"
-          title="Back"
-          className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground [-webkit-app-region:no-drag]"
-        >
-          <ChevronRight className="h-4 w-4 rotate-180" strokeWidth={1.8} />
-        </Link>
+        <IconButton asChild aria-label="Back" title="Back">
+          <Link to={backTo}>
+            <ChevronRight className="h-3.5 w-3.5 rotate-180" strokeWidth={1.8} />
+          </Link>
+        </IconButton>
       )}
 
       <TitleNode title={title} />
 
-      <div className="ml-auto [-webkit-app-region:no-drag]">
+      {/* Spacer + screen-registered actions, then RangePill on the far right.
+          Screens push their per-page IconButtons into the header via
+          useHeaderActions(); the slot renders them just before the range. */}
+      <div className="ml-auto flex items-center gap-1 [-webkit-app-region:no-drag]">
+        {headerActions}
         <RangePill value={range} onChange={setRange} />
       </div>
     </div>
