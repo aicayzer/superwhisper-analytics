@@ -3,11 +3,10 @@ import { ChartCard } from '@renderer/components/charts/ChartCard'
 import { DistBar } from '@renderer/components/charts/DistBar'
 import { Heatmap } from '@renderer/components/charts/Heatmap'
 import { KpiRow } from '@renderer/components/KpiRow'
-import { formatCompact, formatDurationSec } from '@renderer/lib/format'
+import { formatActivityTick, formatCompact, formatDurationSec } from '@renderer/lib/format'
 import { mock } from '@renderer/lib/mock'
 import { useRangeStore, windowFor } from '@renderer/state/rangeStore'
 import { useMemo } from 'react'
-import { formatActivityTick } from './format'
 
 /**
  * Overview — landing page. Three rows:
