@@ -11,6 +11,10 @@ const CONTENT_GUTTER = 24
 const HEADER_TOP = 8 // sidebar + header both at top-2
 const HEADER_H = 36
 const FRAME_GAP = 8 // matches sidebar's bottom-2 — content sits at 8px from the window bottom
+// When the sidebar is hidden the macOS traffic lights (Electron-native at
+// x=18 y=18, ~70px wide) sit on top of the main pane. Reserve the space
+// so the navbar title and content don't collide with them.
+const TRAFFIC_LIGHT_RESERVE = 88
 
 const TITLES: Record<string, string> = {
   '/': 'Overview',
@@ -42,9 +46,12 @@ export function RootLayout(): React.JSX.Element {
   const location = useLocation()
   const [params] = useSearchParams()
 
-  const leftPad =
-    (sidebarOpen ? sidebarWidth + SIDEBAR_GAP /* sidebar's own left-2 */ + SIDEBAR_GAP : 0) +
-    CONTENT_GUTTER
+  // When the sidebar is open it covers the traffic-light area; when it's
+  // closed the navbar/content need to indent past the traffic lights so
+  // the title doesn't collide with them.
+  const leftPad = sidebarOpen
+    ? sidebarWidth + SIDEBAR_GAP /* sidebar's own left-2 */ + SIDEBAR_GAP + CONTENT_GUTTER
+    : Math.max(CONTENT_GUTTER, TRAFFIC_LIGHT_RESERVE)
   // /chart/:slug renders a breadcrumb instead of a plain title; backTo
   // points at the screen the chart was launched from when supplied.
   const chartMatch = location.pathname.match(/^\/chart\/([^/]+)/)
