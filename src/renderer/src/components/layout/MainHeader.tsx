@@ -16,33 +16,36 @@ interface MainHeaderProps {
   showSearch?: boolean
   /** Render a back arrow at the left of the title (chart full-screen view). */
   backTo?: string
+  /** Distance from window left to header content, in px — matches the content
+   *  area's paddingLeft so the header and content align vertically. */
+  leftPad: number
+  /** Distance from window right to header content, in px — matches the
+   *  content area's paddingRight. */
+  rightPad: number
 }
 
 /**
- * Header strip for the main pane. Sits to the right of the sidebar with an
- * 8px gap. When the sidebar is hidden, expands to span the area minus
- * traffic-light room and shows the sidebar toggle inline at its left, so
- * traffic lights and toggle always travel together.
+ * Header strip for the main pane. The header's left and right edges align
+ * with the content area below — same gutter on both sides — so the page
+ * title sits over the same column as the content. When the sidebar is
+ * hidden the show-sidebar toggle still reserves a small slot at the left.
  */
 export function MainHeader({
   title,
   showSearch = false,
-  backTo
+  backTo,
+  leftPad,
+  rightPad
 }: MainHeaderProps): React.JSX.Element {
   const sidebarOpen = useLayoutStore((s) => s.sidebarOpen)
-  const sidebarWidth = useLayoutStore((s) => s.sidebarWidth)
   const toggleSidebar = useLayoutStore((s) => s.toggleSidebar)
   const [range, setRange] = useState('90')
   const [search, setSearch] = useState('')
 
-  const left = sidebarOpen ? sidebarWidth + 16 : 8 // sidebar's left-2 + width + gap-2, or just left-2 outer
-  // When the sidebar is hidden, reserve room for native traffic lights at x=18.
-  const paddingLeft = sidebarOpen ? 12 : 76
-
   return (
     <div
-      style={{ left, paddingLeft }}
-      className="absolute right-2 top-2 z-30 flex h-9 items-center gap-2 pr-1 [-webkit-app-region:drag]"
+      style={{ left: leftPad, right: rightPad }}
+      className="absolute top-2 z-30 flex h-9 items-center gap-2 [-webkit-app-region:drag]"
     >
       {!sidebarOpen && (
         <button
@@ -85,7 +88,7 @@ export function MainHeader({
 function TitleNode({ title }: { title: string | Breadcrumb[] }): React.JSX.Element {
   if (typeof title === 'string') {
     return (
-      <h1 className="select-none truncate text-[14px] font-semibold tracking-tight text-foreground">
+      <h1 className="select-none truncate text-[13.5px] font-medium tracking-tight text-muted-foreground">
         {title}
       </h1>
     )
@@ -93,31 +96,22 @@ function TitleNode({ title }: { title: string | Breadcrumb[] }): React.JSX.Eleme
   return (
     <nav
       aria-label="Breadcrumb"
-      className="flex min-w-0 items-center gap-1 text-[14px] font-semibold tracking-tight"
+      className="flex min-w-0 items-center gap-1 text-[13.5px] font-medium tracking-tight text-muted-foreground"
     >
       {title.map((crumb, i) => {
         const isLast = i === title.length - 1
         const node =
           crumb.to && !isLast ? (
-            <Link
-              to={crumb.to}
-              className="rounded text-muted-foreground transition-colors hover:text-foreground"
-            >
+            <Link to={crumb.to} className="rounded transition-colors hover:text-foreground">
               {crumb.label}
             </Link>
           ) : (
-            <span
-              className={isLast ? 'truncate text-foreground' : 'truncate text-muted-foreground'}
-            >
-              {crumb.label}
-            </span>
+            <span className="truncate">{crumb.label}</span>
           )
         return (
           <span key={i} className="flex min-w-0 items-center gap-1">
             {node}
-            {!isLast && (
-              <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" strokeWidth={1.8} />
-            )}
+            {!isLast && <ChevronRight className="h-3 w-3 shrink-0" strokeWidth={1.8} />}
           </span>
         )
       })}

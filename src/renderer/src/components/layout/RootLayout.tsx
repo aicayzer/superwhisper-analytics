@@ -65,7 +65,13 @@ export function RootLayout(): React.JSX.Element {
   return (
     <Window>
       <Sidebar />
-      <MainHeader title={title} showSearch={onTranscripts} backTo={backTo} />
+      <MainHeader
+        title={title}
+        showSearch={onTranscripts}
+        backTo={backTo}
+        leftPad={leftPad}
+        rightPad={CONTENT_GUTTER}
+      />
       <main
         className="absolute inset-0 overflow-y-auto bg-background transition-[padding] duration-200 ease-out"
         style={{
