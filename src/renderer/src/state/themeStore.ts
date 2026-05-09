@@ -1,39 +1,45 @@
 import { create } from 'zustand'
 
-export type Theme = 'light' | 'dark'
+/** User's stored preference. `system` follows the OS appearance live. */
+export type ThemePref = 'system' | 'light' | 'dark'
 
 const STORAGE_KEY = 'theme'
 
-function systemPrefersDark(): boolean {
-  return typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches
-}
-
-function readInitialTheme(): Theme {
-  if (typeof window === 'undefined') return 'light'
+function readInitialPref(): ThemePref {
+  if (typeof window === 'undefined') return 'system'
   const stored = window.localStorage.getItem(STORAGE_KEY)
-  if (stored === 'dark' || stored === 'light') return stored
-  return systemPrefersDark() ? 'dark' : 'light'
+  if (stored === 'system' || stored === 'light' || stored === 'dark') return stored
+  // First run — default to system. (No migration needed: the previous
+  // values 'light'/'dark' are still valid here.)
+  return 'system'
 }
 
 interface ThemeState {
-  theme: Theme
-  setTheme: (theme: Theme) => void
-  toggleTheme: () => void
+  pref: ThemePref
+  setPref: (p: ThemePref) => void
+  /** Cycle system → light → dark → system. Used by the sidebar toggle. */
+  cyclePref: () => void
+}
+
+const NEXT: Record<ThemePref, ThemePref> = {
+  system: 'light',
+  light: 'dark',
+  dark: 'system'
 }
 
 export const useThemeStore = create<ThemeState>((set, get) => ({
-  theme: readInitialTheme(),
-  setTheme: (theme) => {
+  pref: readInitialPref(),
+  setPref: (pref) => {
     if (typeof window !== 'undefined') {
-      window.localStorage.setItem(STORAGE_KEY, theme)
+      window.localStorage.setItem(STORAGE_KEY, pref)
     }
-    set({ theme })
+    set({ pref })
   },
-  toggleTheme: () => {
-    const next: Theme = get().theme === 'light' ? 'dark' : 'light'
+  cyclePref: () => {
+    const next = NEXT[get().pref]
     if (typeof window !== 'undefined') {
       window.localStorage.setItem(STORAGE_KEY, next)
     }
-    set({ theme: next })
+    set({ pref: next })
   }
 }))

@@ -8,6 +8,7 @@ import {
   House,
   AudioLines,
   Languages,
+  Monitor,
   Moon,
   Search,
   Settings,
@@ -36,8 +37,8 @@ export function CommandPalette(): React.JSX.Element | null {
   const open = usePaletteStore((s) => s.open)
   const setOpen = usePaletteStore((s) => s.setOpen)
   const togglePalette = usePaletteStore((s) => s.toggle)
-  const theme = useThemeStore((s) => s.theme)
-  const toggleTheme = useThemeStore((s) => s.toggleTheme)
+  const pref = useThemeStore((s) => s.pref)
+  const setPref = useThemeStore((s) => s.setPref)
   const navigate = useNavigate()
 
   const close = useCallback(() => setOpen(false), [setOpen])
@@ -76,11 +77,21 @@ export function CommandPalette(): React.JSX.Element | null {
             No results.
           </Command.Empty>
 
-          <PaletteGroup heading="Theme">
+          <PaletteGroup heading="Appearance">
             <PaletteItem
-              icon={theme === 'light' ? Moon : Sun}
-              label={theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'}
-              onSelect={() => run(toggleTheme)}
+              icon={Sun}
+              label={pref === 'light' ? 'Light (current)' : 'Light'}
+              onSelect={() => run(() => setPref('light'))}
+            />
+            <PaletteItem
+              icon={Moon}
+              label={pref === 'dark' ? 'Dark (current)' : 'Dark'}
+              onSelect={() => run(() => setPref('dark'))}
+            />
+            <PaletteItem
+              icon={Monitor}
+              label={pref === 'system' ? 'System (current)' : 'System'}
+              onSelect={() => run(() => setPref('system'))}
             />
           </PaletteGroup>
 

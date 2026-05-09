@@ -1,13 +1,17 @@
 import { useResize } from '@renderer/hooks/useResize'
 import { cn } from '@renderer/lib/cn'
 import { SIDEBAR_MAX_WIDTH, SIDEBAR_MIN_WIDTH, useLayoutStore } from '@renderer/state/layoutStore'
+import { useThemeStore, type ThemePref } from '@renderer/state/themeStore'
 import {
   AudioLines,
   House,
   Languages,
+  Monitor,
+  Moon,
   PanelLeft,
   RefreshCw,
   Settings,
+  Sun,
   TextSearch
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -133,6 +137,7 @@ export function Sidebar(): React.JSX.Element {
         >
           <RefreshCw className="h-3 w-3" strokeWidth={1.8} />
         </button>
+        <ThemeToggle />
         <NavLink
           to="/settings"
           aria-label="Settings"
@@ -150,5 +155,29 @@ export function Sidebar(): React.JSX.Element {
 
       <ResizeHandle edge="right" onPointerDown={startResize} />
     </aside>
+  )
+}
+
+const PREF_LABEL: Record<ThemePref, string> = {
+  system: 'Appearance: system',
+  light: 'Appearance: light',
+  dark: 'Appearance: dark'
+}
+
+/** Cycles system → light → dark → system. Icon reflects the current pref. */
+function ThemeToggle(): React.JSX.Element {
+  const pref = useThemeStore((s) => s.pref)
+  const cyclePref = useThemeStore((s) => s.cyclePref)
+  const Icon = pref === 'system' ? Monitor : pref === 'light' ? Sun : Moon
+  return (
+    <button
+      type="button"
+      onClick={cyclePref}
+      aria-label={PREF_LABEL[pref]}
+      title={PREF_LABEL[pref]}
+      className="rounded p-1 transition-colors hover:bg-foreground/5 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/40"
+    >
+      <Icon className="h-3 w-3" strokeWidth={1.8} />
+    </button>
   )
 }
