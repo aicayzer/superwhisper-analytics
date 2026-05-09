@@ -1,3 +1,5 @@
+import { formatTimestamp } from '@renderer/lib/format'
+import { mock } from '@renderer/lib/mock'
 import { useLayoutStore } from '@renderer/state/layoutStore'
 import { chartBreadcrumb } from '@renderer/screens/chartRegistry'
 import { Outlet, useLocation, useSearchParams } from 'react-router-dom'
@@ -56,15 +58,28 @@ export function RootLayout(): React.JSX.Element {
   // points at the screen the chart was launched from when supplied.
   const chartMatch = location.pathname.match(/^\/chart\/([^/]+)/)
   const chartCrumb = chartMatch ? chartBreadcrumb(chartMatch[1]) : null
-  const fromParam = params.get('from')
-  const backTo = chartCrumb
-    ? fromParam
-      ? decodeURIComponent(fromParam)
-      : chartCrumb.sectionPath
+  // /transcripts/:id likewise produces a breadcrumb (Transcripts › <ts>)
+  // and a Back arrow pointing at the list. Resolved here rather than in
+  // the screen so the navbar is the single source of truth for titles.
+  const transcriptMatch = location.pathname.match(/^\/transcripts\/([^/]+)/)
+  const transcriptRec = transcriptMatch
+    ? mock.recordings.find((r) => r.id === transcriptMatch[1])
     : undefined
-  const title: string | Breadcrumb[] = chartCrumb
-    ? [{ label: chartCrumb.section, to: chartCrumb.sectionPath }, { label: chartCrumb.title }]
-    : titleFor(location.pathname)
+  const fromParam = params.get('from')
+  let backTo: string | undefined
+  let title: string | Breadcrumb[]
+  if (chartCrumb) {
+    backTo = fromParam ? decodeURIComponent(fromParam) : chartCrumb.sectionPath
+    title = [{ label: chartCrumb.section, to: chartCrumb.sectionPath }, { label: chartCrumb.title }]
+  } else if (transcriptRec) {
+    backTo = '/transcripts'
+    title = [
+      { label: 'Transcripts', to: '/transcripts' },
+      { label: formatTimestamp(transcriptRec.datetime) }
+    ]
+  } else {
+    title = titleFor(location.pathname)
+  }
 
   return (
     <Window>
