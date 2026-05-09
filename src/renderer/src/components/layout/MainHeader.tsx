@@ -87,31 +87,35 @@ export function MainHeader({
 
 function TitleNode({ title }: { title: string | Breadcrumb[] }): React.JSX.Element {
   if (typeof title === 'string') {
+    // Plain page title — slightly darker grey than the muted token so it
+    // reads as a label rather than secondary text.
     return (
-      <h1 className="select-none truncate text-[13.5px] font-medium tracking-tight text-muted-foreground">
+      <h1 className="select-none truncate text-[13.5px] font-medium tracking-tight text-foreground/70">
         {title}
       </h1>
     )
   }
+  // Drilled-in breadcrumb — overall lighter than a plain title, separated
+  // by a forward slash. Last segment gets a touch more weight.
   return (
     <nav
       aria-label="Breadcrumb"
-      className="flex min-w-0 items-center gap-1 text-[13.5px] font-medium tracking-tight text-muted-foreground"
+      className="flex min-w-0 items-center gap-1.5 text-[13.5px] font-medium tracking-tight text-muted-foreground/70"
     >
       {title.map((crumb, i) => {
         const isLast = i === title.length - 1
         const node =
           crumb.to && !isLast ? (
-            <Link to={crumb.to} className="rounded transition-colors hover:text-foreground">
+            <Link to={crumb.to} className="rounded transition-colors hover:text-foreground/70">
               {crumb.label}
             </Link>
           ) : (
-            <span className="truncate">{crumb.label}</span>
+            <span className="truncate text-muted-foreground">{crumb.label}</span>
           )
         return (
-          <span key={i} className="flex min-w-0 items-center gap-1">
+          <span key={i} className="flex min-w-0 items-center gap-1.5">
             {node}
-            {!isLast && <ChevronRight className="h-3 w-3 shrink-0" strokeWidth={1.8} />}
+            {!isLast && <span aria-hidden>/</span>}
           </span>
         )
       })}
