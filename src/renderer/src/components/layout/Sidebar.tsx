@@ -129,7 +129,7 @@ export function Sidebar(): React.JSX.Element {
         </ul>
       </nav>
 
-      <footer className="flex items-center gap-0.5 border-t border-border px-1.5 py-1 text-[11px] text-muted-foreground [-webkit-app-region:no-drag]">
+      <footer className="flex items-center gap-0.5 px-1.5 py-1 text-[11px] text-muted-foreground [-webkit-app-region:no-drag]">
         <span className="flex-1 truncate px-1" title={new Date(INDEXED_AT).toLocaleString()}>
           Indexed {relativeTime(INDEXED_AT)}
         </span>

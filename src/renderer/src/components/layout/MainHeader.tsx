@@ -1,11 +1,10 @@
 import { IconButton } from '@renderer/components/ui/IconButton'
 import { useHeaderStore } from '@renderer/state/headerStore'
 import { useLayoutStore } from '@renderer/state/layoutStore'
+import { useRangeStore } from '@renderer/state/rangeStore'
 import { ChevronRight, PanelLeft } from 'lucide-react'
-import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { RangePill } from './RangePill'
-import { DEFAULT_RANGE, type RangeValue } from './rangeOptions'
 
 export interface Breadcrumb {
   label: string
@@ -40,7 +39,10 @@ export function MainHeader({
   const sidebarOpen = useLayoutStore((s) => s.sidebarOpen)
   const toggleSidebar = useLayoutStore((s) => s.toggleSidebar)
   const headerActions = useHeaderStore((s) => s.actions)
-  const [range, setRange] = useState<RangeValue>(DEFAULT_RANGE)
+  // Range lives in a global store so screens can react to it. The pill
+  // here is just the read/write surface for the user.
+  const range = useRangeStore((s) => s.range)
+  const setRange = useRangeStore((s) => s.setRange)
 
   return (
     <div

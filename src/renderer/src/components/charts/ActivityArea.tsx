@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import {
   Area,
   AreaChart,
@@ -17,6 +18,11 @@ interface ActivityAreaProps {
   formatTick?: (raw: string) => string
   /** Approximate number of ticks; Recharts decides the actual stride. */
   tickCount?: number
+  /** Optional date window — filters `data` to entries where `data[xKey]`
+   *  parses to a Date inside [from, to]. If both are omitted the chart
+   *  renders the full series unchanged. */
+  from?: Date
+  to?: Date
 }
 
 /**
@@ -29,11 +35,28 @@ export function ActivityArea({
   xKey,
   yKey,
   formatTick,
-  tickCount = 6
+  tickCount = 6,
+  from,
+  to
 }: ActivityAreaProps): React.JSX.Element {
+  // Filter once per data/window change. Compares ms — Date.parse on the
+  // YYYY-MM-DD strings the data layer produces.
+  const filtered = useMemo(() => {
+    if (!from && !to) return data
+    const fromMs = from?.getTime() ?? -Infinity
+    const toMs = to?.getTime() ?? Infinity
+    return data.filter((row) => {
+      const raw = row[xKey]
+      if (typeof raw !== 'string') return true
+      const t = Date.parse(raw)
+      if (Number.isNaN(t)) return true
+      return t >= fromMs && t <= toMs
+    })
+  }, [data, xKey, from, to])
+
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <AreaChart data={data} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+      <AreaChart data={filtered} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
         <defs>
           <linearGradient id="grad-area" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="var(--chart-1)" stopOpacity={0.18} />

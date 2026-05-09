@@ -4,8 +4,8 @@ import { HBar } from '@renderer/components/charts/HBar'
 import { Heatmap } from '@renderer/components/charts/Heatmap'
 import { HourRadial } from '@renderer/components/charts/HourRadial'
 import { LineTrend } from '@renderer/components/charts/LineTrend'
+import { ModePie } from '@renderer/components/charts/ModePie'
 import { PaceTrend } from '@renderer/components/charts/PaceTrend'
-import { StackedAreaPercent } from '@renderer/components/charts/StackedAreaPercent'
 import { StreakCalendar } from '@renderer/components/charts/StreakCalendar'
 import { VBar } from '@renderer/components/charts/VBar'
 import { mock } from '@renderer/lib/mock'
@@ -49,8 +49,8 @@ export const CHART_REGISTRY: Record<string, ChartSpec> = {
     )
   },
   'when-you-record': {
-    section: 'Usage',
-    sectionPath: '/usage',
+    section: 'Overview',
+    sectionPath: '/',
     title: 'When you record',
     description: 'Day of week × hour of day. Brighter cells are busier.',
     render: () => <Heatmap matrix={mock.heatmap} cellHeight={36} />
@@ -73,9 +73,10 @@ export const CHART_REGISTRY: Record<string, ChartSpec> = {
     render: () => <HourRadial data={mock.hourly} />
   },
   'duration-mix': {
-    section: 'Usage',
-    sectionPath: '/usage',
+    section: 'Overview',
+    sectionPath: '/',
     title: 'Duration mix',
+    description: 'How long recordings tend to run.',
     render: () => (
       <DistBar
         data={mock.durationDist as unknown as Array<Record<string, unknown>>}
@@ -83,6 +84,24 @@ export const CHART_REGISTRY: Record<string, ChartSpec> = {
         yKey="count"
       />
     )
+  },
+  'mode-pie': {
+    section: 'Usage',
+    sectionPath: '/usage',
+    title: 'Mode share',
+    description: 'Share of recordings by mode.',
+    render: () => {
+      const data = mock.modeStats.map((m) => ({ name: m.modeName, value: m.count }))
+      const dom = mock.modeStats[0]
+      const pct = dom ? Math.round((dom.count / mock.overview.totalRecordings) * 100) : 0
+      return (
+        <ModePie
+          data={data}
+          centreLabel={dom?.modeName}
+          centreSubLabel={dom ? `${pct}%` : undefined}
+        />
+      )
+    }
   },
   'top-words': {
     section: 'Language',
@@ -193,21 +212,10 @@ export const CHART_REGISTRY: Record<string, ChartSpec> = {
         yKey="count"
       />
     )
-  },
-  'mode-mix': {
-    section: 'Overview',
-    sectionPath: '/',
-    title: 'Mode mix',
-    description: 'Recording share per mode, week by week.',
-    render: () => (
-      <StackedAreaPercent
-        data={mock.modeByWeekFlat}
-        xKey="date"
-        keys={mock.stackModeKeys}
-        formatTick={(v) => String(v).replace(/^\d{4}-/, '')}
-      />
-    )
   }
+  // mode-mix removed in wave 3 — Mode share is the new primary view via
+  // ModePie ('mode-pie' above). The stacked-area "share over time" wasn't
+  // surfaced anywhere after the Overview restructure.
 }
 
 /** Turn a slug into a breadcrumb if it's a known chart. */

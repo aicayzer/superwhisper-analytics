@@ -298,10 +298,17 @@ for (const r of recordings) {
 }
 const daily: DailySummary[] = Array.from(dailyMap.values())
 
-const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+// Mon-first ordering across the app — keeps the work-week visually
+// contiguous in heatmaps and DOW bar charts. JS Date.getDay() is Sun-first
+// (0..6 = Sun..Sat); mondayIndex remaps it to (0..6 = Mon..Sun).
+const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+function mondayIndex(d: Date): number {
+  return (d.getDay() + 6) % 7
+}
+
 const dowCounts: number[] = [0, 0, 0, 0, 0, 0, 0]
 for (const r of recordings) {
-  const d = new Date(r.datetime).getDay()
+  const d = mondayIndex(new Date(r.datetime))
   dowCounts[d] = (dowCounts[d] ?? 0) + 1
 }
 const dayOfWeek: DayOfWeekPattern[] = DAY_NAMES.map((name, day) => ({
@@ -365,7 +372,7 @@ for (const r of recordings) {
 const heatmap: Heatmap = Array.from({ length: 7 }, () => Array(24).fill(0) as number[])
 for (const r of recordings) {
   const d = new Date(r.datetime)
-  const row = heatmap[d.getDay()]
+  const row = heatmap[mondayIndex(d)]
   if (!row) continue
   row[d.getHours()] = (row[d.getHours()] ?? 0) + 1
 }

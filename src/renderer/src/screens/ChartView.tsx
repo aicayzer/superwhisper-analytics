@@ -1,15 +1,14 @@
-import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { CHART_REGISTRY } from './chartRegistry'
 
 /**
  * Full-screen chart view at /chart/:slug. Reads the chart spec from the
- * registry and renders it in a single bordered panel. The breadcrumb
- * (rendered in MainHeader) and the optional `from` query param handle
- * back-nav.
+ * registry and renders it in a single bordered panel. The breadcrumb in
+ * MainHeader (e.g. "Language › Speaking pace") plus the back arrow
+ * already convey the source — no extra footer needed.
  */
 export function ChartView(): React.JSX.Element {
   const { slug } = useParams<{ slug: string }>()
-  const [params] = useSearchParams()
   const spec = slug ? CHART_REGISTRY[slug] : undefined
 
   if (!spec) {
@@ -23,9 +22,6 @@ export function ChartView(): React.JSX.Element {
     )
   }
 
-  const fromParam = params.get('from')
-  const backTo = fromParam ? decodeURIComponent(fromParam) : spec.sectionPath
-
   return (
     <div className="flex h-full flex-col gap-3">
       {spec.description && (
@@ -33,12 +29,6 @@ export function ChartView(): React.JSX.Element {
       )}
       <div className="min-h-0 flex-1 rounded-xl border border-border bg-card p-4">
         <div className="h-full">{spec.render()}</div>
-      </div>
-      <div className="text-[11.5px] text-muted-foreground">
-        From{' '}
-        <Link to={backTo} className="rounded hover:underline">
-          {spec.section}
-        </Link>
       </div>
     </div>
   )

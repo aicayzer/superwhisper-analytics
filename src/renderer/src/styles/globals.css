@@ -30,7 +30,17 @@
   }
 }
 
-/* Native macOS scrollbars look heavy on light surfaces; soften them. */
+/**
+ * Auto-hiding scrollbars (overlay-style).
+ *
+ * Default: thumb is fully transparent — the track exists (so layout
+ * stays stable) but is invisible. The thumb fades in only when the
+ * cursor is over the scrollable element, mirroring the macOS-native
+ * "show only when needed" feel without the JS scroll listener that
+ * a true scroll-only fade would need.
+ *
+ * The transition gives a soft fade-in/out instead of a hard pop.
+ */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -39,20 +49,65 @@
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.08);
+  background: transparent;
   border-radius: 4px;
+  transition: background-color 200ms ease-out;
 }
-::-webkit-scrollbar-thumb:hover {
+*:hover > *::-webkit-scrollbar-thumb,
+*:hover::-webkit-scrollbar-thumb {
   background: rgba(0, 0, 0, 0.18);
 }
-.dark ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08);
-}
-.dark ::-webkit-scrollbar-thumb:hover {
+.dark *:hover > *::-webkit-scrollbar-thumb,
+.dark *:hover::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.2);
+}
+::-webkit-scrollbar-thumb:active {
+  background: rgba(0, 0, 0, 0.3);
+}
+.dark ::-webkit-scrollbar-thumb:active {
+  background: rgba(255, 255, 255, 0.32);
+}
+
+/* Firefox: same default-invisible behaviour, reveal on hover. */
+* {
+  scrollbar-color: transparent transparent;
+}
+*:hover {
+  scrollbar-color: rgba(0, 0, 0, 0.18) transparent;
+}
+.dark *:hover {
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
 }
 
 /* Tabular numerals on numeric data so columns align */
 .tabular-nums {
   font-variant-numeric: tabular-nums;
+}
+
+/**
+ * Fade-mask utility: text inside fades to transparent at the top and
+ * bottom edges instead of cutting off abruptly under the card padding.
+ * Used on the transcript scroll container so segments visually blend
+ * into the card frame as they scroll past.
+ *
+ * The 16px stops are tuned to match the Card's vertical padding — the
+ * fade band starts where the card begins and ends where the card edge
+ * is. Override per-element with custom properties if other widgets need
+ * a different fade depth.
+ */
+.fade-y-mask {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    black 16px,
+    black calc(100% - 16px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    black 16px,
+    black calc(100% - 16px),
+    transparent 100%
+  );
 }

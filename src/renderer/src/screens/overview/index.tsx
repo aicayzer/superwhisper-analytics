@@ -1,19 +1,26 @@
 import { ActivityArea } from '@renderer/components/charts/ActivityArea'
 import { ChartCard } from '@renderer/components/charts/ChartCard'
+import { DistBar } from '@renderer/components/charts/DistBar'
 import { Heatmap } from '@renderer/components/charts/Heatmap'
-import { StackedAreaPercent } from '@renderer/components/charts/StackedAreaPercent'
 import { KpiRow } from '@renderer/components/KpiRow'
 import { formatCompact, formatDurationSec } from '@renderer/lib/format'
 import { mock } from '@renderer/lib/mock'
+import { useRangeStore, windowFor } from '@renderer/state/rangeStore'
+import { useMemo } from 'react'
 import { formatActivityTick } from './format'
 
 /**
- * Overview — landing page. KPI strip → Activity + Mode mix → "When you record"
- * heatmap fills the rest of the viewport.
+ * Overview — landing page. Three rows:
+ *   1. KPI strip
+ *   2. "When you record" heatmap (3/5) + Duration mix bar (2/5)
+ *   3. Activity area chart filling the rest, scoped to the navbar's
+ *      selected range.
  */
 export function Overview(): React.JSX.Element {
-  const { overview, daily, heatmap, modeByWeekFlat, stackModeKeys, sparklines } = mock
+  const { overview, daily, heatmap, durationDist, sparklines } = mock
   const avgPerRec = Math.round(overview.totalWords / overview.totalRecordings)
+  const range = useRangeStore((s) => s.range)
+  const { from, to } = useMemo(() => windowFor(range), [range])
 
   return (
     <div className="flex h-full flex-col gap-3">
@@ -46,29 +53,35 @@ export function Overview(): React.JSX.Element {
         ]}
       />
 
+      {/* Row 2: heatmap (3/5) + duration mix (2/5). Both share a fixed
+          height so they stay readable as the window grows; the Activity
+          row underneath flexes. */}
       <div className="grid grid-cols-[3fr_2fr] gap-3" style={{ height: 240 }}>
-        <ChartCard title="Activity" slug="activity">
-          <ActivityArea
-            data={daily as unknown as Array<Record<string, unknown>>}
-            xKey="date"
-            yKey="count"
-            formatTick={formatActivityTick}
-          />
+        <ChartCard title="When you record" slug="when-you-record">
+          <div className="flex h-full flex-col justify-center">
+            <Heatmap matrix={heatmap} cellHeight={20} />
+          </div>
         </ChartCard>
-        <ChartCard title="Mode mix" slug="mode-mix">
-          <StackedAreaPercent
-            data={modeByWeekFlat}
-            xKey="date"
-            keys={stackModeKeys}
-            formatTick={(v) => String(v).replace(/^\d{4}-/, '')}
+        <ChartCard title="Duration mix" slug="duration-mix">
+          <DistBar
+            data={durationDist as unknown as Array<Record<string, unknown>>}
+            xKey="label"
+            yKey="count"
           />
         </ChartCard>
       </div>
 
-      <ChartCard title="When you record" slug="when-you-record" className="min-h-0 flex-1">
-        <div className="flex h-full flex-col justify-center">
-          <Heatmap matrix={heatmap} cellHeight={28} />
-        </div>
+      {/* Row 3: Activity. Filters by the navbar range so the chart
+          reflects the user's chosen window. */}
+      <ChartCard title="Activity" slug="activity" className="min-h-0 flex-1">
+        <ActivityArea
+          data={daily as unknown as Array<Record<string, unknown>>}
+          xKey="date"
+          yKey="count"
+          formatTick={formatActivityTick}
+          from={from}
+          to={to}
+        />
       </ChartCard>
     </div>
   )
