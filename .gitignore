@@ -1,54 +1,40 @@
-# Output directories (generated data, not source code)
-/outputs/
+# dependencies
+node_modules/
 
-# Log files
-/logs/
+# build outputs
+dist/
+out/
+build/Output/
 
-# Temporary files
-tmp/
+# coverage
+coverage/
 
-# Virtual environment
-venv/
-env/
-*.virtualenv
-
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
-
-# Linting
-.ruff_cache/
-
-# Local configuration
-config.local.ini
-
-# IDE
+# system / IDE
+.DS_Store
+.eslintcache
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# OS
-.DS_Store
-Thumbs.db
+# logs
+*.log*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
 
-# Distribution / packaging
-dist/
-build/
-*.egg-info/
+# env
+.env
+.env.*
+!.env.example
 
-# Next.js / Web prototypes
-prototypes/web/node_modules/
-prototypes/web/.next/
-prototypes/web/out/
-prototypes/web/.env*.local
-prototypes/web/next-env.d.ts
+# local-only working folders (never tracked)
+_tmp/
+_local/
+
+# playwright artefacts
+.playwright-cli/
+*.png
+!resources/icon.png

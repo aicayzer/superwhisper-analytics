@@ -1,0 +1,155 @@
+/**
+ * Design tokens for SuperWhisper Analytics.
+ *
+ * Two layers:
+ *   1. Source values in :root / .dark — single source of truth
+ *   2. @theme inline mapping — exposes them as Tailwind utilities
+ *
+ * ShadCN tokens (--background, --foreground, --primary, etc.) sit
+ * alongside foundation aliases (--window, --floating, --fg-muted)
+ * so both component sets work side by side.
+ *
+ * Theme switching: toggle the `.dark` class on <html> via themeStore.
+ *
+ * Surface system:
+ *   --window     the cream/charcoal backdrop visible around floating overlays
+ *   --floating   the surface used by the sidebar (sits on --window)
+ *   --card       slightly lifted from --background — used by cards
+ *
+ * Light mode: window and sidebar share the same off-white (#FDFDFC); cards
+ * lift to pure white. Dark mode: window #1F1F1E < card #232322 < sidebar
+ * #262626 — the card sits just above the window, sidebar dominates as the
+ * floating chrome.
+ */
+
+:root {
+  /* Surfaces — window and sidebar share the same off-white in light mode. */
+  --window: #fdfdfc;
+  --floating: #fdfdfc;
+
+  /* ShadCN base (greyscale, neutral) */
+  --background: var(--window);
+  --foreground: #0a0a0a;
+  --card: #ffffff;
+  --card-foreground: #0a0a0a;
+  --popover: var(--floating);
+  --popover-foreground: #0a0a0a;
+  --primary: #0a0a0a;
+  --primary-foreground: #fafafa;
+  --secondary: #f4f4f5;
+  --secondary-foreground: #0a0a0a;
+  --muted: #f4f4f5;
+  --muted-foreground: #737373;
+  --accent: #f4f4f5;
+  --accent-foreground: #0a0a0a;
+  --destructive: #ef4444;
+  --destructive-foreground: #fafafa;
+  --border: #e5e5e5;
+  --input: #e5e5e5;
+  --ring: #a3a3a3;
+  /* Base radius — Tailwind v4 sm/md/lg/xl scale derived from this. Drops
+     2px from the original 0.5rem so cards land at 10px instead of 12px. */
+  --radius: 0.375rem;
+
+  /* Chart palette — monotone ramp from darkest to lightest */
+  --chart-1: #0a0a0a;
+  --chart-2: #404040;
+  --chart-3: #737373;
+  --chart-4: #a3a3a3;
+  --chart-5: #d4d4d4;
+
+  /* Accent blue — used for active-segment + word-hover highlights. The
+     translucent bg sits behind the brighter accent text. */
+  --accent-blue: #0166cc;
+  --accent-blue-bg: #edf3fb;
+
+  /* Elevation — used only by floating overlays (sidebar, palette). Cards
+     get their lift from a brighter --card colour, not shadow. */
+  --shadow-float: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px -4px rgba(0, 0, 0, 0.08);
+}
+
+.dark {
+  --window: #1f1f1e;
+  --floating: #262626;
+
+  --background: var(--window);
+  --foreground: #fafaf9;
+  --card: #232322;
+  --card-foreground: #fafaf9;
+  --popover: var(--floating);
+  --popover-foreground: #fafaf9;
+  --primary: #fafaf9;
+  --primary-foreground: #0a0a0a;
+  --secondary: #2e2e2e;
+  --secondary-foreground: #fafaf9;
+  --muted: #2e2e2e;
+  --muted-foreground: #a8a29e;
+  --accent: #2e2e2e;
+  --accent-foreground: #fafaf9;
+  --destructive: #b91c1c;
+  --destructive-foreground: #fafaf9;
+  --border: #2e2e2e;
+  --input: #2e2e2e;
+  --ring: #525252;
+
+  --chart-1: #fafaf9;
+  --chart-2: #d4d4d4;
+  --chart-3: #a3a3a3;
+  --chart-4: #737373;
+  --chart-5: #404040;
+
+  /* Brighter accent + cooler bg in dark mode so the highlight reads against
+     the deeper window backdrop. */
+  --accent-blue: #0099ff;
+  --accent-blue-bg: #212b35;
+
+  /* Pulled right back in dark mode — the brighter --card and --floating
+     colours carry the elevation cue. Just enough to avoid a hard outline. */
+  --shadow-float: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+@theme inline {
+  /* ShadCN — Tailwind v4 utility generation */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --color-accent-blue: var(--accent-blue);
+  --color-accent-blue-bg: var(--accent-blue-bg);
+
+  /* Foundation aliases (kept so layout primitives still compile) */
+  --color-window: var(--window);
+  --color-floating: var(--floating);
+  --color-fg: var(--foreground);
+  --color-fg-muted: var(--muted-foreground);
+  --color-line: var(--border);
+
+  --shadow-float: var(--shadow-float);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
