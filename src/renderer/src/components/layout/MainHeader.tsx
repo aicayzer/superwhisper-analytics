@@ -3,6 +3,7 @@ import { ChevronRight, PanelLeft, Search } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { RangePill } from './RangePill'
+import { DEFAULT_RANGE, type RangeValue } from './rangeOptions'
 
 export interface Breadcrumb {
   label: string
@@ -39,7 +40,7 @@ export function MainHeader({
 }: MainHeaderProps): React.JSX.Element {
   const sidebarOpen = useLayoutStore((s) => s.sidebarOpen)
   const toggleSidebar = useLayoutStore((s) => s.toggleSidebar)
-  const [range, setRange] = useState('90')
+  const [range, setRange] = useState<RangeValue>(DEFAULT_RANGE)
   const [search, setSearch] = useState('')
 
   return (
