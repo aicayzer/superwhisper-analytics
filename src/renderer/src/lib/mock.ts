@@ -7,6 +7,7 @@
  * screen should ever import from this file once real data flows.
  */
 
+import { tokenise } from './text'
 import type {
   DailySummary,
   DayOfWeekPattern,
@@ -139,108 +140,6 @@ const FILLER_PHRASES = [
   'actually'
 ] as const
 
-const STOP_WORDS = new Set([
-  'the',
-  'and',
-  'a',
-  'an',
-  'of',
-  'to',
-  'in',
-  'is',
-  'it',
-  'that',
-  'i',
-  'for',
-  'on',
-  'with',
-  'as',
-  'this',
-  'be',
-  'are',
-  'was',
-  'or',
-  'at',
-  'by',
-  'we',
-  'you',
-  'he',
-  'she',
-  'they',
-  'but',
-  'not',
-  'have',
-  'has',
-  'had',
-  'do',
-  'does',
-  'did',
-  'so',
-  'if',
-  'just',
-  'my',
-  'me',
-  'your',
-  'our',
-  'their',
-  'his',
-  'her',
-  'its',
-  'them',
-  'will',
-  'would',
-  'could',
-  'should',
-  'about',
-  'from',
-  'into',
-  'over',
-  'after',
-  'before',
-  'than',
-  'some',
-  'any',
-  'no',
-  'how',
-  'what',
-  'when',
-  'where',
-  'who',
-  'why',
-  'all',
-  'one',
-  'two',
-  'be',
-  'been',
-  'being',
-  'am',
-  'were',
-  'because',
-  'while',
-  'also',
-  'only',
-  'very',
-  'can',
-  'cant',
-  'dont',
-  'im',
-  'thats',
-  'whats',
-  'theres',
-  'its',
-  'ive',
-  'youre',
-  'were',
-  'theyre',
-  's',
-  't',
-  'd',
-  'll',
-  've',
-  're',
-  'm'
-])
-
 function pickWeightedMode(): string {
   const total = MODES.reduce((s, m) => s + m.weight, 0)
   let r = rand() * total
@@ -283,16 +182,6 @@ function buildWaveform(durationMs: number): number[] {
     peaks.push(Math.max(0.05, Math.min(1, base + jitter)))
   }
   return peaks
-}
-
-function tokenise(text: string): string[] {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z'\s]/g, ' ')
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((w) => w.replace(/^'+|'+$/g, ''))
-    .filter((w) => w.length > 2 && !STOP_WORDS.has(w))
 }
 
 function buildFillers(transcript: string): {
