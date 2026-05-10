@@ -1,6 +1,8 @@
 import { IconButton } from '@renderer/components/ui/IconButton'
 import { useResize } from '@renderer/hooks/useResize'
 import { cn } from '@renderer/lib/cn'
+import { useConfigStore } from '@renderer/state/configStore'
+import { useDataStore } from '@renderer/state/dataStore'
 import { SIDEBAR_MAX_WIDTH, SIDEBAR_MIN_WIDTH, useLayoutStore } from '@renderer/state/layoutStore'
 import { usePaletteStore } from '@renderer/state/paletteStore'
 import {
@@ -24,10 +26,10 @@ const NAV = [
   { to: '/transcripts', label: 'Transcripts', icon: TextSearch }
 ] as const
 
-const INDEXED_AT = Date.now() - 1000 * 60 * 11 // mock — "11 minutes ago"
-
-function relativeTime(from: number): string {
-  const diffSec = Math.max(0, Math.floor((Date.now() - from) / 1000))
+function relativeTime(iso: string): string {
+  const t = new Date(iso).getTime()
+  if (isNaN(t)) return ''
+  const diffSec = Math.max(0, Math.floor((Date.now() - t) / 1000))
   if (diffSec < 30) return 'just now'
   if (diffSec < 60) return `${diffSec}s ago`
   const diffMin = Math.floor(diffSec / 60)
@@ -64,6 +66,13 @@ export function Sidebar(): React.JSX.Element {
   const setSidebarWidth = useLayoutStore((s) => s.setSidebarWidth)
   const toggleSidebar = useLayoutStore((s) => s.toggleSidebar)
   const openPalette = usePaletteStore((s) => s.openWith)
+  const indexedAt = useDataStore((s) => s.indexedAt)
+  const loading = useDataStore((s) => s.loading)
+  const reindexing = useDataStore((s) => s.reindexing)
+  const reindex = useDataStore((s) => s.reindex)
+  const configValid = useConfigStore((s) => s.isValid)
+  const busy = loading || reindexing
+  const reindexDisabled = busy || !configValid
 
   const { startResize, isResizing } = useResize({
     direction: 'grow-right',
@@ -73,7 +82,16 @@ export function Sidebar(): React.JSX.Element {
     onChange: setSidebarWidth
   })
 
-  useNow(30_000)
+  // Tick once per 10s so the "Indexed Xm ago" string refreshes alongside
+  // Settings' StatusText. Cheap.
+  useNow(10_000)
+
+  const indexedLabel = (() => {
+    if (loading) return 'Scanning…'
+    if (reindexing) return 'Reindexing…'
+    if (indexedAt) return `Indexed ${relativeTime(indexedAt)}`
+    return configValid ? 'Not yet indexed' : 'No folder configured'
+  })()
 
   return (
     <aside
@@ -126,11 +144,22 @@ export function Sidebar(): React.JSX.Element {
       </nav>
 
       <footer className="flex items-center gap-0.5 px-1.5 py-1 text-[11px] text-muted-foreground [-webkit-app-region:no-drag]">
-        <span className="flex-1 truncate px-1" title={new Date(INDEXED_AT).toLocaleString()}>
-          Indexed {relativeTime(INDEXED_AT)}
+        <span
+          className="flex-1 truncate px-1"
+          title={indexedAt ? new Date(indexedAt).toLocaleString() : undefined}
+        >
+          {indexedLabel}
         </span>
-        <IconButton aria-label="Refresh" title="Refresh (placeholder)">
-          <RefreshCw className="h-3.5 w-3.5" strokeWidth={1.8} />
+        <IconButton
+          onClick={() => void reindex()}
+          disabled={reindexDisabled}
+          aria-label="Reindex recordings"
+          title={configValid ? 'Reindex recordings' : 'Pick a valid folder in Settings first'}
+        >
+          <RefreshCw
+            className={cn('h-3.5 w-3.5', reindexing && 'animate-spin')}
+            strokeWidth={1.8}
+          />
         </IconButton>
         <SettingsLink />
       </footer>

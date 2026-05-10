@@ -1,137 +1,29 @@
 /**
- * Canonical shapes used across the renderer.
+ * Re-exports from `@shared/types` for back-compat.
  *
- * Wave 1 these are produced by `lib/mock.ts`. Wave 2 the same shapes will
- * come from a main-process scanner over the SuperWhisper folder, fed via
- * IPC. Screens consume the shapes only — never the source.
+ * Renderer code that historically imported from `'@renderer/lib/types'`
+ * keeps working unchanged. New code should import directly from
+ * `'@shared/types'` for clarity about the cross-process contract.
  */
-
-export interface Segment {
-  start: number // seconds
-  end: number // seconds
-  text: string
-}
-
-export interface Recording {
-  id: string // unix timestamp string ("1755164573")
-  datetime: string // ISO without timezone, as SuperWhisper stores it
-  modeName: string
-  modelName: string
-  appVersion: string
-  recordingDevice: string
-  languageSelected: string
-  duration: number // ms
-  processingTime: number // ms
-  result: string // processed transcript
-  rawResult: string // raw transcript
-  segments: Segment[]
-  // Derived metrics — recomputed by analytics, kept on the object for convenience
-  wordCount: number
-  wordsPerMinute: number
-  sentenceCount: number
-  fillerCount: number
-  fillerBreakdown: Array<{ phrase: string; count: number }>
-  excerpt: string
-  waveform: number[] // mock peaks, normalised 0..1
-}
-
-export interface OverviewStats {
-  totalRecordings: number
-  totalWords: number
-  totalDurationSec: number
-  avgWPM: number
-  avgDurationSec: number
-  dateRange: { start: string; end: string }
-  activeDays: number
-}
-
-export interface DailySummary {
-  date: string // YYYY-MM-DD
-  count: number
-  totalWords: number
-  totalDurationSec: number
-}
-
-export interface DayOfWeekPattern {
-  day: number // 0 = Sun
-  dayName: string
-  count: number
-}
-
-export interface ModeStat {
-  modeName: string
-  count: number
-  totalWords: number
-  totalDurationSec: number
-  pct: number
-}
-
-export interface WordFrequency {
-  word: string
-  count: number
-}
-
-// ---- New for wave 1.5: Usage + Language aggregates ----------------------
-
-export interface HourlyPattern {
-  hour: number // 0-23
-  count: number
-  totalDurationSec: number
-}
-
-export interface DurationBucket {
-  label: string
-  min: number // seconds, inclusive
-  max: number // seconds, exclusive (Infinity for last bucket)
-  count: number
-}
-
-export interface SentenceBucket {
-  label: string
-  min: number // words/sentence, inclusive
-  max: number // exclusive
-  count: number
-}
-
-export interface TrendPoint {
-  period: string // YYYY-MM or YYYY-Www
-  value: number
-}
-
-export interface UsageStats {
-  currentStreak: number
-  longestStreak: number
-  avgPerActiveDay: number
-  timePerActiveDaySec: number
-}
-
-export interface LanguageStats {
-  avgWPM: number
-  fillerRatePct: number
-  vocabularyCount: number
-  avgSentenceLength: number
-}
-
-/** 7×24 number matrix — rows are days (0=Sun), cols are hours. */
-export type Heatmap = number[][]
-
-/** Single cell of the GitHub-style streak calendar. */
-export interface StreakCell {
-  date: string // YYYY-MM-DD
-  count: number
-}
-
-/** A KPI's trailing series — used by the inline sparkline. */
-export interface SparkSeries {
-  /** Recent values, oldest → newest. */
-  values: number[]
-  /** Optional period labels for the values (length must match). */
-  labels?: string[]
-}
-
-/** Per-day breakdown of recordings by mode, for stacked-area / bar charts. */
-export interface ModeByDay {
-  date: string // YYYY-MM-DD
-  /** Counts per mode keyed by mode name. */
-  modes: Record<string, number>
-}
+export type {
+  Aggregates,
+  DailySummary,
+  DayOfWeekPattern,
+  DurationBucket,
+  Heatmap,
+  HourlyPattern,
+  HydratePayload,
+  LanguageStats,
+  ModeByDay,
+  ModeStat,
+  OverviewStats,
+  Recording,
+  Segment,
+  SentenceBucket,
+  SparkSeries,
+  StreakCell,
+  TrendPoint,
+  UsageStats,
+  WordFrequency,
+  WpmByMode
+} from '@shared/types'

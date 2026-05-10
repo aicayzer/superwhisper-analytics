@@ -1,3 +1,5 @@
+import { formatCompact } from '@renderer/lib/format'
+import { memo } from 'react'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { ChartTooltip } from './ChartTooltip'
 
@@ -12,8 +14,12 @@ interface VBarProps {
 
 /**
  * Vertical bar chart, single series. Fills its container.
+ *
+ * Y-axis was previously 32px wide with no formatter — overflowing labels
+ * collapsed to a single visible "0" on counts ≥1000. `width={44}` +
+ * `formatCompact` resolves it.
  */
-export function VBar({
+function VBarInner({
   data,
   xKey,
   yKey,
@@ -22,7 +28,7 @@ export function VBar({
 }: VBarProps): React.JSX.Element {
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={data} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+      <BarChart data={data} margin={{ top: 8, right: 8, left: -4, bottom: 0 }}>
         <CartesianGrid stroke="var(--border)" strokeDasharray="2 4" vertical={false} />
         <XAxis
           dataKey={xKey}
@@ -34,8 +40,9 @@ export function VBar({
           tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }}
           tickLine={false}
           axisLine={false}
-          width={32}
+          width={44}
           allowDecimals={false}
+          tickFormatter={(v) => formatCompact(Number(v))}
         />
         <Tooltip cursor={{ fill: 'var(--accent)' }} content={<ChartTooltip />} />
         <Bar
@@ -49,3 +56,5 @@ export function VBar({
     </ResponsiveContainer>
   )
 }
+
+export const VBar = memo(VBarInner)

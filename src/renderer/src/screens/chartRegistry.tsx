@@ -1,14 +1,20 @@
-import { ActivityArea } from '@renderer/components/charts/ActivityArea'
-import { DistBar } from '@renderer/components/charts/DistBar'
-import { HBar } from '@renderer/components/charts/HBar'
-import { Heatmap } from '@renderer/components/charts/Heatmap'
-import { HourRadial } from '@renderer/components/charts/HourRadial'
-import { LineTrend } from '@renderer/components/charts/LineTrend'
-import { ModePie } from '@renderer/components/charts/ModePie'
-import { PaceTrend } from '@renderer/components/charts/PaceTrend'
-import { StreakCalendar } from '@renderer/components/charts/StreakCalendar'
-import { VBar } from '@renderer/components/charts/VBar'
-import { mock } from '@renderer/lib/mock'
+import {
+  ActivityChart,
+  ByDayOfWeekChart,
+  ByHourOfDayChart,
+  DurationMixChart,
+  FillerRateChart,
+  FillerWordsChart,
+  ModePieChart,
+  RecordingStreakChart,
+  SentenceLengthChart,
+  SpeakingPaceChart,
+  TopWordsChart,
+  VocabularyGrowthChart,
+  VolumeOverTimeChart,
+  WhenYouRecordChart,
+  WpmByModeChart
+} from './chartItems'
 
 export interface ChartSpec {
   /** Section breadcrumb (e.g. "Usage", "Language", "Overview"). */
@@ -27,6 +33,10 @@ export interface ChartSpec {
  * Single source of truth mapping slug → chart. Used by ChartCard's maximise
  * link and by ChartView for the full-screen render. Adding a chart anywhere
  * means adding it here too — keeps the breadcrumb path consistent.
+ *
+ * Each render() returns a small named component (defined in `./chartItems`)
+ * rather than an inline lambda that calls hooks. Inline-lambda hooks would
+ * violate rules of hooks when navigating between /chart/:slug paths.
  */
 export const CHART_REGISTRY: Record<string, ChartSpec> = {
   'volume-over-time': {
@@ -34,202 +44,100 @@ export const CHART_REGISTRY: Record<string, ChartSpec> = {
     sectionPath: '/usage',
     title: 'Volume over time',
     description: 'Recordings per day across the active range.',
-    render: () => (
-      <ActivityArea
-        data={mock.daily as unknown as Array<Record<string, unknown>>}
-        xKey="date"
-        yKey="count"
-        formatTick={(v) => {
-          const d = new Date(String(v))
-          return isNaN(d.getTime())
-            ? ''
-            : d.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' })
-        }}
-      />
-    )
+    render: () => <VolumeOverTimeChart />
   },
   'when-you-record': {
     section: 'Overview',
     sectionPath: '/',
     title: 'When you record',
     description: 'Day of week × hour of day. Brighter cells are busier.',
-    render: () => <Heatmap matrix={mock.heatmap} cellHeight={36} />
+    render: () => <WhenYouRecordChart />
   },
   'recording-streak': {
     section: 'Usage',
     sectionPath: '/usage',
     title: 'Recording streak',
     description: 'Daily activity for the last twelve months.',
-    render: () => (
-      <div className="flex h-full items-center justify-center overflow-auto">
-        <StreakCalendar data={mock.streakCells} cellSize={16} />
-      </div>
-    )
+    render: () => <RecordingStreakChart />
   },
   'by-hour-of-day': {
     section: 'Usage',
     sectionPath: '/usage',
     title: 'By hour of day',
-    render: () => <HourRadial data={mock.hourly} />
+    render: () => <ByHourOfDayChart />
   },
   'duration-mix': {
     section: 'Overview',
     sectionPath: '/',
     title: 'Duration mix',
     description: 'How long recordings tend to run.',
-    render: () => (
-      <DistBar
-        data={mock.durationDist as unknown as Array<Record<string, unknown>>}
-        xKey="label"
-        yKey="count"
-      />
-    )
+    render: () => <DurationMixChart />
   },
   'mode-pie': {
     section: 'Usage',
     sectionPath: '/usage',
     title: 'Mode share',
     description: 'Share of recordings by mode.',
-    render: () => {
-      const data = mock.modeStats.map((m) => ({ name: m.modeName, value: m.count }))
-      const dom = mock.modeStats[0]
-      const pct = dom ? Math.round((dom.count / mock.overview.totalRecordings) * 100) : 0
-      return (
-        <ModePie
-          data={data}
-          centreLabel={dom?.modeName}
-          centreSubLabel={dom ? `${pct}%` : undefined}
-        />
-      )
-    }
+    render: () => <ModePieChart />
   },
   'wpm-by-mode': {
     section: 'Usage',
     sectionPath: '/usage',
     title: 'WPM by mode',
     description: 'Average words-per-minute by mode (top 6 by recording count).',
-    render: () => (
-      <HBar
-        data={mock.wpmByMode.map((w) => ({ label: w.mode, count: w.avgWPM }))}
-        xKey="count"
-        yKey="label"
-        labelWidth={120}
-      />
-    )
+    render: () => <WpmByModeChart />
   },
   'top-words': {
     section: 'Language',
     sectionPath: '/language',
     title: 'Top words',
-    render: () => (
-      <HBar
-        data={mock.wordFrequency.slice(0, 100).map((w) => ({ label: w.word, count: w.count }))}
-        xKey="count"
-        yKey="label"
-      />
-    )
+    render: () => <TopWordsChart />
   },
   'filler-words': {
     section: 'Language',
     sectionPath: '/language',
     title: 'Filler words',
-    render: () => (
-      <HBar
-        data={mock.fillerSummary.slice(0, 50).map((f) => ({ label: f.phrase, count: f.count }))}
-        xKey="count"
-        yKey="label"
-      />
-    )
+    render: () => <FillerWordsChart />
   },
   'speaking-pace': {
     section: 'Language',
     sectionPath: '/language',
     title: 'Speaking pace',
     description: 'Words per minute, monthly average over per-recording dots.',
-    render: () => (
-      <PaceTrend
-        trend={mock.wpmTrend as unknown as Array<Record<string, unknown>>}
-        dots={mock.wpmDots}
-        xKey="period"
-        yKey="value"
-        reference={{ value: 140, label: '140' }}
-        formatTick={(v) => String(v).replace(/^\d{4}-/, '')}
-      />
-    )
+    render: () => <SpeakingPaceChart />
   },
   'filler-rate': {
     section: 'Language',
     sectionPath: '/language',
     title: 'Filler rate over time',
-    render: () => (
-      <LineTrend
-        data={mock.fillerTrend as unknown as Array<Record<string, unknown>>}
-        xKey="period"
-        yKey="value"
-        formatTick={(v) => String(v).replace(/^\d{4}-/, '')}
-      />
-    )
+    render: () => <FillerRateChart />
   },
   'sentence-length': {
     section: 'Language',
     sectionPath: '/language',
     title: 'Sentence length',
-    render: () => (
-      <DistBar
-        data={mock.sentenceDist as unknown as Array<Record<string, unknown>>}
-        xKey="label"
-        yKey="count"
-      />
-    )
+    render: () => <SentenceLengthChart />
   },
   'vocabulary-growth': {
     section: 'Language',
     sectionPath: '/language',
     title: 'Vocabulary growth',
     description: 'Cumulative unique words used.',
-    render: () => (
-      <ActivityArea
-        data={mock.vocabGrowth as unknown as Array<Record<string, unknown>>}
-        xKey="period"
-        yKey="value"
-        formatTick={(v) => String(v).replace(/^\d{4}-/, '')}
-      />
-    )
+    render: () => <VocabularyGrowthChart />
   },
   activity: {
     section: 'Overview',
     sectionPath: '/',
     title: 'Activity',
     description: 'Recordings per day.',
-    render: () => (
-      <ActivityArea
-        data={mock.daily as unknown as Array<Record<string, unknown>>}
-        xKey="date"
-        yKey="count"
-        formatTick={(v) => {
-          const d = new Date(String(v))
-          return isNaN(d.getTime())
-            ? ''
-            : d.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' })
-        }}
-      />
-    )
+    render: () => <ActivityChart />
   },
   'by-day-of-week': {
     section: 'Overview',
     sectionPath: '/',
     title: 'By day of week',
-    render: () => (
-      <VBar
-        data={mock.dayOfWeek as unknown as Array<Record<string, unknown>>}
-        xKey="dayName"
-        yKey="count"
-      />
-    )
+    render: () => <ByDayOfWeekChart />
   }
-  // mode-mix removed in wave 3 — Mode share is the new primary view via
-  // ModePie ('mode-pie' above). The stacked-area "share over time" wasn't
-  // surfaced anywhere after the Overview restructure.
 }
 
 /** Turn a slug into a breadcrumb if it's a known chart. */

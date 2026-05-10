@@ -6,9 +6,12 @@ import { LineTrend } from '@renderer/components/charts/LineTrend'
 import { PaceTrend } from '@renderer/components/charts/PaceTrend'
 import { KpiRow } from '@renderer/components/KpiRow'
 import { formatNumber } from '@renderer/lib/format'
-import { mock } from '@renderer/lib/mock'
+import { useFilteredAggregates } from '@renderer/state/useFilteredAggregates'
+import { useMemo } from 'react'
 
 const WPM_TARGET = 140
+/** Maximum scatter points fed to PaceTrend — sampled deterministically. */
+const MAX_WPM_DOTS = 1000
 
 export function Language(): React.JSX.Element {
   const {
@@ -21,10 +24,26 @@ export function Language(): React.JSX.Element {
     sentenceDist,
     vocabGrowth,
     sparklines
-  } = mock
+  } = useFilteredAggregates()
 
-  const topWords = wordFrequency.slice(0, 12).map((w) => ({ label: w.word, count: w.count }))
-  const topFillers = fillerSummary.slice(0, 8).map((f) => ({ label: f.phrase, count: f.count }))
+  // Derived chart inputs — memoised so chart leaves' React.memo wrappers
+  // can short-circuit on unchanged references.
+  const topWords = useMemo(
+    () => wordFrequency.slice(0, 12).map((w) => ({ label: w.word, count: w.count })),
+    [wordFrequency]
+  )
+  const topFillers = useMemo(
+    () => fillerSummary.slice(0, 8).map((f) => ({ label: f.phrase, count: f.count })),
+    [fillerSummary]
+  )
+  // Sample wpmDots so PaceTrend renders ≤1000 scatter points. On 11k
+  // recordings the raw array is too many marks for a chart this size —
+  // visually noisier without being more informative, and slower to draw.
+  const sampledDots = useMemo(() => {
+    if (wpmDots.length <= MAX_WPM_DOTS) return wpmDots
+    const stride = Math.ceil(wpmDots.length / MAX_WPM_DOTS)
+    return wpmDots.filter((_, i) => i % stride === 0)
+  }, [wpmDots])
 
   return (
     <div className="flex h-full flex-col gap-3">
@@ -75,7 +94,7 @@ export function Language(): React.JSX.Element {
         <ChartCard title="Speaking pace" slug="speaking-pace">
           <PaceTrend
             trend={wpmTrend as unknown as Array<Record<string, unknown>>}
-            dots={wpmDots}
+            dots={sampledDots}
             xKey="period"
             yKey="value"
             reference={{ value: WPM_TARGET, label: `${WPM_TARGET}` }}
@@ -93,6 +112,7 @@ export function Language(): React.JSX.Element {
             xKey="period"
             yKey="value"
             formatTick={(v) => String(v).replace(/^\d{4}-/, '')}
+            formatYTick={(v) => `${v}%`}
           />
         </ChartCard>
       </div>

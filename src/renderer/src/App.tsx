@@ -1,7 +1,9 @@
 import { useEffect } from 'react'
 import { RouterProvider } from 'react-router-dom'
+import { LoadingOverlay } from './components/LoadingOverlay'
 import { router } from './routes'
 import { useConfigStore } from './state/configStore'
+import { useDataStore } from './state/dataStore'
 import { useThemeStore } from './state/themeStore'
 
 /**
@@ -12,6 +14,11 @@ import { useThemeStore } from './state/themeStore'
 function App(): React.JSX.Element {
   const pref = useThemeStore((s) => s.pref)
   const hydrateConfig = useConfigStore((s) => s.hydrate)
+  const configHydrated = useConfigStore((s) => s.hydrated)
+  const configValid = useConfigStore((s) => s.isValid)
+  const hydrateData = useDataStore((s) => s.hydrate)
+  const clearData = useDataStore((s) => s.clearData)
+  const dataLoading = useDataStore((s) => s.loading)
 
   useEffect(() => {
     const mq =
@@ -36,7 +43,26 @@ function App(): React.JSX.Element {
     void hydrateConfig()
   }, [hydrateConfig])
 
-  return <RouterProvider router={router} />
+  // Once config is hydrated, drive the data store off the path's
+  // validity. Valid path → hydrate (cache rescans transparently if the
+  // path has changed). Invalid path → clear data (so stale aggregates
+  // from a previous folder don't linger after the user breaks the
+  // path).
+  useEffect(() => {
+    if (!configHydrated) return
+    if (configValid) {
+      void hydrateData()
+    } else {
+      clearData()
+    }
+  }, [configHydrated, configValid, hydrateData, clearData])
+
+  return (
+    <>
+      <RouterProvider router={router} />
+      {dataLoading && <LoadingOverlay />}
+    </>
+  )
 }
 
 export default App

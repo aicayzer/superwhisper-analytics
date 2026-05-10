@@ -1,7 +1,8 @@
+import { Segmented } from '@renderer/components/Segmented'
 import { useGlobalShortcut } from '@renderer/hooks/useGlobalShortcut'
 import { formatDurationSec, formatTimestamp } from '@renderer/lib/format'
-import { mock } from '@renderer/lib/mock'
 import type { Recording } from '@renderer/lib/types'
+import { useDataStore } from '@renderer/state/dataStore'
 import { usePaletteStore, type PaletteMode } from '@renderer/state/paletteStore'
 import { useThemeStore } from '@renderer/state/themeStore'
 import { Command, useCommandState } from 'cmdk'
@@ -20,6 +21,11 @@ import {
 import { useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 
+const PALETTE_MODE_OPTIONS: ReadonlyArray<{ value: PaletteMode; label: string }> = [
+  { value: 'search', label: 'Search' },
+  { value: 'command', label: 'Commands' }
+]
+
 const DESTINATIONS = [
   { to: '/', label: 'Go to Overview', icon: House },
   { to: '/usage', label: 'Go to Usage', icon: AudioLines },
@@ -33,21 +39,42 @@ const SEARCH_MAX_RESULTS = 30
 /**
  * Two-mode overlay surface — the same shell renders either:
  *   • Command mode  (⌘K)  — appearance + navigation actions
- *   • Search mode   (sidebar 🔍) — substring filter over recordings
+ *   • Search mode   (⌘P, sidebar 🔍) — substring filter over recordings
  *
- * The mode toggle in the bottom-right swaps between them in place.
- * The icon left of the input reflects the current mode (⌘ or 🔍).
+ * The Segmented control in the header top-right swaps between modes in
+ * place. The icon left of the input reflects the current mode (⌘ or 🔍).
+ *
+ * Global shortcuts:
+ *   • ⌘K — toggle the palette; opens in 'command' mode when previously closed.
+ *   • ⌘P — toggle the palette; opens in 'search' mode (or jumps to search if
+ *          already open in 'command' mode).
+ *   • Esc — close.
  */
 export function CommandPalette(): React.JSX.Element | null {
   const open = usePaletteStore((s) => s.open)
   const setOpen = usePaletteStore((s) => s.setOpen)
   const togglePalette = usePaletteStore((s) => s.toggle)
+  const openWith = usePaletteStore((s) => s.openWith)
   const mode = usePaletteStore((s) => s.mode)
   const setMode = usePaletteStore((s) => s.setMode)
 
   const close = useCallback(() => setOpen(false), [setOpen])
   // Cmd-K opens command mode (or closes whichever mode is open).
   useGlobalShortcut({ key: 'k', mod: true }, () => togglePalette('command'))
+  // Cmd-P — search-first shortcut. Closes if already in search; otherwise
+  // opens the palette in search mode (switching modes if it's already up).
+  useGlobalShortcut({ key: 'p', mod: true }, () => {
+    const { open: o, mode: m, setMode: s, setOpen: setO } = usePaletteStore.getState()
+    if (o && m === 'search') {
+      setO(false)
+      return
+    }
+    if (o) {
+      s('search')
+      return
+    }
+    openWith('search')
+  })
   useGlobalShortcut({ key: 'escape' }, close)
 
   if (!open) return null
@@ -66,19 +93,25 @@ export function CommandPalette(): React.JSX.Element | null {
         shouldFilter={mode === 'command'}
         className="w-full max-w-xl overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-float)]"
       >
-        <PaletteHeader mode={mode} />
+        <PaletteHeader mode={mode} onSwitchMode={setMode} />
 
         {mode === 'command' ? <CommandModeBody close={close} /> : <SearchModeBody close={close} />}
 
-        <PaletteFooter mode={mode} onSwitchMode={setMode} />
+        <PaletteFooter />
       </Command>
     </div>
   )
 }
 
-function PaletteHeader({ mode }: { mode: PaletteMode }): React.JSX.Element {
+function PaletteHeader({
+  mode,
+  onSwitchMode
+}: {
+  mode: PaletteMode
+  onSwitchMode: (next: PaletteMode) => void
+}): React.JSX.Element {
   return (
-    <div className="flex items-center gap-3 border-b border-border px-5 py-3.5">
+    <div className="flex items-center gap-3 border-b border-border px-5 py-3">
       {mode === 'command' ? (
         <CommandGlyph />
       ) : (
@@ -88,6 +121,13 @@ function PaletteHeader({ mode }: { mode: PaletteMode }): React.JSX.Element {
         autoFocus
         placeholder={mode === 'command' ? 'Run a command…' : 'Search transcripts…'}
         className="flex-1 bg-transparent text-[14px] text-foreground outline-none placeholder:text-muted-foreground"
+      />
+      <Segmented
+        value={mode}
+        onChange={onSwitchMode}
+        options={PALETTE_MODE_OPTIONS}
+        ariaLabel="Palette mode"
+        size="sm"
       />
     </div>
   )
@@ -192,8 +232,9 @@ function SearchResults({
   query: string
   onPick: (rec: Recording) => void
 }): React.JSX.Element {
+  const recordings = useDataStore((s) => s.recordings)
   const q = query.trim().toLowerCase()
-  const matches = mock.recordings
+  const matches = recordings
     .filter((r) => r.result.toLowerCase().includes(q) || r.modeName.toLowerCase().includes(q))
     .slice(0, SEARCH_MAX_RESULTS)
 
@@ -288,14 +329,7 @@ function PaletteItem({
   )
 }
 
-function PaletteFooter({
-  mode,
-  onSwitchMode
-}: {
-  mode: PaletteMode
-  onSwitchMode: (m: PaletteMode) => void
-}): React.JSX.Element {
-  const otherMode: PaletteMode = mode === 'command' ? 'search' : 'command'
+function PaletteFooter(): React.JSX.Element {
   return (
     <div className="flex items-center gap-4 border-t border-border px-4 py-2 text-[11px] text-muted-foreground">
       <span className="flex items-center gap-1.5">
@@ -313,24 +347,6 @@ function PaletteFooter({
         <Kbd>esc</Kbd>
         Close
       </span>
-      <button
-        type="button"
-        onClick={() => onSwitchMode(otherMode)}
-        className="ml-auto inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/40"
-        aria-label={otherMode === 'search' ? 'Switch to search' : 'Switch to commands'}
-      >
-        {otherMode === 'search' ? (
-          <>
-            <SearchIcon className="h-3 w-3" strokeWidth={1.8} />
-            Search
-          </>
-        ) : (
-          <>
-            <Kbd>⌘</Kbd>
-            Commands
-          </>
-        )}
-      </button>
     </div>
   )
 }

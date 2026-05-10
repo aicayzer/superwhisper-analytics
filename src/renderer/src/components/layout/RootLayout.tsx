@@ -1,10 +1,11 @@
 import { FirstRunModal } from '@renderer/components/FirstRunModal'
+import { useGlobalShortcut } from '@renderer/hooks/useGlobalShortcut'
 import { formatTimestamp } from '@renderer/lib/format'
-import { mock } from '@renderer/lib/mock'
 import { useConfigStore } from '@renderer/state/configStore'
+import { useDataStore } from '@renderer/state/dataStore'
 import { useLayoutStore } from '@renderer/state/layoutStore'
 import { chartBreadcrumb } from '@renderer/screens/chartRegistry'
-import { Outlet, useLocation, useSearchParams } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 import { CommandPalette } from '../command-palette/CommandPalette'
 import { MainHeader, type Breadcrumb } from './MainHeader'
 import { Sidebar } from './Sidebar'
@@ -47,10 +48,16 @@ function titleFor(pathname: string): string {
 export function RootLayout(): React.JSX.Element {
   const sidebarOpen = useLayoutStore((s) => s.sidebarOpen)
   const sidebarWidth = useLayoutStore((s) => s.sidebarWidth)
+  const toggleSidebar = useLayoutStore((s) => s.toggleSidebar)
   const configHydrated = useConfigStore((s) => s.hydrated)
   const configValid = useConfigStore((s) => s.isValid)
+  const recordings = useDataStore((s) => s.recordings)
   const location = useLocation()
-  const [params] = useSearchParams()
+
+  // Cmd-B is the only way to reopen the sidebar once it's collapsed (the
+  // header used to host a toggle button; it doesn't any more). Mounted at
+  // layout level so the shortcut is live on every screen.
+  useGlobalShortcut({ key: 'b', mod: true }, toggleSidebar)
 
   // When the sidebar is open it covers the traffic-light area; when it's
   // closed the navbar/content need to indent past the traffic lights so
@@ -58,25 +65,21 @@ export function RootLayout(): React.JSX.Element {
   const leftPad = sidebarOpen
     ? sidebarWidth + SIDEBAR_GAP /* sidebar's own left-2 */ + SIDEBAR_GAP + CONTENT_GUTTER
     : Math.max(CONTENT_GUTTER, TRAFFIC_LIGHT_RESERVE)
-  // /chart/:slug renders a breadcrumb instead of a plain title; backTo
-  // points at the screen the chart was launched from when supplied.
+  // /chart/:slug renders a breadcrumb instead of a plain title; the
+  // breadcrumb's <Link> segments are how the user navigates back.
   const chartMatch = location.pathname.match(/^\/chart\/([^/]+)/)
   const chartCrumb = chartMatch ? chartBreadcrumb(chartMatch[1]) : null
-  // /transcripts/:id likewise produces a breadcrumb (Transcripts › <ts>)
-  // and a Back arrow pointing at the list. Resolved here rather than in
-  // the screen so the navbar is the single source of truth for titles.
+  // /transcripts/:id likewise produces a breadcrumb (Transcripts › <ts>).
+  // Resolved here rather than in the screen so the navbar is the single
+  // source of truth for titles.
   const transcriptMatch = location.pathname.match(/^\/transcripts\/([^/]+)/)
   const transcriptRec = transcriptMatch
-    ? mock.recordings.find((r) => r.id === transcriptMatch[1])
+    ? recordings.find((r) => r.id === transcriptMatch[1])
     : undefined
-  const fromParam = params.get('from')
-  let backTo: string | undefined
   let title: string | Breadcrumb[]
   if (chartCrumb) {
-    backTo = fromParam ? decodeURIComponent(fromParam) : chartCrumb.sectionPath
     title = [{ label: chartCrumb.section, to: chartCrumb.sectionPath }, { label: chartCrumb.title }]
   } else if (transcriptRec) {
-    backTo = '/transcripts'
     title = [
       { label: 'Transcripts', to: '/transcripts' },
       { label: formatTimestamp(transcriptRec.datetime) }
@@ -88,7 +91,7 @@ export function RootLayout(): React.JSX.Element {
   return (
     <Window>
       <Sidebar />
-      <MainHeader title={title} backTo={backTo} leftPad={leftPad} rightPad={CONTENT_GUTTER} />
+      <MainHeader title={title} leftPad={leftPad} rightPad={CONTENT_GUTTER} />
       <main
         className="absolute inset-0 overflow-y-auto bg-background transition-[padding] duration-200 ease-out"
         style={{

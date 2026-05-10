@@ -1,8 +1,4 @@
-import { IconButton } from '@renderer/components/ui/IconButton'
-import { useHeaderStore } from '@renderer/state/headerStore'
-import { useLayoutStore } from '@renderer/state/layoutStore'
 import { useRangeStore } from '@renderer/state/rangeStore'
-import { ChevronRight, PanelLeft } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { RangePill } from './RangePill'
 
@@ -14,8 +10,6 @@ export interface Breadcrumb {
 interface MainHeaderProps {
   /** Title or breadcrumb path. A single string renders as the page title. */
   title: string | Breadcrumb[]
-  /** Render a back arrow at the left of the title (chart full-screen view). */
-  backTo?: string
   /** Distance from window left to header content, in px — matches the content
    *  area's paddingLeft so the header and content align vertically. */
   leftPad: number
@@ -25,22 +19,19 @@ interface MainHeaderProps {
 }
 
 /**
- * Header strip for the main pane. The header's left and right edges align
- * with the content area below — same gutter on both sides — so the page
- * title sits over the same column as the content. When the sidebar is
- * hidden the show-sidebar toggle still reserves a small slot at the left.
+ * Header strip for the main pane. Only renders the page title (or breadcrumb
+ * trail) on the left and the global RangePill on the right.
+ *
+ * Previously this hosted a sidebar toggle, back arrow, and a per-screen
+ * actions slot. Those were removed in PR #15:
+ *   • Sidebar toggle  → Cmd-B (registered in RootLayout). The sidebar's own
+ *                       internal close button handles the open→closed flip.
+ *   • Back arrow      → redundant with the breadcrumb's <Link> segments.
+ *   • Header actions  → screens now own their action chrome (Copy lives in
+ *                       the DetailsCard header, ColumnsMenu lives in the
+ *                       transcripts-table toolbar, view-mode is in Settings).
  */
-export function MainHeader({
-  title,
-  backTo,
-  leftPad,
-  rightPad
-}: MainHeaderProps): React.JSX.Element {
-  const sidebarOpen = useLayoutStore((s) => s.sidebarOpen)
-  const toggleSidebar = useLayoutStore((s) => s.toggleSidebar)
-  const headerActions = useHeaderStore((s) => s.actions)
-  // Range lives in a global store so screens can react to it. The pill
-  // here is just the read/write surface for the user.
+export function MainHeader({ title, leftPad, rightPad }: MainHeaderProps): React.JSX.Element {
   const range = useRangeStore((s) => s.range)
   const setRange = useRangeStore((s) => s.setRange)
 
@@ -49,27 +40,8 @@ export function MainHeader({
       style={{ left: leftPad, right: rightPad }}
       className="absolute top-2 z-30 flex h-9 items-center gap-2 [-webkit-app-region:drag]"
     >
-      {!sidebarOpen && (
-        <IconButton onClick={toggleSidebar} aria-label="Show sidebar" title="Show sidebar">
-          <PanelLeft className="h-3.5 w-3.5" strokeWidth={1.8} />
-        </IconButton>
-      )}
-
-      {backTo && (
-        <IconButton asChild aria-label="Back" title="Back">
-          <Link to={backTo}>
-            <ChevronRight className="h-3.5 w-3.5 rotate-180" strokeWidth={1.8} />
-          </Link>
-        </IconButton>
-      )}
-
       <TitleNode title={title} />
-
-      {/* Spacer + screen-registered actions, then RangePill on the far right.
-          Screens push their per-page IconButtons into the header via
-          useHeaderActions(); the slot renders them just before the range. */}
       <div className="ml-auto flex items-center gap-1 [-webkit-app-region:no-drag]">
-        {headerActions}
         <RangePill value={range} onChange={setRange} />
       </div>
     </div>

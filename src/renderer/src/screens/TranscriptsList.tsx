@@ -3,9 +3,8 @@ import { IconButton } from '@renderer/components/ui/IconButton'
 import { Popover, PopoverContent, PopoverTrigger } from '@renderer/components/ui/popover'
 import { cn } from '@renderer/lib/cn'
 import { formatDurationSec, formatTimestamp, truncate } from '@renderer/lib/format'
-import { mock } from '@renderer/lib/mock'
 import type { Recording } from '@renderer/lib/types'
-import { useHeaderActions } from '@renderer/state/headerStore'
+import { useDataStore } from '@renderer/state/dataStore'
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Columns3 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
@@ -105,6 +104,7 @@ function sortRecordings(records: Recording[], key: SortKey, dir: Direction): Rec
 }
 
 export function TranscriptsList(): React.JSX.Element {
+  const recordings = useDataStore((s) => s.recordings)
   const [sortKey, setSortKey] = useState<SortKey>('datetime')
   const [dir, setDir] = useState<Direction>('desc')
   const [page, setPage] = useState(1)
@@ -123,7 +123,10 @@ export function TranscriptsList(): React.JSX.Element {
 
   const visibleCols = useMemo(() => COLS.filter((c) => visibility[c.key]), [visibility])
 
-  const sortedRows = useMemo(() => sortRecordings(mock.recordings, sortKey, dir), [sortKey, dir])
+  const sortedRows = useMemo(
+    () => sortRecordings(recordings, sortKey, dir),
+    [recordings, sortKey, dir]
+  )
 
   const pageCount = Math.max(1, Math.ceil(sortedRows.length / PAGE_SIZE))
   const safePage = Math.min(page, pageCount)
@@ -152,16 +155,14 @@ export function TranscriptsList(): React.JSX.Element {
     })
   }
 
-  // Register the column-visibility menu in the navbar.
-  const headerActions = useMemo(
-    () => <ColumnsMenu visibility={visibility} onToggle={toggleColumn} />,
-    [visibility]
-  )
-  useHeaderActions(headerActions)
-
   return (
     <div className="flex h-full flex-col">
       <Card className="flex min-h-0 flex-1 flex-col overflow-hidden p-0">
+        {/* Toolbar sits above the table, flush with the card edge. Hosts the
+            column-visibility menu (previously lived in the navbar). */}
+        <div className="flex items-center justify-end border-b border-border px-4 py-1.5">
+          <ColumnsMenu visibility={visibility} onToggle={toggleColumn} />
+        </div>
         <div className="min-h-0 flex-1 overflow-y-auto">
           <table className="w-full text-[13px]">
             <thead className="sticky top-0 z-10 bg-card">
@@ -328,11 +329,11 @@ function Pagination({ page, pageCount, total, onChange }: PaginationProps): Reac
   const pages = pageNumbers(page, pageCount)
 
   return (
-    <div className="flex items-center justify-between gap-3 border-t border-border bg-card px-3 py-2 text-[12px] text-muted-foreground">
+    <div className="flex items-center justify-between gap-3 border-t border-border bg-card px-4 py-1.5 text-[12px] text-muted-foreground">
       <span className="tabular-nums">
         {total === 0 ? '0 recordings' : `${total.toLocaleString()} recordings`}
       </span>
-      <div className="flex items-center gap-0.5">
+      <div className="flex items-center gap-0">
         <IconButton
           onClick={() => goto(page - 1)}
           disabled={page <= 1}
@@ -358,7 +359,7 @@ function Pagination({ page, pageCount, total, onChange }: PaginationProps): Reac
               aria-current={p === page ? 'page' : undefined}
               aria-label={`Page ${p}`}
               className={cn(
-                'inline-flex h-7 min-w-[1.75rem] items-center justify-center rounded-md px-1.5 text-[12px] tabular-nums transition-colors',
+                'inline-flex h-7 min-w-[1.5rem] items-center justify-center rounded-md px-1 text-[12px] tabular-nums transition-colors',
                 p === page
                   ? 'bg-foreground/[0.06] text-foreground'
                   : 'text-muted-foreground hover:bg-foreground/5 hover:text-foreground'

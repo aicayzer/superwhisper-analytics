@@ -1,3 +1,5 @@
+import { formatCompact } from '@renderer/lib/format'
+import { memo } from 'react'
 import {
   CartesianGrid,
   Line,
@@ -17,6 +19,9 @@ interface LineTrendProps {
   /** Optional horizontal target line (e.g. WPM goal). */
   reference?: { value: number; label?: string }
   formatTick?: (raw: string) => string
+  /** Custom Y-axis tick formatter — defaults to compact-number. Filler rate
+   *  passes a `${v}%` formatter so percent values read naturally. */
+  formatYTick?: (raw: number) => string
 }
 
 /**
@@ -24,16 +29,18 @@ interface LineTrendProps {
  * Optional dashed reference line for a target value (e.g. 140 WPM). Fills
  * its container.
  */
-export function LineTrend({
+function LineTrendInner({
   data,
   xKey,
   yKey,
   reference,
-  formatTick
+  formatTick,
+  formatYTick
 }: LineTrendProps): React.JSX.Element {
+  const yTick = formatYTick ?? ((v: number) => formatCompact(v))
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <LineChart data={data} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+      <LineChart data={data} margin={{ top: 8, right: 8, left: -4, bottom: 0 }}>
         <CartesianGrid stroke="var(--border)" strokeDasharray="2 4" vertical={false} />
         <XAxis
           dataKey={xKey}
@@ -48,7 +55,8 @@ export function LineTrend({
           tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }}
           tickLine={false}
           axisLine={false}
-          width={32}
+          width={44}
+          tickFormatter={(v) => yTick(Number(v))}
         />
         {reference && (
           <ReferenceLine
@@ -81,3 +89,5 @@ export function LineTrend({
     </ResponsiveContainer>
   )
 }
+
+export const LineTrend = memo(LineTrendInner)

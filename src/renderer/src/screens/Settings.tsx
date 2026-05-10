@@ -1,8 +1,13 @@
 import { Segmented } from '@renderer/components/Segmented'
 import { cn } from '@renderer/lib/cn'
+import { formatNumber } from '@renderer/lib/format'
+import { DEFAULT_FILLER_PHRASES } from '@renderer/lib/text'
 import { useConfigStore } from '@renderer/state/configStore'
+import { useDataStore } from '@renderer/state/dataStore'
 import { useThemeStore, type ThemePref } from '@renderer/state/themeStore'
-import { ExternalLink, RefreshCw } from 'lucide-react'
+import { useUiPrefsStore, type TranscriptViewMode } from '@renderer/state/uiPrefsStore'
+import { ExternalLink, RefreshCw, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
 
 const GITHUB_URL = 'https://github.com/aicayzer/superwhisper-analytics'
 
@@ -12,11 +17,16 @@ const APPEARANCE_OPTIONS: ReadonlyArray<{ value: ThemePref; label: string }> = [
   { value: 'dark', label: 'Dark' }
 ]
 
+const TRANSCRIPT_VIEW_OPTIONS: ReadonlyArray<{ value: TranscriptViewMode; label: string }> = [
+  { value: 'block', label: 'Segments' },
+  { value: 'inline', label: 'Inline' }
+]
+
 /**
  * Settings page. Three sections, no boxed cards — sectioned by spacing
  * and headings only. Order:
- *   1. Recordings folder — path display, status, change/reset, reindex
- *      (reindex wires up in wave 4 PR B once the scanner exists).
+ *   1. Recordings folder — path display, live status (count + last
+ *      indexed), change/reset, reindex.
  *   2. Appearance — three-way Light / System / Dark toggle.
  *   3. About — name, version, GitHub link, licence.
  */
@@ -25,6 +35,8 @@ export function Settings(): React.JSX.Element {
     <div className="mx-auto flex max-w-2xl flex-col gap-10 py-2">
       <RecordingsSection />
       <AppearanceSection />
+      <TranscriptsSection />
+      <DictionarySection />
       <AboutSection />
     </div>
   )
@@ -43,6 +55,12 @@ function RecordingsSection(): React.JSX.Element {
   const isValid = useConfigStore((s) => s.isValid)
   const defaultPath = useConfigStore((s) => s.defaultPath)
   const setPath = useConfigStore((s) => s.setPath)
+  const count = useDataStore((s) => s.count)
+  const indexedAt = useDataStore((s) => s.indexedAt)
+  const loading = useDataStore((s) => s.loading)
+  const reindexing = useDataStore((s) => s.reindexing)
+  const error = useDataStore((s) => s.error)
+  const reindex = useDataStore((s) => s.reindex)
 
   async function choose(): Promise<void> {
     const chosen = await window.api.dialog.pickFolder()
@@ -54,6 +72,7 @@ function RecordingsSection(): React.JSX.Element {
   }
 
   const canReset = defaultPath !== null && defaultPath !== path
+  const busy = loading || reindexing
 
   return (
     <section>
@@ -70,9 +89,13 @@ function RecordingsSection(): React.JSX.Element {
             className={cn('h-1.5 w-1.5 rounded-full', isValid ? 'bg-emerald-500' : 'bg-red-500')}
             aria-hidden
           />
-          <span className="text-[12.5px] text-muted-foreground">
-            {isValid ? 'Path valid' : 'Path not found'}
-          </span>
+          <StatusText
+            isValid={isValid}
+            count={count}
+            indexedAt={indexedAt}
+            loading={loading}
+            reindexing={reindexing}
+          />
           <div className="flex-1" />
           <button type="button" onClick={reset} disabled={!canReset} className={CHROME_BUTTON}>
             Reset to default
@@ -82,17 +105,75 @@ function RecordingsSection(): React.JSX.Element {
           </button>
           <button
             type="button"
-            disabled
-            title="Available once the data layer ships"
+            onClick={() => void reindex()}
+            disabled={!isValid || busy}
+            title={isValid ? 'Rescan the recordings folder' : 'Pick a valid folder first'}
             className={CHROME_BUTTON}
           >
-            <RefreshCw className="h-3 w-3" strokeWidth={1.8} />
-            Reindex
+            <RefreshCw className={cn('h-3 w-3', reindexing && 'animate-spin')} strokeWidth={1.8} />
+            {reindexing ? 'Reindexing…' : 'Reindex'}
           </button>
         </div>
+        {error && (
+          <p className="text-[12px] text-red-500" role="alert">
+            {error}
+          </p>
+        )}
       </div>
     </section>
   )
+}
+
+/** Status copy live-updates so 'last indexed 12s ago' becomes '13s ago' etc. */
+function StatusText({
+  isValid,
+  count,
+  indexedAt,
+  loading,
+  reindexing
+}: {
+  isValid: boolean
+  count: number
+  indexedAt: string | null
+  loading: boolean
+  reindexing: boolean
+}): React.JSX.Element {
+  // Tick every 10s while we have a fresh indexedAt — the relative-time
+  // string drifts slowly, so this is plenty.
+  const [, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (!indexedAt) return undefined
+    const t = window.setInterval(() => setNow(Date.now()), 10_000)
+    return () => window.clearInterval(t)
+  }, [indexedAt])
+
+  let text: string
+  if (!isValid) {
+    text = 'Path not found'
+  } else if (loading) {
+    text = 'Scanning…'
+  } else if (reindexing) {
+    text = 'Reindexing…'
+  } else if (indexedAt) {
+    text = `${formatNumber(count)} recording${count === 1 ? '' : 's'} · last indexed ${relativeTime(indexedAt)}`
+  } else {
+    text = 'Path valid'
+  }
+  return <span className="text-[12.5px] text-muted-foreground">{text}</span>
+}
+
+function relativeTime(iso: string): string {
+  const t = new Date(iso).getTime()
+  if (isNaN(t)) return ''
+  const diffSec = Math.max(0, Math.floor((Date.now() - t) / 1000))
+  if (diffSec < 30) return 'just now'
+  if (diffSec < 60) return `${diffSec}s ago`
+  const diffMin = Math.floor(diffSec / 60)
+  if (diffMin < 60) return `${diffMin}m ago`
+  const diffHr = Math.floor(diffMin / 60)
+  if (diffHr < 24) return `${diffHr}h ago`
+  const diffD = Math.floor(diffHr / 24)
+  return `${diffD}d ago`
 }
 
 /**
@@ -110,6 +191,148 @@ function AppearanceSection(): React.JSX.Element {
     <section>
       <SectionHeading>Appearance</SectionHeading>
       <Segmented value={pref} onChange={setPref} options={APPEARANCE_OPTIONS} ariaLabel="Theme" />
+    </section>
+  )
+}
+
+/**
+ * Transcript view-mode picker. Previously a toggle in the navbar; now lives
+ * here so the preference is explicit and persists between sessions.
+ *   • Segments — block view with [m:ss] timestamp prefix per segment.
+ *   • Inline   — flowing prose, no timestamps. Use when the transcript reads
+ *                more naturally as a paragraph.
+ */
+function TranscriptsSection(): React.JSX.Element {
+  const mode = useUiPrefsStore((s) => s.transcriptViewMode)
+  const setMode = useUiPrefsStore((s) => s.setTranscriptViewMode)
+
+  return (
+    <section>
+      <SectionHeading>Transcripts</SectionHeading>
+      <div className="space-y-2">
+        <p className="text-[12.5px] text-muted-foreground">
+          How transcripts are laid out in the recording detail view.
+        </p>
+        <Segmented
+          value={mode}
+          onChange={setMode}
+          options={TRANSCRIPT_VIEW_OPTIONS}
+          ariaLabel="Transcript view"
+        />
+      </div>
+    </section>
+  )
+}
+
+/**
+ * Editable filler-phrase list. Reads from configStore; each add/remove/reset
+ * triggers `setFillerWords` which calls main, recomputes filler-derived
+ * aggregates in-place against the cached recordings, and replaces the
+ * dataStore payload — so the Language page reflects the change immediately.
+ */
+function DictionarySection(): React.JSX.Element {
+  const fillerWords = useConfigStore((s) => s.fillerWords)
+  const setFillerWords = useConfigStore((s) => s.setFillerWords)
+  const [draft, setDraft] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function commit(next: string[]): Promise<void> {
+    setBusy(true)
+    try {
+      await setFillerWords(next)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const isDefault =
+    fillerWords.length === DEFAULT_FILLER_PHRASES.length &&
+    fillerWords.every((w, i) => w === DEFAULT_FILLER_PHRASES[i]?.toLowerCase())
+
+  async function add(): Promise<void> {
+    const cleaned = draft.trim().toLowerCase().replace(/\s+/g, ' ')
+    if (!cleaned) return
+    if (fillerWords.includes(cleaned)) {
+      setDraft('')
+      return
+    }
+    setDraft('')
+    await commit([...fillerWords, cleaned])
+  }
+
+  async function remove(phrase: string): Promise<void> {
+    await commit(fillerWords.filter((w) => w !== phrase))
+  }
+
+  async function resetToDefault(): Promise<void> {
+    await commit([...DEFAULT_FILLER_PHRASES])
+  }
+
+  return (
+    <section>
+      <SectionHeading>Dictionary</SectionHeading>
+      <div className="space-y-3">
+        <p className="text-[12.5px] text-muted-foreground">
+          Phrases counted as fillers in the Language analytics. Edits update the dashboard
+          immediately.
+        </p>
+        <div className="flex flex-wrap gap-1.5">
+          {fillerWords.length === 0 ? (
+            <span className="text-[12px] text-muted-foreground">No filler phrases configured.</span>
+          ) : (
+            fillerWords.map((phrase) => (
+              <span
+                key={phrase}
+                className="inline-flex items-center gap-1 rounded-md border border-border bg-secondary px-2 py-0.5 text-[12px] text-secondary-foreground"
+              >
+                {phrase}
+                <button
+                  type="button"
+                  onClick={() => void remove(phrase)}
+                  disabled={busy}
+                  aria-label={`Remove "${phrase}"`}
+                  title={`Remove "${phrase}"`}
+                  className="rounded text-muted-foreground hover:text-foreground disabled:opacity-50"
+                >
+                  <X className="h-3 w-3" strokeWidth={2} />
+                </button>
+              </span>
+            ))
+          )}
+        </div>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            void add()
+          }}
+          className="flex items-center gap-2"
+        >
+          <input
+            type="text"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder="Add a phrase (e.g. honestly)"
+            disabled={busy}
+            className="h-7 flex-1 rounded-md border border-border bg-background px-2 text-[12.5px] text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-foreground/40 disabled:opacity-50"
+          />
+          <button
+            type="submit"
+            disabled={busy || draft.trim().length === 0}
+            className={CHROME_BUTTON}
+          >
+            Add
+          </button>
+          <button
+            type="button"
+            onClick={() => void resetToDefault()}
+            disabled={busy || isDefault}
+            title={isDefault ? 'Already at defaults' : 'Reset to the built-in phrase list'}
+            className={CHROME_BUTTON}
+          >
+            Reset to default
+          </button>
+        </form>
+      </div>
     </section>
   )
 }

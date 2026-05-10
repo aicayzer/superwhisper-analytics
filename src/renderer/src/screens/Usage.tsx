@@ -4,12 +4,13 @@ import { HourRadial } from '@renderer/components/charts/HourRadial'
 import { ModePie } from '@renderer/components/charts/ModePie'
 import { KpiRow } from '@renderer/components/KpiRow'
 import { formatDurationSec } from '@renderer/lib/format'
-import { mock } from '@renderer/lib/mock'
+import { useFilteredAggregates } from '@renderer/state/useFilteredAggregates'
+import { useMemo } from 'react'
 
 /**
  * Usage — recording cadence + mode breakdown.
  *
- * Layout (post wave-4 polish):
+ * Layout:
  *
  *   ┌─────────────────────┬─────────────────────┐
  *   │                     │   Mode share        │
@@ -17,21 +18,26 @@ import { mock } from '@renderer/lib/mock'
  *   │  (full height)      │   WPM by mode       │
  *   └─────────────────────┴─────────────────────┘
  *
- * The hour-of-day clock is the single most-information-dense view of
- * the dataset; it earns the full height. Mode share + WPM-by-mode
- * stack on the right because each is a small categorical breakdown
- * that fits comfortably in half a column.
+ * Every aggregate flows through `useFilteredAggregates`, so the cards
+ * here update with the navbar range pill.
  */
 export function Usage(): React.JSX.Element {
-  const { overview, usage, daily, hourly, modeStats, sparklines, wpmByMode } = mock
+  const { overview, usage, daily, hourly, modeStats, sparklines, wpmByMode } =
+    useFilteredAggregates()
 
-  const modePieData = modeStats.map((m) => ({ name: m.modeName, value: m.count }))
+  const modePieData = useMemo(
+    () => modeStats.map((m) => ({ name: m.modeName, value: m.count })),
+    [modeStats]
+  )
   const dominantMode = modeStats[0]
   const dominantPct = dominantMode
     ? Math.round((dominantMode.count / overview.totalRecordings) * 100)
     : 0
 
-  const wpmBarData = wpmByMode.map((w) => ({ label: w.mode, count: w.avgWPM }))
+  const wpmBarData = useMemo(
+    () => wpmByMode.map((w) => ({ label: w.mode, count: w.avgWPM })),
+    [wpmByMode]
+  )
 
   return (
     <div className="flex h-full flex-col gap-3">

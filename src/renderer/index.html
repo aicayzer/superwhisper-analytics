@@ -3,9 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <title>Foundation</title>
+    <!-- sw: appears on media-src (for <audio src="sw://..."/>) and on
+         connect-src (for fetch() in audio-peaks.ts during waveform decode).
+         Without these the renderer's CSP falls back to default-src 'self'
+         which blocks every sw:// load. -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; media-src 'self' sw:; connect-src 'self' sw:"
     />
   </head>
 

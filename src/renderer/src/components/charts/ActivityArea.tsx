@@ -1,4 +1,5 @@
-import { useMemo } from 'react'
+import { formatCompact } from '@renderer/lib/format'
+import { memo, useMemo } from 'react'
 import {
   Area,
   AreaChart,
@@ -29,8 +30,12 @@ interface ActivityAreaProps {
  * Smooth area chart for daily activity. Fills its container — wrap it in a
  * sized parent (e.g. flex-1 or a fixed-height div). Single series, monotone
  * curve, gradient fill from the foreground colour.
+ *
+ * Y-axis widened to 44px and ticks compacted ("13.8k") so vocab growth +
+ * activity counts render properly. Previously a 32px gutter clipped
+ * every tick to "0".
  */
-export function ActivityArea({
+function ActivityAreaInner({
   data,
   xKey,
   yKey,
@@ -56,7 +61,7 @@ export function ActivityArea({
 
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <AreaChart data={filtered} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+      <AreaChart data={filtered} margin={{ top: 8, right: 8, left: -4, bottom: 0 }}>
         <defs>
           <linearGradient id="grad-area" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="var(--chart-1)" stopOpacity={0.18} />
@@ -77,8 +82,9 @@ export function ActivityArea({
           tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }}
           tickLine={false}
           axisLine={false}
-          width={32}
+          width={44}
           allowDecimals={false}
+          tickFormatter={(v) => formatCompact(Number(v))}
         />
         <Tooltip cursor={{ stroke: 'var(--border)', strokeWidth: 1 }} content={<ChartTooltip />} />
         <Area
@@ -93,3 +99,5 @@ export function ActivityArea({
     </ResponsiveContainer>
   )
 }
+
+export const ActivityArea = memo(ActivityAreaInner)
