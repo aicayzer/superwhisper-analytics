@@ -74,37 +74,33 @@ function RecordingsSection(): React.JSX.Element {
             {isValid ? 'Path valid' : 'Path not found'}
           </span>
           <div className="flex-1" />
-          <button
-            type="button"
-            disabled
-            title="Available once the data layer ships"
-            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-floating px-2.5 py-1 text-[12px] text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <RefreshCw className="h-3 w-3" strokeWidth={1.8} />
-            Reindex
+          <button type="button" onClick={reset} disabled={!canReset} className={CHROME_BUTTON}>
+            Reset to default
           </button>
-        </div>
-        <div className="flex items-center gap-3 text-[12.5px]">
-          <button
-            type="button"
-            onClick={choose}
-            className="rounded-md border border-border bg-floating px-3 py-1 text-foreground transition-colors hover:bg-foreground/5"
-          >
+          <button type="button" onClick={choose} className={CHROME_BUTTON}>
             Choose folder…
           </button>
           <button
             type="button"
-            onClick={reset}
-            disabled={!canReset}
-            className="text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40 disabled:hover:text-muted-foreground"
+            disabled
+            title="Available once the data layer ships"
+            className={CHROME_BUTTON}
           >
-            Reset to default
+            <RefreshCw className="h-3 w-3" strokeWidth={1.8} />
+            Reindex
           </button>
         </div>
       </div>
     </section>
   )
 }
+
+/**
+ * Shared chrome-button styling for the Settings action row. h-7 to match
+ * IconButton/RangePill, ghost-bordered floating surface, hover lift.
+ */
+const CHROME_BUTTON =
+  'inline-flex h-7 items-center gap-1.5 rounded-md border border-border bg-floating px-3 text-[12px] text-foreground transition-colors hover:bg-foreground/5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-floating'
 
 function AppearanceSection(): React.JSX.Element {
   const pref = useThemeStore((s) => s.pref)
