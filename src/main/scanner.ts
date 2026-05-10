@@ -75,11 +75,11 @@ function buildExcerpt(text: string, max = 240): string {
   return text.slice(0, Math.max(0, max - 1)).trimEnd() + '…'
 }
 
-function metaToRecording(id: string, meta: RawMeta): Recording {
+function metaToRecording(id: string, meta: RawMeta, fillerPhrases: readonly string[]): Recording {
   const result = asString(meta.result)
   const durationMs = asNumber(meta.duration)
   const words = rawWordCount(result)
-  const fillers = buildFillers(result)
+  const fillers = buildFillers(result, fillerPhrases)
   return {
     id,
     datetime: asString(meta.datetime),
@@ -113,7 +113,7 @@ export interface ScanResult {
   skipped: number
 }
 
-export function scan(rootPath: string): ScanResult {
+export function scan(rootPath: string, fillerPhrases: readonly string[]): ScanResult {
   let entries: Dirent[]
   try {
     entries = readdirSync(rootPath, { withFileTypes: true }) as Dirent[]
@@ -141,7 +141,7 @@ export function scan(rootPath: string): ScanResult {
     }
     try {
       const parsed = JSON.parse(raw) as RawMeta
-      recordings.push(metaToRecording(id, parsed))
+      recordings.push(metaToRecording(id, parsed, fillerPhrases))
     } catch (err) {
       errors++
       if (!firstParseErrorLogged) {

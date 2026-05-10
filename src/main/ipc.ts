@@ -1,7 +1,7 @@
 import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import type { HydratePayload } from '@shared/types'
 import { defaultPath, getConfig, isPathValid, setConfig } from './config'
-import { hydrate, reindex } from './cache'
+import { hydrate, reindex, setFillerWords } from './cache'
 import type { ConfigStatus } from '../preload/api'
 
 /**
@@ -16,7 +16,8 @@ function buildStatus(): ConfigStatus {
   return {
     path: config.superwhisperPath,
     isValid: isPathValid(config.superwhisperPath),
-    defaultPath: defaultPath()
+    defaultPath: defaultPath(),
+    fillerWords: config.fillerWords
   }
 }
 
@@ -45,4 +46,8 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('data:hydrate', (): HydratePayload => hydrate())
   ipcMain.handle('data:reindex', (): HydratePayload => reindex())
+  ipcMain.handle(
+    'data:setFillerWords',
+    (_, words: string[]): HydratePayload => setFillerWords(words)
+  )
 }

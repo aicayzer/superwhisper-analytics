@@ -124,10 +124,12 @@ export function tokenise(text: string): string[] {
 }
 
 /**
- * Common conversational filler phrases. Multi-word phrases match
+ * Default conversational filler phrases. Used as the seed value when a
+ * config has no `fillerWords` field yet, and as the "Reset to default"
+ * target in Settings → Dictionary. Multi-word phrases match
  * whitespace-flexibly so "you   know" and "you know" both count.
  */
-export const FILLER_PHRASES = [
+export const DEFAULT_FILLER_PHRASES: readonly string[] = [
   'um',
   'uh',
   'like',
@@ -150,16 +152,27 @@ export interface FillerSummary {
  * Count filler-phrase occurrences in a transcript. Case-insensitive.
  * The leading + trailing space wraps the regex so word-boundary checks
  * work at the very start/end of the text.
+ *
+ * `phrases` defaults to `DEFAULT_FILLER_PHRASES`; callers in main pass the
+ * user's configured list (Settings → Dictionary) so the analytics reflect
+ * what the user counts as a filler today.
  */
-export function buildFillers(text: string): FillerSummary {
+export function buildFillers(
+  text: string,
+  phrases: readonly string[] = DEFAULT_FILLER_PHRASES
+): FillerSummary {
   const lower = ` ${text.toLowerCase()} `
   const counts = new Map<string, number>()
   let total = 0
-  for (const phrase of FILLER_PHRASES) {
-    const escaped = phrase.replace(/ /g, '\\s+')
+  for (const phrase of phrases) {
+    if (!phrase) continue
+    // Allow flexible whitespace inside phrases, and escape regex metas.
+    const cleaned = phrase.toLowerCase().trim()
+    if (!cleaned) continue
+    const escaped = cleaned.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+')
     const matches = lower.match(new RegExp(`(?<=\\W)${escaped}(?=\\W)`, 'g'))
     if (matches && matches.length > 0) {
-      counts.set(phrase, matches.length)
+      counts.set(cleaned, (counts.get(cleaned) ?? 0) + matches.length)
       total += matches.length
     }
   }
@@ -169,4 +182,23 @@ export function buildFillers(text: string): FillerSummary {
       .map(([phrase, count]) => ({ phrase, count }))
       .sort((a, b) => b.count - a.count)
   }
+}
+
+/**
+ * Normalise a user-supplied phrase list: trim, lowercase, collapse
+ * internal whitespace, drop empties + duplicates. Used by the renderer
+ * when writing back to config + by main when reading from config.
+ */
+export function normalisePhrases(phrases: readonly unknown[]): string[] {
+  const out: string[] = []
+  const seen = new Set<string>()
+  for (const raw of phrases) {
+    if (typeof raw !== 'string') continue
+    const cleaned = raw.trim().toLowerCase().replace(/\s+/g, ' ')
+    if (!cleaned) continue
+    if (seen.has(cleaned)) continue
+    seen.add(cleaned)
+    out.push(cleaned)
+  }
+  return out
 }

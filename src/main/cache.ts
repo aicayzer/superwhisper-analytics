@@ -1,6 +1,7 @@
+import { buildFillers } from '@shared/text-metrics'
 import type { Aggregates, HydratePayload, Recording } from '@shared/types'
 import { computeAll, emptyAggregates } from './aggregates'
-import { getConfig, isPathValid } from './config'
+import { getConfig, isPathValid, setConfig } from './config'
 import { scan } from './scanner'
 
 /**
@@ -39,7 +40,8 @@ function clear(): void {
 }
 
 function rescan(): HydratePayload {
-  const path = getConfig().superwhisperPath
+  const config = getConfig()
+  const path = config.superwhisperPath
   if (!path) {
     clear()
     return buildPayload('No recordings folder configured.')
@@ -50,7 +52,7 @@ function rescan(): HydratePayload {
   }
 
   const t0 = Date.now()
-  const result = scan(path)
+  const result = scan(path, config.fillerWords)
   const t1 = Date.now()
   recordings = result.recordings
   aggregates = computeAll(recordings, new Date())
@@ -78,4 +80,21 @@ export function hydrate(): HydratePayload {
 /** Force a fresh scan. Always rebuilds, even if the path hasn't changed. */
 export function reindex(): HydratePayload {
   return rescan()
+}
+
+/**
+ * Replace the active filler-phrase list and re-derive the cached
+ * filler-derived fields + aggregates. No disk re-read — we already
+ * have the raw transcripts in memory, so the recompute is purely
+ * CPU-bound (~150ms on 11k recordings).
+ */
+export function setFillerWords(words: string[]): HydratePayload {
+  const updated = setConfig({ fillerWords: words })
+  for (const r of recordings) {
+    const f = buildFillers(r.result, updated.fillerWords)
+    r.fillerCount = f.count
+    r.fillerBreakdown = f.breakdown
+  }
+  aggregates = computeAll(recordings, new Date())
+  return buildPayload(null)
 }

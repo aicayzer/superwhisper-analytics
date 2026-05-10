@@ -5,7 +5,7 @@
  */
 export {
   buildFillers,
-  FILLER_PHRASES,
+  DEFAULT_FILLER_PHRASES,
   STOP_WORDS,
   tokenise,
   type FillerSummary

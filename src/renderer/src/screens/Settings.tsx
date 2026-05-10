@@ -1,11 +1,12 @@
 import { Segmented } from '@renderer/components/Segmented'
 import { cn } from '@renderer/lib/cn'
 import { formatNumber } from '@renderer/lib/format'
+import { DEFAULT_FILLER_PHRASES } from '@renderer/lib/text'
 import { useConfigStore } from '@renderer/state/configStore'
 import { useDataStore } from '@renderer/state/dataStore'
 import { useThemeStore, type ThemePref } from '@renderer/state/themeStore'
 import { useUiPrefsStore, type TranscriptViewMode } from '@renderer/state/uiPrefsStore'
-import { ExternalLink, RefreshCw } from 'lucide-react'
+import { ExternalLink, RefreshCw, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 const GITHUB_URL = 'https://github.com/aicayzer/superwhisper-analytics'
@@ -35,6 +36,7 @@ export function Settings(): React.JSX.Element {
       <RecordingsSection />
       <AppearanceSection />
       <TranscriptsSection />
+      <DictionarySection />
       <AboutSection />
     </div>
   )
@@ -217,6 +219,119 @@ function TranscriptsSection(): React.JSX.Element {
           options={TRANSCRIPT_VIEW_OPTIONS}
           ariaLabel="Transcript view"
         />
+      </div>
+    </section>
+  )
+}
+
+/**
+ * Editable filler-phrase list. Reads from configStore; each add/remove/reset
+ * triggers `setFillerWords` which calls main, recomputes filler-derived
+ * aggregates in-place against the cached recordings, and replaces the
+ * dataStore payload — so the Language page reflects the change immediately.
+ */
+function DictionarySection(): React.JSX.Element {
+  const fillerWords = useConfigStore((s) => s.fillerWords)
+  const setFillerWords = useConfigStore((s) => s.setFillerWords)
+  const [draft, setDraft] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function commit(next: string[]): Promise<void> {
+    setBusy(true)
+    try {
+      await setFillerWords(next)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const isDefault =
+    fillerWords.length === DEFAULT_FILLER_PHRASES.length &&
+    fillerWords.every((w, i) => w === DEFAULT_FILLER_PHRASES[i]?.toLowerCase())
+
+  async function add(): Promise<void> {
+    const cleaned = draft.trim().toLowerCase().replace(/\s+/g, ' ')
+    if (!cleaned) return
+    if (fillerWords.includes(cleaned)) {
+      setDraft('')
+      return
+    }
+    setDraft('')
+    await commit([...fillerWords, cleaned])
+  }
+
+  async function remove(phrase: string): Promise<void> {
+    await commit(fillerWords.filter((w) => w !== phrase))
+  }
+
+  async function resetToDefault(): Promise<void> {
+    await commit([...DEFAULT_FILLER_PHRASES])
+  }
+
+  return (
+    <section>
+      <SectionHeading>Dictionary</SectionHeading>
+      <div className="space-y-3">
+        <p className="text-[12.5px] text-muted-foreground">
+          Phrases counted as fillers in the Language analytics. Edits update the dashboard
+          immediately.
+        </p>
+        <div className="flex flex-wrap gap-1.5">
+          {fillerWords.length === 0 ? (
+            <span className="text-[12px] text-muted-foreground">No filler phrases configured.</span>
+          ) : (
+            fillerWords.map((phrase) => (
+              <span
+                key={phrase}
+                className="inline-flex items-center gap-1 rounded-md border border-border bg-secondary px-2 py-0.5 text-[12px] text-secondary-foreground"
+              >
+                {phrase}
+                <button
+                  type="button"
+                  onClick={() => void remove(phrase)}
+                  disabled={busy}
+                  aria-label={`Remove "${phrase}"`}
+                  title={`Remove "${phrase}"`}
+                  className="rounded text-muted-foreground hover:text-foreground disabled:opacity-50"
+                >
+                  <X className="h-3 w-3" strokeWidth={2} />
+                </button>
+              </span>
+            ))
+          )}
+        </div>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            void add()
+          }}
+          className="flex items-center gap-2"
+        >
+          <input
+            type="text"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder="Add a phrase (e.g. honestly)"
+            disabled={busy}
+            className="h-7 flex-1 rounded-md border border-border bg-background px-2 text-[12.5px] text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-foreground/40 disabled:opacity-50"
+          />
+          <button
+            type="submit"
+            disabled={busy || draft.trim().length === 0}
+            className={CHROME_BUTTON}
+          >
+            Add
+          </button>
+          <button
+            type="button"
+            onClick={() => void resetToDefault()}
+            disabled={busy || isDefault}
+            title={isDefault ? 'Already at defaults' : 'Reset to the built-in phrase list'}
+            className={CHROME_BUTTON}
+          >
+            Reset to default
+          </button>
+        </form>
       </div>
     </section>
   )
