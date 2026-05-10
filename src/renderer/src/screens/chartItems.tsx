@@ -8,7 +8,8 @@ import { ModePie } from '@renderer/components/charts/ModePie'
 import { PaceTrend } from '@renderer/components/charts/PaceTrend'
 import { StreakCalendar } from '@renderer/components/charts/StreakCalendar'
 import { VBar } from '@renderer/components/charts/VBar'
-import { useDataStore } from '@renderer/state/dataStore'
+import { useFilteredAggregates } from '@renderer/state/useFilteredAggregates'
+import { useMemo } from 'react'
 
 /**
  * One small data-bound component per chart in the registry.
@@ -16,10 +17,13 @@ import { useDataStore } from '@renderer/state/dataStore'
  * Lives in a separate file so chartRegistry.tsx can keep its
  * `CHART_REGISTRY` constant + ChartSpec type + chartBreadcrumb helper
  * exports without tripping react-refresh/only-export-components.
+ *
+ * Every chart reads from `useFilteredAggregates()` so the full-screen view
+ * respects the navbar's date pill the same way the home cards do.
  */
 
 export function VolumeOverTimeChart(): React.JSX.Element {
-  const daily = useDataStore((s) => s.daily)
+  const { daily } = useFilteredAggregates()
   return (
     <ActivityArea
       data={daily as unknown as Array<Record<string, unknown>>}
@@ -36,12 +40,12 @@ export function VolumeOverTimeChart(): React.JSX.Element {
 }
 
 export function WhenYouRecordChart(): React.JSX.Element {
-  const heatmap = useDataStore((s) => s.heatmap)
+  const { heatmap } = useFilteredAggregates()
   return <Heatmap matrix={heatmap} cellHeight={36} />
 }
 
 export function RecordingStreakChart(): React.JSX.Element {
-  const streakCells = useDataStore((s) => s.streakCells)
+  const { streakCells } = useFilteredAggregates()
   return (
     <div className="flex h-full items-center justify-center overflow-auto">
       <StreakCalendar data={streakCells} cellSize={16} />
@@ -50,12 +54,12 @@ export function RecordingStreakChart(): React.JSX.Element {
 }
 
 export function ByHourOfDayChart(): React.JSX.Element {
-  const hourly = useDataStore((s) => s.hourly)
+  const { hourly } = useFilteredAggregates()
   return <HourRadial data={hourly} />
 }
 
 export function DurationMixChart(): React.JSX.Element {
-  const durationDist = useDataStore((s) => s.durationDist)
+  const { durationDist } = useFilteredAggregates()
   return (
     <DistBar
       data={durationDist as unknown as Array<Record<string, unknown>>}
@@ -66,53 +70,50 @@ export function DurationMixChart(): React.JSX.Element {
 }
 
 export function ModePieChart(): React.JSX.Element {
-  const modeStats = useDataStore((s) => s.modeStats)
-  const totalRecordings = useDataStore((s) => s.overview.totalRecordings)
-  const data = modeStats.map((m) => ({ name: m.modeName, value: m.count }))
+  const { modeStats, overview } = useFilteredAggregates()
+  const data = useMemo(
+    () => modeStats.map((m) => ({ name: m.modeName, value: m.count })),
+    [modeStats]
+  )
   const dom = modeStats[0]
-  const pct = dom && totalRecordings > 0 ? Math.round((dom.count / totalRecordings) * 100) : 0
+  const pct =
+    dom && overview.totalRecordings > 0
+      ? Math.round((dom.count / overview.totalRecordings) * 100)
+      : 0
   return (
     <ModePie data={data} centreLabel={dom?.modeName} centreSubLabel={dom ? `${pct}%` : undefined} />
   )
 }
 
 export function WpmByModeChart(): React.JSX.Element {
-  const wpmByMode = useDataStore((s) => s.wpmByMode)
-  return (
-    <HBar
-      data={wpmByMode.map((w) => ({ label: w.mode, count: w.avgWPM }))}
-      xKey="count"
-      yKey="label"
-      labelWidth={120}
-    />
+  const { wpmByMode } = useFilteredAggregates()
+  const data = useMemo(
+    () => wpmByMode.map((w) => ({ label: w.mode, count: w.avgWPM })),
+    [wpmByMode]
   )
+  return <HBar data={data} xKey="count" yKey="label" labelWidth={120} />
 }
 
 export function TopWordsChart(): React.JSX.Element {
-  const wordFrequency = useDataStore((s) => s.wordFrequency)
-  return (
-    <HBar
-      data={wordFrequency.slice(0, 100).map((w) => ({ label: w.word, count: w.count }))}
-      xKey="count"
-      yKey="label"
-    />
+  const { wordFrequency } = useFilteredAggregates()
+  const data = useMemo(
+    () => wordFrequency.slice(0, 100).map((w) => ({ label: w.word, count: w.count })),
+    [wordFrequency]
   )
+  return <HBar data={data} xKey="count" yKey="label" />
 }
 
 export function FillerWordsChart(): React.JSX.Element {
-  const fillerSummary = useDataStore((s) => s.fillerSummary)
-  return (
-    <HBar
-      data={fillerSummary.slice(0, 50).map((f) => ({ label: f.phrase, count: f.count }))}
-      xKey="count"
-      yKey="label"
-    />
+  const { fillerSummary } = useFilteredAggregates()
+  const data = useMemo(
+    () => fillerSummary.slice(0, 50).map((f) => ({ label: f.phrase, count: f.count })),
+    [fillerSummary]
   )
+  return <HBar data={data} xKey="count" yKey="label" />
 }
 
 export function SpeakingPaceChart(): React.JSX.Element {
-  const wpmTrend = useDataStore((s) => s.wpmTrend)
-  const wpmDots = useDataStore((s) => s.wpmDots)
+  const { wpmTrend, wpmDots } = useFilteredAggregates()
   return (
     <PaceTrend
       trend={wpmTrend as unknown as Array<Record<string, unknown>>}
@@ -126,19 +127,20 @@ export function SpeakingPaceChart(): React.JSX.Element {
 }
 
 export function FillerRateChart(): React.JSX.Element {
-  const fillerTrend = useDataStore((s) => s.fillerTrend)
+  const { fillerTrend } = useFilteredAggregates()
   return (
     <LineTrend
       data={fillerTrend as unknown as Array<Record<string, unknown>>}
       xKey="period"
       yKey="value"
       formatTick={(v) => String(v).replace(/^\d{4}-/, '')}
+      formatYTick={(v) => `${v}%`}
     />
   )
 }
 
 export function SentenceLengthChart(): React.JSX.Element {
-  const sentenceDist = useDataStore((s) => s.sentenceDist)
+  const { sentenceDist } = useFilteredAggregates()
   return (
     <DistBar
       data={sentenceDist as unknown as Array<Record<string, unknown>>}
@@ -149,7 +151,7 @@ export function SentenceLengthChart(): React.JSX.Element {
 }
 
 export function VocabularyGrowthChart(): React.JSX.Element {
-  const vocabGrowth = useDataStore((s) => s.vocabGrowth)
+  const { vocabGrowth } = useFilteredAggregates()
   return (
     <ActivityArea
       data={vocabGrowth as unknown as Array<Record<string, unknown>>}
@@ -161,7 +163,7 @@ export function VocabularyGrowthChart(): React.JSX.Element {
 }
 
 export function ActivityChart(): React.JSX.Element {
-  const daily = useDataStore((s) => s.daily)
+  const { daily } = useFilteredAggregates()
   return (
     <ActivityArea
       data={daily as unknown as Array<Record<string, unknown>>}
@@ -178,7 +180,7 @@ export function ActivityChart(): React.JSX.Element {
 }
 
 export function ByDayOfWeekChart(): React.JSX.Element {
-  const dayOfWeek = useDataStore((s) => s.dayOfWeek)
+  const { dayOfWeek } = useFilteredAggregates()
   return (
     <VBar
       data={dayOfWeek as unknown as Array<Record<string, unknown>>}

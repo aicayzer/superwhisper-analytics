@@ -6,18 +6,26 @@ import type { Aggregates, HydratePayload, Recording } from '@shared/types'
  * Renderer mirror of the main-process recording cache.
  *
  * Hydrated once on app start (or after a path change) via
- * `window.api.data.hydrate()`. The store flattens every aggregate
- * onto the top level so screens can do `useDataStore(s => s.overview)`
- * — the same shape the legacy `mock` object exposed, so swapping
- * mock.X → useDataStore-selector is one-line per consumer.
+ * `window.api.data.hydrate()`. The store keeps the full `Aggregates`
+ * bundle as a single field so:
+ *
+ *   • the range-aware `useFilteredAggregates()` hook can return the
+ *     same shape after filtering, and screens swap their selector
+ *     without changing the consumer code, and
+ *   • when `range === all` the hook returns this precomputed bundle
+ *     directly — no renderer-side recompute.
  *
  * `loading` is set during full hydrates (initial load, post path
  * change). `reindexing` is set only during the user-triggered reindex
  * — Settings shows a status update; no full-screen overlay.
  */
 
-interface DataState extends Aggregates {
+interface DataState {
   recordings: Recording[]
+  /** Aggregates computed in main against the full recording set. The
+   *  range-aware hook layers a filtered recompute on top of this when
+   *  the user picks a window. */
+  aggregates: Aggregates
   loading: boolean
   reindexing: boolean
   error: string | null
@@ -32,11 +40,9 @@ interface DataState extends Aggregates {
   clearData: () => void
 }
 
-const empty = emptyAggregates()
-
 const INITIAL_STATE = {
-  ...empty,
   recordings: [] as Recording[],
+  aggregates: emptyAggregates(),
   loading: false,
   reindexing: false,
   error: null as string | null,
@@ -46,7 +52,7 @@ const INITIAL_STATE = {
 
 function applyPayload(payload: HydratePayload): Partial<DataState> {
   return {
-    ...payload.aggregates,
+    aggregates: payload.aggregates,
     recordings: payload.recordings,
     indexedAt: payload.indexedAt || null,
     count: payload.count,
@@ -79,5 +85,5 @@ export const useDataStore = create<DataState>((set) => ({
     }
   },
 
-  clearData: () => set({ ...INITIAL_STATE })
+  clearData: () => set({ ...INITIAL_STATE, aggregates: emptyAggregates() })
 }))
