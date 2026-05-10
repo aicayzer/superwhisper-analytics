@@ -1,3 +1,4 @@
+import { emptyAggregates } from '@shared/empty-aggregates'
 import { tokenise } from '@shared/text-metrics'
 import type {
   Aggregates,
@@ -541,7 +542,7 @@ export function computeAll(recordings: Recording[], now: Date = new Date()): Agg
   }
 }
 
-/** Empty aggregates for the unset-path / no-recordings case. */
-export function emptyAggregates(): Aggregates {
-  return computeAll([], new Date())
-}
+// emptyAggregates() is now in @shared/empty-aggregates so the renderer
+// can reuse the same factory for its dataStore initial state. Re-export
+// here for consumers that previously imported it from `./aggregates`.
+export { emptyAggregates }
