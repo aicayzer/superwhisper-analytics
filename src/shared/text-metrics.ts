@@ -128,19 +128,108 @@ export function tokenise(text: string): string[] {
  * config has no `fillerWords` field yet, and as the "Reset to default"
  * target in Settings → Dictionary. Multi-word phrases match
  * whitespace-flexibly so "you   know" and "you know" both count.
+ *
+ * The list spans the usual linguistic categories — interjections,
+ * discourse markers, hedges, vague intensifiers, epistemic phrases,
+ * vague references, closers, and common filler clauses. Users can prune
+ * what doesn't suit them from Settings → Dictionary; the canonical list
+ * is intentionally generous so the analytics catch most candidates.
  */
 export const DEFAULT_FILLER_PHRASES: readonly string[] = [
+  // Pure hesitations / interjections
   'um',
+  'uhm',
   'uh',
+  'er',
+  'erm',
+  'ah',
+  'eh',
+  'hmm',
+  'mhm',
+  'mm',
+  'oh',
+  // Discourse markers
   'like',
   'you know',
   'I mean',
   'so',
+  'well',
   'right',
+  'okay',
+  'alright',
+  'anyway',
+  'anyhow',
+  'now',
+  'you see',
+  'see',
+  'look',
+  'listen',
+  // Hedges
   'kind of',
   'sort of',
+  'kinda',
+  'sorta',
   'basically',
-  'actually'
+  'essentially',
+  'more or less',
+  'in a way',
+  'sort of like',
+  'kind of like',
+  'type of thing',
+  'type thing',
+  // Vague intensifiers
+  'actually',
+  'literally',
+  'definitely',
+  'totally',
+  'obviously',
+  'clearly',
+  'honestly',
+  'frankly',
+  'really',
+  'just',
+  'pretty much',
+  'absolutely',
+  // Epistemic / opinion
+  'I guess',
+  'I suppose',
+  'I think',
+  'I would say',
+  "I'd say",
+  'it seems',
+  "it's like",
+  'you could say',
+  'I would think',
+  // Vague references
+  'thing',
+  'stuff',
+  'whatever',
+  'something',
+  'anything',
+  'somehow',
+  // Closers
+  'or something',
+  'or whatever',
+  'or anything',
+  'or so',
+  'or thereabouts',
+  'or such',
+  'or whatnot',
+  // Filler clauses
+  'you know what I mean',
+  'do you know what I mean',
+  'you see what I mean',
+  'if that makes sense',
+  'does that make sense',
+  // Other common
+  'like I said',
+  'as I said',
+  'sort of a',
+  'kind of a',
+  'a bit of a',
+  'a little bit',
+  'a sort of',
+  'a kind of'
 ] as const
 
 export interface FillerSummary {

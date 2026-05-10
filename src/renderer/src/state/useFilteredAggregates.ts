@@ -31,6 +31,17 @@ export function useFilteredAggregates(): Aggregates {
     const window = windowFor(range)
     if (!window.from && !window.to) return fullAggregates
     const slice = filterByRange(recordings, window)
-    return computeAll(slice)
+    const filtered = computeAll(slice)
+    // Sparklines + streak cells stay tied to the full unfiltered dataset.
+    // They give recent-trend context behind the big KPI number; tying them
+    // to the range would shrink "Last 7 days" sparklines into 7 data points
+    // padded with 23 days of zeros, which reads as a flat line. Keeping the
+    // full-set series means the sparkline always shows the trailing 30
+    // days, regardless of what the pill is filtered to.
+    return {
+      ...filtered,
+      sparklines: fullAggregates.sparklines,
+      streakCells: fullAggregates.streakCells
+    }
   }, [recordings, fullAggregates, range])
 }

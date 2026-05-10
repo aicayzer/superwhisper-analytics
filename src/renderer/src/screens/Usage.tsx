@@ -1,7 +1,8 @@
 import { ChartCard } from '@renderer/components/charts/ChartCard'
-import { HBar } from '@renderer/components/charts/HBar'
-import { HourRadial } from '@renderer/components/charts/HourRadial'
+import { DistBar } from '@renderer/components/charts/DistBar'
+import { Heatmap } from '@renderer/components/charts/Heatmap'
 import { ModePie } from '@renderer/components/charts/ModePie'
+import { StreakCalendar } from '@renderer/components/charts/StreakCalendar'
 import { KpiRow } from '@renderer/components/KpiRow'
 import { formatDurationSec } from '@renderer/lib/format'
 import { useFilteredAggregates } from '@renderer/state/useFilteredAggregates'
@@ -10,19 +11,24 @@ import { useMemo } from 'react'
 /**
  * Usage — recording cadence + mode breakdown.
  *
- * Layout:
+ * Final layout — 2×2 with asymmetric column ratios so each chart gets the
+ * aspect that fits it best:
  *
- *   ┌─────────────────────┬─────────────────────┐
- *   │                     │   Mode share        │
- *   │  By hour of day     ├─────────────────────┤
- *   │  (full height)      │   WPM by mode       │
- *   └─────────────────────┴─────────────────────┘
+ *   ┌──────────────────────────┬──────────────────┐
+ *   │  When you record (3/5)   │  Mode share (2/5)│
+ *   │  (hour × day heatmap)    │  (pie)           │
+ *   ├──────────────────┬───────┴──────────────────┤
+ *   │  Duration mix    │  Streak calendar (3/5)   │
+ *   │  (2/5, square)   │  (year of days, github)  │
+ *   └──────────────────┴──────────────────────────┘
  *
+ * Top row is "rectangular left, square right". Bottom flips that —
+ * a more square duration chart sits beside the wide streak calendar.
  * Every aggregate flows through `useFilteredAggregates`, so the cards
- * here update with the navbar range pill.
+ * update with the navbar range pill.
  */
 export function Usage(): React.JSX.Element {
-  const { overview, usage, daily, hourly, modeStats, sparklines, wpmByMode } =
+  const { overview, usage, daily, heatmap, durationDist, modeStats, sparklines, streakCells } =
     useFilteredAggregates()
 
   const modePieData = useMemo(
@@ -33,11 +39,6 @@ export function Usage(): React.JSX.Element {
   const dominantPct = dominantMode
     ? Math.round((dominantMode.count / overview.totalRecordings) * 100)
     : 0
-
-  const wpmBarData = useMemo(
-    () => wpmByMode.map((w) => ({ label: w.mode, count: w.avgWPM })),
-    [wpmByMode]
-  )
 
   return (
     <div className="flex h-full flex-col gap-3">
@@ -69,25 +70,37 @@ export function Usage(): React.JSX.Element {
         ]}
       />
 
-      {/* Three-panel grid: HourRadial fills the left column at full height;
-          right column splits into Mode share + WPM by mode. min-h-0 so the
-          inner ResponsiveContainers actually receive a height. */}
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-2">
-        <ChartCard title="By hour of day" slug="by-hour-of-day">
-          <HourRadial data={hourly} />
+      {/* Top row — When you record (3/5) + Mode share (2/5). */}
+      <div className="grid min-h-0 flex-1 grid-cols-[3fr_2fr] gap-3">
+        <ChartCard title="When you record" slug="when-you-record">
+          <div className="flex h-full flex-col justify-center">
+            <Heatmap matrix={heatmap} cellHeight={24} />
+          </div>
         </ChartCard>
-        <div className="grid min-h-0 grid-rows-2 gap-3">
-          <ChartCard title="Mode share" slug="mode-pie">
-            <ModePie
-              data={modePieData}
-              centreLabel={dominantMode?.modeName}
-              centreSubLabel={dominantMode ? `${dominantPct}%` : undefined}
-            />
-          </ChartCard>
-          <ChartCard title="WPM by mode" slug="wpm-by-mode">
-            <HBar data={wpmBarData} xKey="count" yKey="label" labelWidth={96} />
-          </ChartCard>
-        </div>
+        <ChartCard title="Mode share" slug="mode-pie">
+          <ModePie
+            data={modePieData}
+            centreLabel={dominantMode?.modeName}
+            centreSubLabel={dominantMode ? `${dominantPct}%` : undefined}
+          />
+        </ChartCard>
+      </div>
+
+      {/* Bottom row — Duration mix (2/5, more square) + Streak calendar
+          (3/5, wide GitHub-style year grid). */}
+      <div className="grid min-h-0 flex-1 grid-cols-[2fr_3fr] gap-3">
+        <ChartCard title="Duration mix" slug="duration-mix">
+          <DistBar
+            data={durationDist as unknown as Array<Record<string, unknown>>}
+            xKey="label"
+            yKey="count"
+          />
+        </ChartCard>
+        <ChartCard title="Recording streak" slug="recording-streak">
+          <div className="flex h-full items-center justify-center">
+            <StreakCalendar data={streakCells} cellSize={11} />
+          </div>
+        </ChartCard>
       </div>
     </div>
   )

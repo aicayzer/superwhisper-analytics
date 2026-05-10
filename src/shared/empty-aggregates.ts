@@ -33,11 +33,6 @@ export function emptyAggregates(): Aggregates {
     modeStats: [],
     wordFrequency: [],
     fillerSummary: [],
-    hourly: Array.from({ length: 24 }, (_, hour) => ({
-      hour,
-      count: 0,
-      totalDurationSec: 0
-    })),
     heatmap: Array.from({ length: 7 }, () => Array(24).fill(0) as number[]),
     durationDist: [],
     usage: {
@@ -67,7 +62,6 @@ export function emptyAggregates(): Aggregates {
     modeByWeek: [],
     modeByWeekFlat: [],
     stackModeKeys: [],
-    wpmDots: [],
-    wpmByMode: []
+    wpmDots: []
   }
 }

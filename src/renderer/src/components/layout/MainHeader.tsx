@@ -40,8 +40,13 @@ export function MainHeader({ title, leftPad, rightPad }: MainHeaderProps): React
       style={{ left: leftPad, right: rightPad }}
       className="absolute top-2 z-30 flex h-9 items-center gap-2 [-webkit-app-region:drag]"
     >
-      <TitleNode title={title} />
-      <div className="ml-auto flex items-center gap-1 [-webkit-app-region:no-drag]">
+      {/* `no-drag` on the title so breadcrumb <Link> segments are clickable
+          (the parent header is a drag region, which otherwise eats clicks
+          and turns them into window drags). */}
+      <div className="min-w-0 flex-1 [-webkit-app-region:no-drag]">
+        <TitleNode title={title} />
+      </div>
+      <div className="flex shrink-0 items-center gap-1 [-webkit-app-region:no-drag]">
         <RangePill value={range} onChange={setRange} />
       </div>
     </div>

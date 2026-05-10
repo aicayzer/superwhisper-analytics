@@ -2,7 +2,6 @@ import { ActivityArea } from '@renderer/components/charts/ActivityArea'
 import { DistBar } from '@renderer/components/charts/DistBar'
 import { HBar } from '@renderer/components/charts/HBar'
 import { Heatmap } from '@renderer/components/charts/Heatmap'
-import { HourRadial } from '@renderer/components/charts/HourRadial'
 import { LineTrend } from '@renderer/components/charts/LineTrend'
 import { ModePie } from '@renderer/components/charts/ModePie'
 import { PaceTrend } from '@renderer/components/charts/PaceTrend'
@@ -53,11 +52,6 @@ export function RecordingStreakChart(): React.JSX.Element {
   )
 }
 
-export function ByHourOfDayChart(): React.JSX.Element {
-  const { hourly } = useFilteredAggregates()
-  return <HourRadial data={hourly} />
-}
-
 export function DurationMixChart(): React.JSX.Element {
   const { durationDist } = useFilteredAggregates()
   return (
@@ -83,15 +77,6 @@ export function ModePieChart(): React.JSX.Element {
   return (
     <ModePie data={data} centreLabel={dom?.modeName} centreSubLabel={dom ? `${pct}%` : undefined} />
   )
-}
-
-export function WpmByModeChart(): React.JSX.Element {
-  const { wpmByMode } = useFilteredAggregates()
-  const data = useMemo(
-    () => wpmByMode.map((w) => ({ label: w.mode, count: w.avgWPM })),
-    [wpmByMode]
-  )
-  return <HBar data={data} xKey="count" yKey="label" labelWidth={120} />
 }
 
 export function TopWordsChart(): React.JSX.Element {
