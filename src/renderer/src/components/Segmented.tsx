@@ -4,9 +4,11 @@ import { cn } from '@renderer/lib/cn'
  * Three-or-more-choice segmented control. Used for the appearance
  * toggle in Settings, but generic — pass any string-keyed list.
  *
- * Active segment uses the accent-blue token pair so it lines up with
- * the rest of the chrome's "active" surfaces (transcript highlights,
- * word-hover, etc.).
+ * Active segment uses a neutral lifted surface (white-ish in light,
+ * lifted grey in dark) rather than the accent-blue. The accent is
+ * reserved for content selection (transcript highlights, hover-word
+ * matches) — controls keep a calmer surface so the eye reads the page
+ * rather than darting to whichever segment is selected.
  */
 interface SegmentedProps<T extends string> {
   value: T
@@ -45,7 +47,7 @@ export function Segmented<T extends string>({
               'h-7 rounded-[5px] px-3 text-[12.5px] font-medium transition-colors',
               'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/40',
               active
-                ? 'bg-accent-blue-bg text-accent-blue'
+                ? 'bg-background text-foreground shadow-[0_0_0_1px_var(--border)]'
                 : 'text-muted-foreground hover:text-foreground'
             )}
           >

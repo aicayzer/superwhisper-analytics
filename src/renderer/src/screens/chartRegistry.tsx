@@ -103,13 +103,27 @@ export const CHART_REGISTRY: Record<string, ChartSpec> = {
       )
     }
   },
+  'wpm-by-mode': {
+    section: 'Usage',
+    sectionPath: '/usage',
+    title: 'WPM by mode',
+    description: 'Average words-per-minute by mode (top 6 by recording count).',
+    render: () => (
+      <HBar
+        data={mock.wpmByMode.map((w) => ({ label: w.mode, count: w.avgWPM }))}
+        xKey="count"
+        yKey="label"
+        labelWidth={120}
+      />
+    )
+  },
   'top-words': {
     section: 'Language',
     sectionPath: '/language',
     title: 'Top words',
     render: () => (
       <HBar
-        data={mock.wordFrequency.slice(0, 24).map((w) => ({ label: w.word, count: w.count }))}
+        data={mock.wordFrequency.slice(0, 100).map((w) => ({ label: w.word, count: w.count }))}
         xKey="count"
         yKey="label"
       />
@@ -121,7 +135,7 @@ export const CHART_REGISTRY: Record<string, ChartSpec> = {
     title: 'Filler words',
     render: () => (
       <HBar
-        data={mock.fillerSummary.slice(0, 12).map((f) => ({ label: f.phrase, count: f.count }))}
+        data={mock.fillerSummary.slice(0, 50).map((f) => ({ label: f.phrase, count: f.count }))}
         xKey="count"
         yKey="label"
       />

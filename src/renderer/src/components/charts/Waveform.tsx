@@ -86,7 +86,7 @@ export function Waveform({ peaks, progress, onSeek, className }: WaveformProps):
         y1={3}
         y2={VB_H - 3}
         stroke="var(--foreground)"
-        strokeWidth={1}
+        strokeWidth={0.8}
       />
     </svg>
   )
