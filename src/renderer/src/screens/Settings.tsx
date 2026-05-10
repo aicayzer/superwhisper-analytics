@@ -1,8 +1,11 @@
 import { Segmented } from '@renderer/components/Segmented'
 import { cn } from '@renderer/lib/cn'
+import { formatNumber } from '@renderer/lib/format'
 import { useConfigStore } from '@renderer/state/configStore'
+import { useDataStore } from '@renderer/state/dataStore'
 import { useThemeStore, type ThemePref } from '@renderer/state/themeStore'
 import { ExternalLink, RefreshCw } from 'lucide-react'
+import { useEffect, useState } from 'react'
 
 const GITHUB_URL = 'https://github.com/aicayzer/superwhisper-analytics'
 
@@ -15,8 +18,8 @@ const APPEARANCE_OPTIONS: ReadonlyArray<{ value: ThemePref; label: string }> = [
 /**
  * Settings page. Three sections, no boxed cards — sectioned by spacing
  * and headings only. Order:
- *   1. Recordings folder — path display, status, change/reset, reindex
- *      (reindex wires up in wave 4 PR B once the scanner exists).
+ *   1. Recordings folder — path display, live status (count + last
+ *      indexed), change/reset, reindex.
  *   2. Appearance — three-way Light / System / Dark toggle.
  *   3. About — name, version, GitHub link, licence.
  */
@@ -43,6 +46,11 @@ function RecordingsSection(): React.JSX.Element {
   const isValid = useConfigStore((s) => s.isValid)
   const defaultPath = useConfigStore((s) => s.defaultPath)
   const setPath = useConfigStore((s) => s.setPath)
+  const count = useDataStore((s) => s.count)
+  const indexedAt = useDataStore((s) => s.indexedAt)
+  const loading = useDataStore((s) => s.loading)
+  const reindexing = useDataStore((s) => s.reindexing)
+  const reindex = useDataStore((s) => s.reindex)
 
   async function choose(): Promise<void> {
     const chosen = await window.api.dialog.pickFolder()
@@ -54,6 +62,7 @@ function RecordingsSection(): React.JSX.Element {
   }
 
   const canReset = defaultPath !== null && defaultPath !== path
+  const busy = loading || reindexing
 
   return (
     <section>
@@ -70,9 +79,13 @@ function RecordingsSection(): React.JSX.Element {
             className={cn('h-1.5 w-1.5 rounded-full', isValid ? 'bg-emerald-500' : 'bg-red-500')}
             aria-hidden
           />
-          <span className="text-[12.5px] text-muted-foreground">
-            {isValid ? 'Path valid' : 'Path not found'}
-          </span>
+          <StatusText
+            isValid={isValid}
+            count={count}
+            indexedAt={indexedAt}
+            loading={loading}
+            reindexing={reindexing}
+          />
           <div className="flex-1" />
           <button type="button" onClick={reset} disabled={!canReset} className={CHROME_BUTTON}>
             Reset to default
@@ -82,17 +95,70 @@ function RecordingsSection(): React.JSX.Element {
           </button>
           <button
             type="button"
-            disabled
-            title="Available once the data layer ships"
+            onClick={() => void reindex()}
+            disabled={!isValid || busy}
+            title={isValid ? 'Rescan the recordings folder' : 'Pick a valid folder first'}
             className={CHROME_BUTTON}
           >
-            <RefreshCw className="h-3 w-3" strokeWidth={1.8} />
-            Reindex
+            <RefreshCw className={cn('h-3 w-3', reindexing && 'animate-spin')} strokeWidth={1.8} />
+            {reindexing ? 'Reindexing…' : 'Reindex'}
           </button>
         </div>
       </div>
     </section>
   )
+}
+
+/** Status copy live-updates so 'last indexed 12s ago' becomes '13s ago' etc. */
+function StatusText({
+  isValid,
+  count,
+  indexedAt,
+  loading,
+  reindexing
+}: {
+  isValid: boolean
+  count: number
+  indexedAt: string | null
+  loading: boolean
+  reindexing: boolean
+}): React.JSX.Element {
+  // Tick every 10s while we have a fresh indexedAt — the relative-time
+  // string drifts slowly, so this is plenty.
+  const [, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (!indexedAt) return undefined
+    const t = window.setInterval(() => setNow(Date.now()), 10_000)
+    return () => window.clearInterval(t)
+  }, [indexedAt])
+
+  let text: string
+  if (!isValid) {
+    text = 'Path not found'
+  } else if (loading) {
+    text = 'Scanning…'
+  } else if (reindexing) {
+    text = 'Reindexing…'
+  } else if (indexedAt) {
+    text = `${formatNumber(count)} recording${count === 1 ? '' : 's'} · last indexed ${relativeTime(indexedAt)}`
+  } else {
+    text = 'Path valid'
+  }
+  return <span className="text-[12.5px] text-muted-foreground">{text}</span>
+}
+
+function relativeTime(iso: string): string {
+  const t = new Date(iso).getTime()
+  if (isNaN(t)) return ''
+  const diffSec = Math.max(0, Math.floor((Date.now() - t) / 1000))
+  if (diffSec < 30) return 'just now'
+  if (diffSec < 60) return `${diffSec}s ago`
+  const diffMin = Math.floor(diffSec / 60)
+  if (diffMin < 60) return `${diffMin}m ago`
+  const diffHr = Math.floor(diffMin / 60)
+  if (diffHr < 24) return `${diffHr}h ago`
+  const diffD = Math.floor(diffHr / 24)
+  return `${diffD}d ago`
 }
 
 /**
