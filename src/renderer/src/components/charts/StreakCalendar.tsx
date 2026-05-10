@@ -1,11 +1,9 @@
 import type { StreakCell } from '@renderer/lib/types'
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 interface StreakCalendarProps {
   /** One entry per day, ordered oldest → newest. */
   data: StreakCell[]
-  /** Side length of each cell in px (default 11, GitHub-style). */
-  cellSize?: number
   /** Gap between cells. */
   cellGap?: number
 }
@@ -25,25 +23,26 @@ const MONTH_LABELS = [
   'Nov',
   'Dec'
 ] as const
+const LABEL_GUTTER = 22
+const MONTH_ROW_H = 12
+const MIN_CELL = 5
+const MAX_CELL = 16
 
 /**
- * GitHub-style streak grid — 53 weeks × 7 days. Mon-start.
- * Renders as plain SVG so columns and labels stay perfectly aligned no
- * matter the parent width. Cell colour ramps from --muted (zero) toward
- * --chart-1 by relative intensity, via color-mix, so the gradient adapts
- * to dark mode.
+ * GitHub-style streak grid — up to 53 weeks × 7 days, Mon-start.
+ *
+ * Cell size adapts to the container via ResizeObserver — the grid stays
+ * proportional to whatever cell it's dropped into. A narrow card gives
+ * small cells; a wide card gives chunky ones. Capped at [MIN_CELL,
+ * MAX_CELL] so cells never disappear or look comical.
  */
-export function StreakCalendar({
-  data,
-  cellSize = 11,
-  cellGap = 2
-}: StreakCalendarProps): React.JSX.Element {
-  // Compute layout: turn the flat list into [week][weekday] columns.
-  // Mon-start: shift JS day so 1=Mon, 2=Tue, ..., 7=Sun mapped to 0..6.
+export function StreakCalendar({ data, cellGap = 2 }: StreakCalendarProps): React.JSX.Element {
+  // Compute layout once per data change. Columns + month markers stay
+  // stable across resize ticks — only the visual cellSize changes.
   const { columns, monthMarkers, max } = useMemo(() => {
-    const columns: Array<Array<StreakCell | null>> = []
+    const cols: Array<Array<StreakCell | null>> = []
     let m = 0
-    if (data.length === 0) return { columns, monthMarkers: [], max: 1 }
+    if (data.length === 0) return { columns: cols, monthMarkers: [], max: 1 }
 
     const firstDate = new Date(data[0]!.date)
     const firstDayIdx = (firstDate.getDay() + 6) % 7 // 0=Mon
@@ -56,69 +55,109 @@ export function StreakCalendar({
       const d = new Date(cell.date)
       const month = d.getMonth()
       if (month !== lastMonth && week.length === 0) {
-        markers.push({ col: columns.length, label: MONTH_LABELS[month]! })
+        markers.push({ col: cols.length, label: MONTH_LABELS[month]! })
         lastMonth = month
       }
       week.push(cell)
       if (cell.count > m) m = cell.count
       if (week.length === 7) {
-        columns.push(week)
+        cols.push(week)
         week = []
       }
     }
     if (week.length > 0) {
       while (week.length < 7) week.push(null)
-      columns.push(week)
+      cols.push(week)
     }
-    return { columns, monthMarkers: markers, max: m || 1 }
+    return { columns: cols, monthMarkers: markers, max: m || 1 }
   }, [data])
 
+  // Pick the largest cellSize that lets the grid fit both dimensions of
+  // the container at this exact data length.
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const [cellSize, setCellSize] = useState<number>(11)
+  useEffect(() => {
+    const el = wrapRef.current
+    if (!el) return undefined
+    const compute = (): void => {
+      const w = el.clientWidth
+      const h = el.clientHeight
+      if (w <= 0 || h <= 0 || columns.length === 0) return
+      const colCount = columns.length
+      const byW = Math.floor((w - LABEL_GUTTER) / colCount) - cellGap
+      const byH = Math.floor((h - MONTH_ROW_H) / 7) - cellGap
+      const next = Math.max(MIN_CELL, Math.min(MAX_CELL, Math.min(byW, byH)))
+      setCellSize(next)
+    }
+    compute()
+    const ro = new ResizeObserver(compute)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [columns.length, cellGap])
+
   const stride = cellSize + cellGap
-  const labelGutter = 22
-  const monthRowH = 12
-  const width = labelGutter + columns.length * stride
-  const height = monthRowH + 7 * stride
+  const width = LABEL_GUTTER + columns.length * stride
+  const height = MONTH_ROW_H + 7 * stride
 
   return (
-    <svg
-      role="img"
-      aria-label="Recording streak calendar"
-      viewBox={`0 0 ${width} ${height}`}
-      preserveAspectRatio="xMidYMid meet"
-      className="block h-full w-full"
-    >
-      {/* Day labels (left column) */}
-      {DAY_LABELS.map((label, i) =>
-        label ? (
+    <div ref={wrapRef} className="flex h-full w-full items-center justify-center">
+      <svg
+        role="img"
+        aria-label="Recording streak calendar"
+        width={width}
+        height={height}
+        viewBox={`0 0 ${width} ${height}`}
+        preserveAspectRatio="xMidYMid meet"
+      >
+        {/* Day labels (left column) */}
+        {DAY_LABELS.map((label, i) =>
+          label ? (
+            <text
+              key={i}
+              x={0}
+              y={MONTH_ROW_H + i * stride + cellSize - 1}
+              fontSize={9}
+              fill="var(--muted-foreground)"
+            >
+              {label}
+            </text>
+          ) : null
+        )}
+        {/* Month labels (top row) */}
+        {monthMarkers.map((mm, i) => (
           <text
             key={i}
-            x={0}
-            y={monthRowH + i * stride + cellSize - 1}
+            x={LABEL_GUTTER + mm.col * stride}
+            y={9}
             fontSize={9}
             fill="var(--muted-foreground)"
           >
-            {label}
+            {mm.label}
           </text>
-        ) : null
-      )}
-      {/* Month labels (top row) */}
-      {monthMarkers.map((m, i) => (
-        <text
-          key={i}
-          x={labelGutter + m.col * stride}
-          y={9}
-          fontSize={9}
-          fill="var(--muted-foreground)"
-        >
-          {m.label}
-        </text>
-      ))}
-      {/* Cells */}
-      {columns.map((week, c) =>
-        week.map((cell, r) => {
-          const x = labelGutter + c * stride
-          const y = monthRowH + r * stride
-          if (!cell) {
+        ))}
+        {/* Cells */}
+        {columns.map((week, c) =>
+          week.map((cell, r) => {
+            const x = LABEL_GUTTER + c * stride
+            const y = MONTH_ROW_H + r * stride
+            if (!cell) {
+              return (
+                <rect
+                  key={`${c}-${r}`}
+                  x={x}
+                  y={y}
+                  width={cellSize}
+                  height={cellSize}
+                  fill="transparent"
+                />
+              )
+            }
+            const intensity =
+              cell.count === 0 ? 0 : Math.max(8, Math.round((cell.count / max) * 100))
+            const fill =
+              cell.count === 0
+                ? 'var(--muted)'
+                : `color-mix(in oklab, var(--chart-1) ${intensity}%, var(--muted))`
             return (
               <rect
                 key={`${c}-${r}`}
@@ -126,31 +165,16 @@ export function StreakCalendar({
                 y={y}
                 width={cellSize}
                 height={cellSize}
-                fill="transparent"
-              />
+                rx={2}
+                ry={2}
+                fill={fill}
+              >
+                <title>{`${cell.date} — ${cell.count}`}</title>
+              </rect>
             )
-          }
-          const intensity = cell.count === 0 ? 0 : Math.max(8, Math.round((cell.count / max) * 100))
-          const fill =
-            cell.count === 0
-              ? 'var(--muted)'
-              : `color-mix(in oklab, var(--chart-1) ${intensity}%, var(--muted))`
-          return (
-            <rect
-              key={`${c}-${r}`}
-              x={x}
-              y={y}
-              width={cellSize}
-              height={cellSize}
-              rx={2}
-              ry={2}
-              fill={fill}
-            >
-              <title>{`${cell.date} — ${cell.count}`}</title>
-            </rect>
-          )
-        })
-      )}
-    </svg>
+          })
+        )}
+      </svg>
+    </div>
   )
 }

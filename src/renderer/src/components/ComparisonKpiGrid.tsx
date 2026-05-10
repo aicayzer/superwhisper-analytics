@@ -1,5 +1,5 @@
 import { cn } from '@renderer/lib/cn'
-import { ArrowDown, ArrowRight, ArrowUp } from 'lucide-react'
+import { ArrowDown, ArrowUp } from 'lucide-react'
 
 interface KpiCardSpec {
   label: string
@@ -19,23 +19,22 @@ interface ComparisonKpiGridProps {
 }
 
 /**
- * 6-card KPI grid showing period-over-period comparisons. When the active
- * range is "All time" the `previous` prop is null and only the current
- * value is shown — there's no meaningful prior window for an unbounded
- * range.
+ * 6-card KPI grid showing period-over-period comparisons.
  *
- * Card layout:
+ *   ┌─────────────────────────────┐
+ *   │ RECORDINGS         ↓ 6.9%   │ ← label left, pct badge top-right
+ *   │                             │
+ *   │ 11.1k                       │ ← big current value
+ *   └─────────────────────────────┘
  *
- *   ┌──────────────────────────┐
- *   │ LABEL                    │  ← uppercase muted
- *   │ <prev> → <current>       │  ← prev faded, current bold; if no prev,
- *   │                          │     just the current value
- *   │ ↓ 6.9%                   │  ← direction-coloured delta (or hidden)
- *   └──────────────────────────┘
+ * Cards stay the same height across every range — when comparison is
+ * available the corner badge appears, when it isn't (range = All time)
+ * the badge is absent but the card geometry is unchanged. The previous
+ * period's value is intentionally hidden; the percentage carries that
+ * information without doubling card height.
  *
- * Arrows are monochrome by design — colouring "down" red on the
- * filler-rate card would imply judgement we don't want to make. Anyone
- * who treats "down filler rate" as good can read the number themselves.
+ * Arrows are monochrome. Treating "filler rate down" as green or "WPM up"
+ * as red would imply judgements the app shouldn't make.
  */
 export function ComparisonKpiGrid({ items, className }: ComparisonKpiGridProps): React.JSX.Element {
   return (
@@ -56,33 +55,28 @@ function Card({ label, unit, current, previous, format }: KpiCardSpec): React.JS
 
   return (
     <div className="rounded-xl border border-border bg-card px-5 py-4">
-      <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-        {label}
-      </div>
-      <div className="mt-2 flex items-baseline gap-2">
-        {hasPrev && (
-          <>
-            <span className="text-[18px] tabular-nums text-muted-foreground/70">
-              {fmt(previous!)}
-              {unit && <span className="ml-0.5 text-[12px]">{unit}</span>}
-            </span>
-            <ArrowRight className="h-4 w-4 text-muted-foreground/60" strokeWidth={1.8} />
-          </>
-        )}
-        <span className="text-[24px] font-semibold leading-none tabular-nums text-foreground">
-          {fmt(current)}
-          {unit && <span className="ml-0.5 text-[13px] font-medium">{unit}</span>}
-        </span>
-      </div>
-      {hasPrev && (
-        <div className="mt-3 flex items-center gap-1 text-[12px] text-muted-foreground">
-          {direction === 'up' && <ArrowUp className="h-3 w-3" strokeWidth={2} />}
-          {direction === 'down' && <ArrowDown className="h-3 w-3" strokeWidth={2} />}
-          <span className="tabular-nums">
-            {direction === 'flat' ? '—' : `${Math.abs(pct).toFixed(1)}%`}
-          </span>
+      <div className="flex items-start justify-between gap-2">
+        <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+          {label}
         </div>
-      )}
+        {hasPrev && direction !== 'flat' && (
+          <span
+            className="inline-flex items-center gap-0.5 rounded-md bg-foreground/[0.05] px-1.5 py-0.5 text-[11px] tabular-nums text-muted-foreground"
+            title={`Previous period: ${fmt(previous!)}`}
+          >
+            {direction === 'up' ? (
+              <ArrowUp className="h-3 w-3" strokeWidth={2} />
+            ) : (
+              <ArrowDown className="h-3 w-3" strokeWidth={2} />
+            )}
+            {Math.abs(pct).toFixed(1)}%
+          </span>
+        )}
+      </div>
+      <div className="mt-3 text-[26px] font-semibold leading-none tabular-nums text-foreground">
+        {fmt(current)}
+        {unit && <span className="ml-0.5 text-[14px] font-medium">{unit}</span>}
+      </div>
     </div>
   )
 }

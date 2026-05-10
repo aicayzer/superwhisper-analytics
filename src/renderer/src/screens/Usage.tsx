@@ -97,9 +97,7 @@ export function Usage(): React.JSX.Element {
           />
         </ChartCard>
         <ChartCard title="Recording streak" slug="recording-streak">
-          <div className="flex h-full items-center justify-center">
-            <StreakCalendar data={streakCells} cellSize={11} />
-          </div>
+          <StreakCalendar data={streakCells} />
         </ChartCard>
       </div>
     </div>

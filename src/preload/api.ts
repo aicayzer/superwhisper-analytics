@@ -18,10 +18,19 @@ import type { HydratePayload } from '@shared/types'
  * by the analytics. Editable from Settings → Dictionary; falls back to
  * `DEFAULT_FILLER_PHRASES` when absent (older configs migrate
  * transparently on first read).
+ *
+ * `watchFolder` toggles the main-process fs.watch on the recordings
+ * folder — when on, new recordings auto-trigger a reindex.
+ *
+ * `transcriptsOnly` hides the audio player + waveform from
+ * TranscriptDetail when on. The on-disk WAVs are untouched; this is a
+ * renderer-side preference only.
  */
 export interface Config {
   superwhisperPath: string | null
   fillerWords: string[]
+  watchFolder: boolean
+  transcriptsOnly: boolean
 }
 
 /**
@@ -39,13 +48,26 @@ export interface ConfigStatus {
   defaultPath: string | null
   /** Active filler-phrase list. */
   fillerWords: string[]
+  watchFolder: boolean
+  transcriptsOnly: boolean
 }
+
+/** Wire callback type for main → renderer push when the indexed dataset
+ *  invalidates (today: fs.watch debounce on the recordings folder). */
+type Unsubscribe = () => void
 
 export const api = {
   config: {
     status: (): Promise<ConfigStatus> => ipcRenderer.invoke('config:status'),
     setPath: (path: string | null): Promise<ConfigStatus> =>
-      ipcRenderer.invoke('config:setPath', path)
+      ipcRenderer.invoke('config:setPath', path),
+    /** Toggle the fs.watch on the recordings folder. Main starts/stops the
+     *  watcher accordingly. */
+    setWatchFolder: (enabled: boolean): Promise<ConfigStatus> =>
+      ipcRenderer.invoke('config:setWatchFolder', enabled),
+    /** Toggle the renderer-side "hide audio UI" preference. */
+    setTranscriptsOnly: (enabled: boolean): Promise<ConfigStatus> =>
+      ipcRenderer.invoke('config:setTranscriptsOnly', enabled)
   },
   data: {
     hydrate: (): Promise<HydratePayload> => ipcRenderer.invoke('data:hydrate'),
@@ -55,7 +77,18 @@ export const api = {
      * Resolves to a fresh HydratePayload — no separate hydrate call needed.
      */
     setFillerWords: (words: string[]): Promise<HydratePayload> =>
-      ipcRenderer.invoke('data:setFillerWords', words)
+      ipcRenderer.invoke('data:setFillerWords', words),
+    /**
+     * Subscribe to main-process invalidation pushes. Fires whenever the
+     * watch-folder picks up a new recording. Returns an unsubscribe
+     * function — register on app mount so a fresh HydratePayload lands
+     * in the renderer the moment a recording is created.
+     */
+    onInvalidated: (handler: (payload: HydratePayload) => void): Unsubscribe => {
+      const listener = (_e: unknown, payload: HydratePayload): void => handler(payload)
+      ipcRenderer.on('data:invalidated', listener)
+      return () => ipcRenderer.removeListener('data:invalidated', listener)
+    }
   },
   dialog: {
     pickFolder: (): Promise<string | null> => ipcRenderer.invoke('dialog:pickFolder')

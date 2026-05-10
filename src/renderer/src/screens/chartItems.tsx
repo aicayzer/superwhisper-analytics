@@ -45,11 +45,7 @@ export function WhenYouRecordChart(): React.JSX.Element {
 
 export function RecordingStreakChart(): React.JSX.Element {
   const { streakCells } = useFilteredAggregates()
-  return (
-    <div className="flex h-full items-center justify-center overflow-auto">
-      <StreakCalendar data={streakCells} cellSize={16} />
-    </div>
-  )
+  return <StreakCalendar data={streakCells} />
 }
 
 export function DurationMixChart(): React.JSX.Element {

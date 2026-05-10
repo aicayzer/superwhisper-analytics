@@ -6,6 +6,7 @@ import { decodePeaks } from '@renderer/lib/audio-peaks'
 import { cn } from '@renderer/lib/cn'
 import { formatClock, formatDurationSec, formatTimestamp } from '@renderer/lib/format'
 import type { Recording } from '@renderer/lib/types'
+import { useConfigStore } from '@renderer/state/configStore'
 import { useDataStore } from '@renderer/state/dataStore'
 import { useUiPrefsStore } from '@renderer/state/uiPrefsStore'
 import { Copy, Pause, Play } from 'lucide-react'
@@ -37,6 +38,7 @@ export function TranscriptDetail(): React.JSX.Element {
 
 function DetailView({ rec }: { rec: Recording }): React.JSX.Element {
   const totalSec = rec.duration / 1000
+  const transcriptsOnly = useConfigStore((s) => s.transcriptsOnly)
   const [playing, setPlaying] = useState(false)
   const [currentSec, setCurrentSec] = useState(0)
   // Block view (segments with [m:ss] prefixes) is the default. The
@@ -82,12 +84,13 @@ function DetailView({ rec }: { rec: Recording }): React.JSX.Element {
     return () => cancelAnimationFrame(raf)
   }, [playing])
 
-  // Lazy-decode the WAV into ~512 peaks for the waveform. AudioContext
-  // pipeline lives in lib/audio-peaks.ts; results are cached by URL so
-  // re-opening the same recording is instant. The cancelled flag stops
-  // a slow decode from clobbering newer state if the user navigates
-  // between recordings before the previous one finishes.
+  // Lazy-decode the WAV into ~512 peaks for the waveform. Skipped when
+  // the user has chosen "Transcripts only" in Settings — the audio
+  // player is hidden, so decoding peaks is wasted work. Any previously-
+  // decoded peaks stay in state so flipping the toggle off shows them
+  // again instantly.
   useEffect(() => {
+    if (transcriptsOnly) return undefined
     let cancelled = false
     decodePeaks(audioUrl, WAVEFORM_PEAK_COUNT)
       .then((p) => {
@@ -99,7 +102,7 @@ function DetailView({ rec }: { rec: Recording }): React.JSX.Element {
     return () => {
       cancelled = true
     }
-  }, [audioUrl])
+  }, [audioUrl, transcriptsOnly])
 
   // Keyboard shortcuts: Space play/pause, arrow keys scrub. Ignore typing.
   useEffect(() => {
@@ -152,50 +155,62 @@ function DetailView({ rec }: { rec: Recording }): React.JSX.Element {
   return (
     <div className="flex h-full flex-col gap-3">
       {/* Hidden <audio> drives playback. State synced via the four event
-          handlers; currentSec sampled at frame rate by the effect above. */}
-      <audio
-        ref={audioRef}
-        src={audioUrl}
-        preload="metadata"
-        onPlay={() => setPlaying(true)}
-        onPause={() => setPlaying(false)}
-        onEnded={() => {
-          setPlaying(false)
-          setCurrentSec(totalSec)
-        }}
-        onError={(e) => {
-          // Fail quietly — the play button just won't do anything.
-          console.warn('[TranscriptDetail] audio error', audioUrl, e)
-        }}
-      />
+          handlers; currentSec sampled at frame rate by the effect above.
+          Skipped entirely when transcripts-only mode is on. */}
+      {!transcriptsOnly && (
+        <audio
+          ref={audioRef}
+          src={audioUrl}
+          preload="metadata"
+          onPlay={() => setPlaying(true)}
+          onPause={() => setPlaying(false)}
+          onEnded={() => {
+            setPlaying(false)
+            setCurrentSec(totalSec)
+          }}
+          onError={(e) => {
+            // Fail quietly — the play button just won't do anything.
+            console.warn('[TranscriptDetail] audio error', audioUrl, e)
+          }}
+        />
+      )}
 
-      {/* Audio player */}
-      <Card className="p-3">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={togglePlay}
-            aria-label={playing ? 'Pause' : 'Play'}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            {playing ? (
-              <Pause className="h-3.5 w-3.5" strokeWidth={2.2} fill="currentColor" />
-            ) : (
-              <Play className="h-3.5 w-3.5 translate-x-px" strokeWidth={2.2} fill="currentColor" />
-            )}
-          </button>
-          <div className="min-w-0 flex-1">
-            <Waveform
-              peaks={peaks}
-              progress={totalSec > 0 ? currentSec / totalSec : 0}
-              onSeek={(f) => seekTo(f * totalSec)}
-            />
+      {/* Audio player — hidden when the user opts into "Transcripts only"
+          from Settings → Indexing. The text + Details + Words columns
+          below stay unchanged so the transcript reading experience is
+          unaffected. */}
+      {!transcriptsOnly && (
+        <Card className="p-3">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={togglePlay}
+              aria-label={playing ? 'Pause' : 'Play'}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary/90"
+            >
+              {playing ? (
+                <Pause className="h-3.5 w-3.5" strokeWidth={2.2} fill="currentColor" />
+              ) : (
+                <Play
+                  className="h-3.5 w-3.5 translate-x-px"
+                  strokeWidth={2.2}
+                  fill="currentColor"
+                />
+              )}
+            </button>
+            <div className="min-w-0 flex-1">
+              <Waveform
+                peaks={peaks}
+                progress={totalSec > 0 ? currentSec / totalSec : 0}
+                onSeek={(f) => seekTo(f * totalSec)}
+              />
+            </div>
+            <div className="shrink-0 tabular-nums text-[11px] text-muted-foreground">
+              {formatClock(currentSec)} / {formatClock(totalSec)}
+            </div>
           </div>
-          <div className="shrink-0 tabular-nums text-[11px] text-muted-foreground">
-            {formatClock(currentSec)} / {formatClock(totalSec)}
-          </div>
-        </div>
-      </Card>
+        </Card>
+      )}
 
       {/* Detail grid: fills the rest of the viewport */}
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[1fr_280px]">
