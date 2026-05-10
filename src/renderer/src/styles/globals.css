@@ -85,28 +85,26 @@
 }
 
 /**
- * Fade-mask utility: text inside fades to transparent at the top and
- * bottom edges instead of cutting off abruptly under the card padding.
- * Used on the transcript scroll container so segments visually blend
- * into the card frame as they scroll past.
+ * Fade-mask utility: text fades to transparent at the top and bottom
+ * edges so segments blend into the card frame as they scroll past.
  *
- * The 16px stops are tuned to match the Card's vertical padding — the
- * fade band starts where the card begins and ends where the card edge
- * is. Override per-element with custom properties if other widgets need
- * a different fade depth.
+ * Asymmetric stops by design — the top fade is tight (4px, barely a
+ * sub-pixel softening) so the first segment isn't visually cropped
+ * when there's nothing above it to fade out of, while the bottom keeps
+ * a chunkier 16px gentle settle into the card edge.
  */
 .fade-y-mask {
   -webkit-mask-image: linear-gradient(
     to bottom,
     transparent 0,
-    black 16px,
+    black 4px,
     black calc(100% - 16px),
     transparent 100%
   );
   mask-image: linear-gradient(
     to bottom,
     transparent 0,
-    black 16px,
+    black 4px,
     black calc(100% - 16px),
     transparent 100%
   );
