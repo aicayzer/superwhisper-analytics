@@ -1,4 +1,5 @@
 import { ipcRenderer } from 'electron'
+import type { HydratePayload } from '@shared/types'
 
 /**
  * Single source of truth for the renderer ↔ main IPC surface.
@@ -37,6 +38,10 @@ export const api = {
     status: (): Promise<ConfigStatus> => ipcRenderer.invoke('config:status'),
     setPath: (path: string | null): Promise<ConfigStatus> =>
       ipcRenderer.invoke('config:setPath', path)
+  },
+  data: {
+    hydrate: (): Promise<HydratePayload> => ipcRenderer.invoke('data:hydrate'),
+    reindex: (): Promise<HydratePayload> => ipcRenderer.invoke('data:reindex')
   },
   dialog: {
     pickFolder: (): Promise<string | null> => ipcRenderer.invoke('dialog:pickFolder')

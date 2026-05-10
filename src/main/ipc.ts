@@ -1,5 +1,7 @@
 import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import type { HydratePayload } from '@shared/types'
 import { defaultPath, getConfig, isPathValid, setConfig } from './config'
+import { hydrate, reindex } from './cache'
 import type { ConfigStatus } from '../preload/api'
 
 /**
@@ -40,4 +42,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('shell:openExternal', async (_, url: string): Promise<void> => {
     await shell.openExternal(url)
   })
+
+  ipcMain.handle('data:hydrate', (): HydratePayload => hydrate())
+  ipcMain.handle('data:reindex', (): HydratePayload => reindex())
 }
