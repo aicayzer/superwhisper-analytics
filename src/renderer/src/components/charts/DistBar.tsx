@@ -1,3 +1,5 @@
+import { formatCompact } from '@renderer/lib/format'
+import { memo } from 'react'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { ChartTooltip } from './ChartTooltip'
 
@@ -13,11 +15,15 @@ interface DistBarProps {
  * Vertical bar chart over labelled buckets — duration distribution,
  * sentence-length distribution etc. Fills its container. Slightly muted
  * fill to distinguish from the primary VBar.
+ *
+ * Y-axis was previously 32px wide with no tickFormatter — counts in the
+ * thousands overflowed and Recharts clipped them to a single visible "0".
+ * `width={44}` + `formatCompact` keeps "1.2k" style ticks readable.
  */
-export function DistBar({ data, xKey, yKey }: DistBarProps): React.JSX.Element {
+function DistBarInner({ data, xKey, yKey }: DistBarProps): React.JSX.Element {
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={data} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+      <BarChart data={data} margin={{ top: 8, right: 8, left: -4, bottom: 0 }}>
         <CartesianGrid stroke="var(--border)" strokeDasharray="2 4" vertical={false} />
         <XAxis
           dataKey={xKey}
@@ -29,8 +35,9 @@ export function DistBar({ data, xKey, yKey }: DistBarProps): React.JSX.Element {
           tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }}
           tickLine={false}
           axisLine={false}
-          width={32}
+          width={44}
           allowDecimals={false}
+          tickFormatter={(v) => formatCompact(Number(v))}
         />
         <Tooltip cursor={{ fill: 'var(--accent)' }} content={<ChartTooltip />} />
         <Bar
@@ -44,3 +51,5 @@ export function DistBar({ data, xKey, yKey }: DistBarProps): React.JSX.Element {
     </ResponsiveContainer>
   )
 }
+
+export const DistBar = memo(DistBarInner)

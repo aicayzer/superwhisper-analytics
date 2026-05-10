@@ -7,16 +7,14 @@ import { cn } from '@renderer/lib/cn'
 import { formatClock, formatDurationSec, formatTimestamp } from '@renderer/lib/format'
 import type { Recording } from '@renderer/lib/types'
 import { useDataStore } from '@renderer/state/dataStore'
-import { useHeaderActions } from '@renderer/state/headerStore'
-import { AlignJustify, AlignLeft, Copy, Pause, Play } from 'lucide-react'
+import { useUiPrefsStore } from '@renderer/state/uiPrefsStore'
+import { Copy, Pause, Play } from 'lucide-react'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
 const WAVEFORM_PEAK_COUNT = 512
 
 const SCRUB_STEP_SEC = 5
-
-type ViewMode = 'inline' | 'block'
 
 export function TranscriptDetail(): React.JSX.Element {
   const { id } = useParams<{ id: string }>()
@@ -41,10 +39,10 @@ function DetailView({ rec }: { rec: Recording }): React.JSX.Element {
   const totalSec = rec.duration / 1000
   const [playing, setPlaying] = useState(false)
   const [currentSec, setCurrentSec] = useState(0)
-  // Block view (segments with [m:ss] prefixes) is the default — segment
-  // timestamps are usually what users want when scanning a transcript.
-  // The navbar toggle still flips back to flowing inline prose.
-  const [viewMode, setViewMode] = useState<ViewMode>('block')
+  // Block view (segments with [m:ss] prefixes) is the default. The
+  // preference lives in uiPrefsStore so it persists across reloads; the
+  // user flips it in Settings → Transcripts.
+  const viewMode = useUiPrefsStore((s) => s.transcriptViewMode)
   const [hoveredWord, setHoveredWord] = useState<string | null>(null)
   const [peaks, setPeaks] = useState<number[]>([])
   const audioRef = useRef<HTMLAudioElement>(null)
@@ -145,37 +143,6 @@ function DetailView({ rec }: { rec: Recording }): React.JSX.Element {
       }
     }
   }, [activeSegmentIndex, playing])
-
-  // Register Copy + view-toggle into the navbar slot. Recreated when the
-  // recording or view mode changes; useHeaderActions handles cleanup.
-  const headerActions = useMemo(
-    () => (
-      <>
-        <IconButton
-          onClick={() => {
-            void navigator.clipboard.writeText(rec.result)
-          }}
-          aria-label="Copy transcript"
-          title="Copy transcript"
-        >
-          <Copy className="h-3.5 w-3.5" strokeWidth={1.8} />
-        </IconButton>
-        <IconButton
-          onClick={() => setViewMode((v) => (v === 'inline' ? 'block' : 'inline'))}
-          aria-label={viewMode === 'inline' ? 'Show segment timestamps' : 'Show inline view'}
-          title={viewMode === 'inline' ? 'Show segment timestamps' : 'Show inline view'}
-        >
-          {viewMode === 'inline' ? (
-            <AlignJustify className="h-3.5 w-3.5" strokeWidth={1.8} />
-          ) : (
-            <AlignLeft className="h-3.5 w-3.5" strokeWidth={1.8} />
-          )}
-        </IconButton>
-      </>
-    ),
-    [rec.result, viewMode]
-  )
-  useHeaderActions(headerActions)
 
   const fillerPct = rec.wordCount > 0 ? (rec.fillerCount / rec.wordCount) * 100 : 0
 
@@ -384,10 +351,21 @@ function highlightWord(text: string, word: string | null): React.ReactNode {
 }
 
 function DetailsCard({ rec, fillerPct }: { rec: Recording; fillerPct: number }): React.JSX.Element {
+  const copy = (): void => {
+    void navigator.clipboard.writeText(rec.result)
+  }
   return (
     <Card className="p-4 text-[12px]">
-      <div className="mb-1 text-[12px] font-semibold tracking-tight text-foreground">Details</div>
-      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+      <div className="mb-2 flex items-center justify-between text-[12px] font-semibold tracking-tight text-foreground">
+        <span>Details</span>
+        <IconButton onClick={copy} aria-label="Copy transcript" title="Copy transcript">
+          <Copy className="h-3.5 w-3.5" strokeWidth={1.8} />
+        </IconButton>
+      </div>
+      {/* Per-row flex so labels and values sit at the row edges with their
+          own widths — avoids the "Words / minute" column width bleeding
+          into shorter labels like "Mode". */}
+      <dl className="flex flex-col gap-y-1">
         <Row k="Recorded" v={formatTimestamp(rec.datetime)} />
         <Row k="Mode" v={rec.modeName} />
         <Row k="Duration" v={formatDurationSec(rec.duration / 1000)} />
@@ -405,9 +383,9 @@ function DetailsCard({ rec, fillerPct }: { rec: Recording; fillerPct: number }):
 
 function Row({ k, v }: { k: string; v: string }): React.JSX.Element {
   return (
-    <>
+    <div className="flex items-baseline justify-between gap-3">
       <dt className="text-muted-foreground">{k}</dt>
       <dd className="text-right tabular-nums text-foreground">{v}</dd>
-    </>
+    </div>
   )
 }

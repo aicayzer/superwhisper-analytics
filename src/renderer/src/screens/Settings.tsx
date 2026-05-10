@@ -4,6 +4,7 @@ import { formatNumber } from '@renderer/lib/format'
 import { useConfigStore } from '@renderer/state/configStore'
 import { useDataStore } from '@renderer/state/dataStore'
 import { useThemeStore, type ThemePref } from '@renderer/state/themeStore'
+import { useUiPrefsStore, type TranscriptViewMode } from '@renderer/state/uiPrefsStore'
 import { ExternalLink, RefreshCw } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
@@ -13,6 +14,11 @@ const APPEARANCE_OPTIONS: ReadonlyArray<{ value: ThemePref; label: string }> = [
   { value: 'light', label: 'Light' },
   { value: 'system', label: 'System' },
   { value: 'dark', label: 'Dark' }
+]
+
+const TRANSCRIPT_VIEW_OPTIONS: ReadonlyArray<{ value: TranscriptViewMode; label: string }> = [
+  { value: 'block', label: 'Segments' },
+  { value: 'inline', label: 'Inline' }
 ]
 
 /**
@@ -28,6 +34,7 @@ export function Settings(): React.JSX.Element {
     <div className="mx-auto flex max-w-2xl flex-col gap-10 py-2">
       <RecordingsSection />
       <AppearanceSection />
+      <TranscriptsSection />
       <AboutSection />
     </div>
   )
@@ -176,6 +183,35 @@ function AppearanceSection(): React.JSX.Element {
     <section>
       <SectionHeading>Appearance</SectionHeading>
       <Segmented value={pref} onChange={setPref} options={APPEARANCE_OPTIONS} ariaLabel="Theme" />
+    </section>
+  )
+}
+
+/**
+ * Transcript view-mode picker. Previously a toggle in the navbar; now lives
+ * here so the preference is explicit and persists between sessions.
+ *   • Segments — block view with [m:ss] timestamp prefix per segment.
+ *   • Inline   — flowing prose, no timestamps. Use when the transcript reads
+ *                more naturally as a paragraph.
+ */
+function TranscriptsSection(): React.JSX.Element {
+  const mode = useUiPrefsStore((s) => s.transcriptViewMode)
+  const setMode = useUiPrefsStore((s) => s.setTranscriptViewMode)
+
+  return (
+    <section>
+      <SectionHeading>Transcripts</SectionHeading>
+      <div className="space-y-2">
+        <p className="text-[12.5px] text-muted-foreground">
+          How transcripts are laid out in the recording detail view.
+        </p>
+        <Segmented
+          value={mode}
+          onChange={setMode}
+          options={TRANSCRIPT_VIEW_OPTIONS}
+          ariaLabel="Transcript view"
+        />
+      </div>
     </section>
   )
 }

@@ -12,6 +12,15 @@
 @layer base {
   * {
     border-color: var(--border);
+    /* Chromium taps a yellow highlight on the just-clicked element by default.
+       Looks alien on a desktop app — kill it everywhere. */
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* Drop the browser default focus ring. Interactive elements throughout the
+     app opt back in via `focus-visible:ring-*` tokens; keeping the global
+     outline gives a noisy double-ring on every button. */
+  *:focus {
+    outline: none;
   }
   html,
   body {
@@ -85,27 +94,19 @@
 }
 
 /**
- * Fade-mask utility: text fades to transparent at the top and bottom
- * edges so segments blend into the card frame as they scroll past.
+ * Fade-mask utility: text fades to transparent at the bottom edge so
+ * segments blend into the card frame as they scroll past.
  *
- * Asymmetric stops by design — the top fade is tight (4px, barely a
- * sub-pixel softening) so the first segment isn't visually cropped
- * when there's nothing above it to fade out of, while the bottom keeps
- * a chunkier 16px gentle settle into the card edge.
+ * Only the bottom fades — the top stop is 0 so the active-segment
+ * highlight on the first segment renders fully opaque without the
+ * top of the box being eaten by the gradient.
  */
 .fade-y-mask {
   -webkit-mask-image: linear-gradient(
     to bottom,
-    transparent 0,
-    black 4px,
+    black 0,
     black calc(100% - 16px),
     transparent 100%
   );
-  mask-image: linear-gradient(
-    to bottom,
-    transparent 0,
-    black 4px,
-    black calc(100% - 16px),
-    transparent 100%
-  );
+  mask-image: linear-gradient(to bottom, black 0, black calc(100% - 16px), transparent 100%);
 }

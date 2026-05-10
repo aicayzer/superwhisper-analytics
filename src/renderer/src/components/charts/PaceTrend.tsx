@@ -1,3 +1,5 @@
+import { formatCompact } from '@renderer/lib/format'
+import { memo } from 'react'
 import {
   CartesianGrid,
   ComposedChart,
@@ -29,7 +31,7 @@ interface PaceTrendProps {
  * average. Custom shape because Recharts' ComposedChart needs both series
  * keyed against the same X axis.
  */
-export function PaceTrend({
+function PaceTrendInner({
   trend,
   dots,
   xKey,
@@ -56,7 +58,7 @@ export function PaceTrend({
     <ResponsiveContainer width="100%" height="100%">
       <ComposedChart
         data={[...merged, ...dotRows]}
-        margin={{ top: 8, right: 8, left: -16, bottom: 0 }}
+        margin={{ top: 8, right: 8, left: -4, bottom: 0 }}
       >
         <CartesianGrid stroke="var(--border)" strokeDasharray="2 4" vertical={false} />
         <XAxis
@@ -73,7 +75,8 @@ export function PaceTrend({
           tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }}
           tickLine={false}
           axisLine={false}
-          width={32}
+          width={44}
+          tickFormatter={(v) => formatCompact(Number(v))}
         />
         {reference && (
           <ReferenceLine
@@ -115,3 +118,5 @@ export function PaceTrend({
     </ResponsiveContainer>
   )
 }
+
+export const PaceTrend = memo(PaceTrendInner)

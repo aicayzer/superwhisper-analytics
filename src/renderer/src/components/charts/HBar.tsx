@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { ChartTooltip } from './ChartTooltip'
 
@@ -12,11 +13,16 @@ interface HBarProps {
 /**
  * Horizontal bar list — labels on the left, bars to the right. Fills its
  * container. Single fill colour; the visual ranking comes from order alone.
+ *
+ * `interval={0}` on the Y-axis forces every category label to render. Without
+ * it Recharts skips labels when the available height shrinks, which produces
+ * the bar-vs-label misalignment seen on Top words with 12+ items. `margin.left`
+ * gets a 4px nudge so the leftmost characters don't kiss the card edge.
  */
-export function HBar({ data, xKey, yKey, labelWidth = 88 }: HBarProps): React.JSX.Element {
+function HBarInner({ data, xKey, yKey, labelWidth = 88 }: HBarProps): React.JSX.Element {
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <BarChart layout="vertical" data={data} margin={{ top: 4, right: 12, left: 0, bottom: 0 }}>
+      <BarChart layout="vertical" data={data} margin={{ top: 4, right: 12, left: 4, bottom: 0 }}>
         <XAxis type="number" hide />
         <YAxis
           type="category"
@@ -25,6 +31,7 @@ export function HBar({ data, xKey, yKey, labelWidth = 88 }: HBarProps): React.JS
           tickLine={false}
           axisLine={false}
           width={labelWidth}
+          interval={0}
         />
         <Tooltip cursor={{ fill: 'var(--accent)' }} content={<ChartTooltip />} />
         <Bar
@@ -38,3 +45,5 @@ export function HBar({ data, xKey, yKey, labelWidth = 88 }: HBarProps): React.JS
     </ResponsiveContainer>
   )
 }
+
+export const HBar = memo(HBarInner)
