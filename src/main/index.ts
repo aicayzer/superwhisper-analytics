@@ -3,6 +3,12 @@ import { join } from 'path'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { registerIpcHandlers } from './ipc'
+import { registerSwProtocolHandler, registerSwSchemeAsPrivileged } from './protocol'
+
+// Privileged scheme registration must happen BEFORE app.whenReady — the
+// renderer's session inherits these privileges at startup. Doing this at
+// import time is safe; Electron caches the registration until ready.
+registerSwSchemeAsPrivileged()
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -52,6 +58,7 @@ app.whenReady().then(() => {
   })
 
   registerIpcHandlers()
+  registerSwProtocolHandler()
 
   createWindow()
 
