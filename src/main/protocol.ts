@@ -8,16 +8,24 @@ import { getConfig } from './config'
  * Custom `sw://` protocol that streams recording audio from disk to
  * the renderer's `<audio>` element.
  *
- * URL shape: `sw://<id>/output.wav`
- *   • host  = recording id (the timestamp folder name)
- *   • path  = file inside the recording folder (today only output.wav)
+ * URL shape: `sw://recording/<id>/<file>`
+ *   • host  = literal "recording" (constant, see below)
+ *   • path  = "<id>/<file>" — id is the timestamp folder name, file is the
+ *             leaf inside it (today only output.wav)
+ *
+ * Why a constant host? Recording ids are 10-digit Unix timestamps (e.g.
+ * 1755164573). With `standard: true`, Chromium's URL parser interprets
+ * numeric hosts under 2³² as packed-integer IPv4 addresses — so
+ * `new URL('sw://1755164573/output.wav').host` is the dotted-quad form,
+ * not the original digits. Putting "recording" in the host slot dodges
+ * the IPv4 reinterpretation entirely; the id lives in the path.
  *
  * Why a custom scheme rather than `file://`? Two reasons:
  *
  *   1. The renderer is sandboxed; allowing `file://` would expose the
  *      entire filesystem. A scoped scheme is auditable.
- *   2. We can rewrite the host portion to `<configPath>/<id>/...` so
- *      the renderer never needs to know the user's actual SuperWhisper
+ *   2. We can rewrite the path to `<configPath>/<id>/...` so the
+ *      renderer never needs to know the user's actual SuperWhisper
  *      path — it just speaks ids.
  *
  * Privileges (set before app.whenReady):
@@ -31,6 +39,7 @@ import { getConfig } from './config'
  */
 
 export const SW_SCHEME = 'sw'
+export const SW_HOST = 'recording'
 
 export function registerSwSchemeAsPrivileged(): void {
   protocol.registerSchemesAsPrivileged([
@@ -72,8 +81,17 @@ export function registerSwProtocolHandler(): void {
       return forbidden('Malformed sw:// URL.')
     }
 
-    const id = parsed.host
-    const file = decodeURIComponent(parsed.pathname.replace(/^\//, ''))
+    if (parsed.host !== SW_HOST) {
+      return forbidden(`sw:// host must be "${SW_HOST}".`)
+    }
+
+    // pathname is "/<id>/<file>" — split on the first slash after the
+    // leading one, leaving id and the (possibly nested) file portion.
+    const trimmed = parsed.pathname.replace(/^\/+/, '')
+    const slash = trimmed.indexOf('/')
+    if (slash <= 0) return notFound('sw:// URL must include both id and file.')
+    const id = decodeURIComponent(trimmed.slice(0, slash))
+    const file = decodeURIComponent(trimmed.slice(slash + 1))
     if (!id || !file) return notFound('sw:// URL must include both id and file.')
 
     const rootResolved = resolve(root)

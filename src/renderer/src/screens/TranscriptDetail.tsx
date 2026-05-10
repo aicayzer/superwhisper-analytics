@@ -48,7 +48,10 @@ function DetailView({ rec }: { rec: Recording }): React.JSX.Element {
   const audioRef = useRef<HTMLAudioElement>(null)
   const transcriptRef = useRef<HTMLDivElement>(null)
 
-  const audioUrl = `sw://${rec.id}/output.wav`
+  // URL host is the literal "recording" (not the recording id) — see the
+  // long-form comment in src/main/protocol.ts for why. The id lives in
+  // the path so Chromium's URL parser doesn't treat numeric ids as IPv4.
+  const audioUrl = `sw://recording/${rec.id}/output.wav`
 
   const togglePlay = (): void => {
     const el = audioRef.current

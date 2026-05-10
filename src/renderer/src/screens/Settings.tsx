@@ -57,6 +57,7 @@ function RecordingsSection(): React.JSX.Element {
   const indexedAt = useDataStore((s) => s.indexedAt)
   const loading = useDataStore((s) => s.loading)
   const reindexing = useDataStore((s) => s.reindexing)
+  const error = useDataStore((s) => s.error)
   const reindex = useDataStore((s) => s.reindex)
 
   async function choose(): Promise<void> {
@@ -111,6 +112,11 @@ function RecordingsSection(): React.JSX.Element {
             {reindexing ? 'Reindexing…' : 'Reindex'}
           </button>
         </div>
+        {error && (
+          <p className="text-[12px] text-red-500" role="alert">
+            {error}
+          </p>
+        )}
       </div>
     </section>
   )
