@@ -175,7 +175,7 @@ function DetailView({ rec }: { rec: Recording }): React.JSX.Element {
           </button>
           <div className="min-w-0 flex-1">
             <Waveform
-              peaks={rec.waveform}
+              peaks={rec.waveform ?? []}
               progress={totalSec > 0 ? currentSec / totalSec : 0}
               onSeek={(f) => seekTo(f * totalSec)}
             />

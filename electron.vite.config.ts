@@ -8,16 +8,23 @@ const pkg = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf-8')
   version: string
 }
 
+const sharedAlias = { '@shared': resolve('src/shared') }
+
 export default defineConfig({
-  main: {},
-  preload: {},
+  main: {
+    resolve: { alias: sharedAlias }
+  },
+  preload: {
+    resolve: { alias: sharedAlias }
+  },
   renderer: {
     define: {
       __APP_VERSION__: JSON.stringify(pkg.version)
     },
     resolve: {
       alias: {
-        '@renderer': resolve('src/renderer/src')
+        '@renderer': resolve('src/renderer/src'),
+        ...sharedAlias
       }
     },
     plugins: [react(), tailwindcss()]
