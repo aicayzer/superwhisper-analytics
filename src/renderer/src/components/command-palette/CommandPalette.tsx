@@ -1,7 +1,7 @@
 import { useGlobalShortcut } from '@renderer/hooks/useGlobalShortcut'
 import { formatDurationSec, formatTimestamp } from '@renderer/lib/format'
-import { mock } from '@renderer/lib/mock'
 import type { Recording } from '@renderer/lib/types'
+import { useDataStore } from '@renderer/state/dataStore'
 import { usePaletteStore, type PaletteMode } from '@renderer/state/paletteStore'
 import { useThemeStore } from '@renderer/state/themeStore'
 import { Command, useCommandState } from 'cmdk'
@@ -192,8 +192,9 @@ function SearchResults({
   query: string
   onPick: (rec: Recording) => void
 }): React.JSX.Element {
+  const recordings = useDataStore((s) => s.recordings)
   const q = query.trim().toLowerCase()
-  const matches = mock.recordings
+  const matches = recordings
     .filter((r) => r.result.toLowerCase().includes(q) || r.modeName.toLowerCase().includes(q))
     .slice(0, SEARCH_MAX_RESULTS)
 

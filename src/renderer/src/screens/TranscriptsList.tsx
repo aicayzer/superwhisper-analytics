@@ -3,8 +3,8 @@ import { IconButton } from '@renderer/components/ui/IconButton'
 import { Popover, PopoverContent, PopoverTrigger } from '@renderer/components/ui/popover'
 import { cn } from '@renderer/lib/cn'
 import { formatDurationSec, formatTimestamp, truncate } from '@renderer/lib/format'
-import { mock } from '@renderer/lib/mock'
 import type { Recording } from '@renderer/lib/types'
+import { useDataStore } from '@renderer/state/dataStore'
 import { useHeaderActions } from '@renderer/state/headerStore'
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Columns3 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
@@ -105,6 +105,7 @@ function sortRecordings(records: Recording[], key: SortKey, dir: Direction): Rec
 }
 
 export function TranscriptsList(): React.JSX.Element {
+  const recordings = useDataStore((s) => s.recordings)
   const [sortKey, setSortKey] = useState<SortKey>('datetime')
   const [dir, setDir] = useState<Direction>('desc')
   const [page, setPage] = useState(1)
@@ -123,7 +124,10 @@ export function TranscriptsList(): React.JSX.Element {
 
   const visibleCols = useMemo(() => COLS.filter((c) => visibility[c.key]), [visibility])
 
-  const sortedRows = useMemo(() => sortRecordings(mock.recordings, sortKey, dir), [sortKey, dir])
+  const sortedRows = useMemo(
+    () => sortRecordings(recordings, sortKey, dir),
+    [recordings, sortKey, dir]
+  )
 
   const pageCount = Math.max(1, Math.ceil(sortedRows.length / PAGE_SIZE))
   const safePage = Math.min(page, pageCount)

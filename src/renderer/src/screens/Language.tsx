@@ -6,22 +6,20 @@ import { LineTrend } from '@renderer/components/charts/LineTrend'
 import { PaceTrend } from '@renderer/components/charts/PaceTrend'
 import { KpiRow } from '@renderer/components/KpiRow'
 import { formatNumber } from '@renderer/lib/format'
-import { mock } from '@renderer/lib/mock'
+import { useDataStore } from '@renderer/state/dataStore'
 
 const WPM_TARGET = 140
 
 export function Language(): React.JSX.Element {
-  const {
-    language,
-    wordFrequency,
-    fillerSummary,
-    wpmTrend,
-    wpmDots,
-    fillerTrend,
-    sentenceDist,
-    vocabGrowth,
-    sparklines
-  } = mock
+  const language = useDataStore((s) => s.language)
+  const wordFrequency = useDataStore((s) => s.wordFrequency)
+  const fillerSummary = useDataStore((s) => s.fillerSummary)
+  const wpmTrend = useDataStore((s) => s.wpmTrend)
+  const wpmDots = useDataStore((s) => s.wpmDots)
+  const fillerTrend = useDataStore((s) => s.fillerTrend)
+  const sentenceDist = useDataStore((s) => s.sentenceDist)
+  const vocabGrowth = useDataStore((s) => s.vocabGrowth)
+  const sparklines = useDataStore((s) => s.sparklines)
 
   const topWords = wordFrequency.slice(0, 12).map((w) => ({ label: w.word, count: w.count }))
   const topFillers = fillerSummary.slice(0, 8).map((f) => ({ label: f.phrase, count: f.count }))

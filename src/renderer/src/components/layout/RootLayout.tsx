@@ -1,7 +1,7 @@
 import { FirstRunModal } from '@renderer/components/FirstRunModal'
 import { formatTimestamp } from '@renderer/lib/format'
-import { mock } from '@renderer/lib/mock'
 import { useConfigStore } from '@renderer/state/configStore'
+import { useDataStore } from '@renderer/state/dataStore'
 import { useLayoutStore } from '@renderer/state/layoutStore'
 import { chartBreadcrumb } from '@renderer/screens/chartRegistry'
 import { Outlet, useLocation, useSearchParams } from 'react-router-dom'
@@ -49,6 +49,7 @@ export function RootLayout(): React.JSX.Element {
   const sidebarWidth = useLayoutStore((s) => s.sidebarWidth)
   const configHydrated = useConfigStore((s) => s.hydrated)
   const configValid = useConfigStore((s) => s.isValid)
+  const recordings = useDataStore((s) => s.recordings)
   const location = useLocation()
   const [params] = useSearchParams()
 
@@ -67,7 +68,7 @@ export function RootLayout(): React.JSX.Element {
   // the screen so the navbar is the single source of truth for titles.
   const transcriptMatch = location.pathname.match(/^\/transcripts\/([^/]+)/)
   const transcriptRec = transcriptMatch
-    ? mock.recordings.find((r) => r.id === transcriptMatch[1])
+    ? recordings.find((r) => r.id === transcriptMatch[1])
     : undefined
   const fromParam = params.get('from')
   let backTo: string | undefined

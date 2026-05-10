@@ -4,7 +4,7 @@ import { DistBar } from '@renderer/components/charts/DistBar'
 import { Heatmap } from '@renderer/components/charts/Heatmap'
 import { KpiRow } from '@renderer/components/KpiRow'
 import { formatActivityTick, formatCompact, formatDurationSec } from '@renderer/lib/format'
-import { mock } from '@renderer/lib/mock'
+import { useDataStore } from '@renderer/state/dataStore'
 import { useRangeStore, windowFor } from '@renderer/state/rangeStore'
 import { useMemo } from 'react'
 
@@ -16,8 +16,13 @@ import { useMemo } from 'react'
  *      selected range.
  */
 export function Overview(): React.JSX.Element {
-  const { overview, daily, heatmap, durationDist, sparklines } = mock
-  const avgPerRec = Math.round(overview.totalWords / overview.totalRecordings)
+  const overview = useDataStore((s) => s.overview)
+  const daily = useDataStore((s) => s.daily)
+  const heatmap = useDataStore((s) => s.heatmap)
+  const durationDist = useDataStore((s) => s.durationDist)
+  const sparklines = useDataStore((s) => s.sparklines)
+  const avgPerRec =
+    overview.totalRecordings > 0 ? Math.round(overview.totalWords / overview.totalRecordings) : 0
   const range = useRangeStore((s) => s.range)
   const { from, to } = useMemo(() => windowFor(range), [range])
 

@@ -4,7 +4,7 @@ import { HourRadial } from '@renderer/components/charts/HourRadial'
 import { ModePie } from '@renderer/components/charts/ModePie'
 import { KpiRow } from '@renderer/components/KpiRow'
 import { formatDurationSec } from '@renderer/lib/format'
-import { mock } from '@renderer/lib/mock'
+import { useDataStore } from '@renderer/state/dataStore'
 
 /**
  * Usage — recording cadence + mode breakdown.
@@ -23,7 +23,13 @@ import { mock } from '@renderer/lib/mock'
  * that fits comfortably in half a column.
  */
 export function Usage(): React.JSX.Element {
-  const { overview, usage, daily, hourly, modeStats, sparklines, wpmByMode } = mock
+  const overview = useDataStore((s) => s.overview)
+  const usage = useDataStore((s) => s.usage)
+  const daily = useDataStore((s) => s.daily)
+  const hourly = useDataStore((s) => s.hourly)
+  const modeStats = useDataStore((s) => s.modeStats)
+  const sparklines = useDataStore((s) => s.sparklines)
+  const wpmByMode = useDataStore((s) => s.wpmByMode)
 
   const modePieData = modeStats.map((m) => ({ name: m.modeName, value: m.count }))
   const dominantMode = modeStats[0]
