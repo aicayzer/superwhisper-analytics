@@ -24,6 +24,10 @@ interface ConfigState {
   isValid: boolean
   /** Active filler-phrase list (edited from Settings → Dictionary). */
   fillerWords: string[]
+  /** fs.watch on the recordings folder — see main/watcher.ts. */
+  watchFolder: boolean
+  /** Hide audio + waveform from TranscriptDetail when true. */
+  transcriptsOnly: boolean
   /** Has the initial round-trip completed? Gates the first-run modal. */
   hydrated: boolean
 
@@ -34,6 +38,10 @@ interface ConfigState {
   /** Persist a new filler-phrase list. Triggers a full aggregate
    *  recompute in main and updates dataStore with the fresh payload. */
   setFillerWords: (words: string[]) => Promise<void>
+  /** Toggle the recordings-folder watcher. */
+  setWatchFolder: (enabled: boolean) => Promise<void>
+  /** Toggle the "transcripts only" preference (hide audio UI). */
+  setTranscriptsOnly: (enabled: boolean) => Promise<void>
 }
 
 function applyStatus(status: ConfigStatus): Partial<ConfigState> {
@@ -42,6 +50,8 @@ function applyStatus(status: ConfigStatus): Partial<ConfigState> {
     defaultPath: status.defaultPath,
     isValid: status.isValid,
     fillerWords: status.fillerWords,
+    watchFolder: status.watchFolder,
+    transcriptsOnly: status.transcriptsOnly,
     hydrated: true
   }
 }
@@ -51,6 +61,8 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
   defaultPath: null,
   isValid: false,
   fillerWords: [],
+  watchFolder: false,
+  transcriptsOnly: false,
   hydrated: false,
 
   hydrate: async () => {
@@ -86,5 +98,17 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
       count: payload.count,
       error: payload.error
     })
+  },
+
+  setWatchFolder: async (enabled) => {
+    set({ watchFolder: enabled })
+    const updated = await window.api.config.setWatchFolder(enabled)
+    set(applyStatus(updated))
+  },
+
+  setTranscriptsOnly: async (enabled) => {
+    set({ transcriptsOnly: enabled })
+    const updated = await window.api.config.setTranscriptsOnly(enabled)
+    set(applyStatus(updated))
   }
 }))

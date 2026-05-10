@@ -57,6 +57,23 @@ function App(): React.JSX.Element {
     }
   }, [configHydrated, configValid, hydrateData, clearData])
 
+  // Subscribe to fs.watch invalidation pushes from main — when the user
+  // has the watch-folder toggle on and SuperWhisper writes a new
+  // recording, main reindexes and pushes a fresh payload. The dataStore
+  // setState slots it straight into the running app.
+  useEffect(() => {
+    const unsubscribe = window.api.data.onInvalidated((payload) => {
+      useDataStore.setState({
+        aggregates: payload.aggregates,
+        recordings: payload.recordings,
+        indexedAt: payload.indexedAt || null,
+        count: payload.count,
+        error: payload.error
+      })
+    })
+    return unsubscribe
+  }, [])
+
   return (
     <>
       <RouterProvider router={router} />

@@ -1,21 +1,29 @@
+import { AppearancePicker } from '@renderer/components/settings/AppearancePicker'
+import { SettingsCard } from '@renderer/components/settings/SettingsCard'
 import { Segmented } from '@renderer/components/Segmented'
+import { Switch } from '@renderer/components/ui/Switch'
 import { cn } from '@renderer/lib/cn'
-import { formatNumber } from '@renderer/lib/format'
+import { formatCompact, formatDurationSec } from '@renderer/lib/format'
 import { DEFAULT_FILLER_PHRASES } from '@renderer/lib/text'
 import { useConfigStore } from '@renderer/state/configStore'
 import { useDataStore } from '@renderer/state/dataStore'
-import { useThemeStore, type ThemePref } from '@renderer/state/themeStore'
 import { useUiPrefsStore, type TranscriptViewMode } from '@renderer/state/uiPrefsStore'
-import { ExternalLink, RefreshCw, X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import {
+  AlignLeft,
+  BookOpen,
+  ExternalLink,
+  Folder,
+  Info,
+  RefreshCw,
+  Settings as SettingsIcon,
+  Sun,
+  X
+} from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 
 const GITHUB_URL = 'https://github.com/aicayzer/superwhisper-analytics'
-
-const APPEARANCE_OPTIONS: ReadonlyArray<{ value: ThemePref; label: string }> = [
-  { value: 'light', label: 'Light' },
-  { value: 'system', label: 'System' },
-  { value: 'dark', label: 'Dark' }
-]
+const DISCLAIMER =
+  'Not affiliated with SuperWhisper. Built out of a love for the app and curiosity about the data behind every recording.'
 
 const TRANSCRIPT_VIEW_OPTIONS: ReadonlyArray<{ value: TranscriptViewMode; label: string }> = [
   { value: 'block', label: 'Segments' },
@@ -23,37 +31,41 @@ const TRANSCRIPT_VIEW_OPTIONS: ReadonlyArray<{ value: TranscriptViewMode; label:
 ]
 
 /**
- * Settings page. Three sections, no boxed cards — sectioned by spacing
- * and headings only. Order:
- *   1. Recordings folder — path display, live status (count + last
- *      indexed), change/reset, reindex.
- *   2. Appearance — three-way Light / System / Dark toggle.
- *   3. About — name, version, GitHub link, licence.
+ * Card-based Settings page. Each section is a `<SettingsCard>` with an
+ * icon header + body content. Sections, in order:
+ *
+ *   1. Recordings folder — path, indexed stats, Choose/Reindex.
+ *   2. Appearance — preview cards (Light / System / Dark).
+ *   3. Indexing — Watch folder + Index transcripts only toggles.
+ *   4. Transcripts — segment / inline view-mode preference.
+ *   5. Dictionary — searchable, scrollable filler-phrase list.
+ *   6. About — version (live from package.json), GitHub link, MIT,
+ *              and an "unaffiliated" disclaimer.
  */
 export function Settings(): React.JSX.Element {
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-10 py-2">
-      <RecordingsSection />
-      <AppearanceSection />
-      <TranscriptsSection />
-      <DictionarySection />
-      <AboutSection />
+    <div className="mx-auto flex max-w-2xl flex-col gap-4 pb-8 pt-2">
+      <header className="px-1 pb-2">
+        <h1 className="text-[22px] font-semibold tracking-tight text-foreground">Settings</h1>
+        <p className="mt-1 text-[13px] text-muted-foreground">
+          SuperWhisper Analytics is a local-only companion. Nothing leaves your machine.
+        </p>
+      </header>
+      <RecordingsCard />
+      <AppearanceCard />
+      <IndexingCard />
+      <TranscriptsCard />
+      <DictionaryCard />
+      <AboutCard />
     </div>
   )
 }
 
-function SectionHeading({ children }: { children: React.ReactNode }): React.JSX.Element {
-  return (
-    <h2 className="mb-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-      {children}
-    </h2>
-  )
-}
+// ---------- Recordings folder ------------------------------------------
 
-function RecordingsSection(): React.JSX.Element {
+function RecordingsCard(): React.JSX.Element {
   const path = useConfigStore((s) => s.path)
   const isValid = useConfigStore((s) => s.isValid)
-  const defaultPath = useConfigStore((s) => s.defaultPath)
   const setPath = useConfigStore((s) => s.setPath)
   const count = useDataStore((s) => s.count)
   const indexedAt = useDataStore((s) => s.indexedAt)
@@ -61,46 +73,53 @@ function RecordingsSection(): React.JSX.Element {
   const reindexing = useDataStore((s) => s.reindexing)
   const error = useDataStore((s) => s.error)
   const reindex = useDataStore((s) => s.reindex)
+  const totalDurationSec = useDataStore((s) => s.aggregates.overview.totalDurationSec)
+  // Tick once a minute so the "5m ago" string drifts naturally without
+  // a custom hook per stat.
+  const [, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const t = window.setInterval(() => setNow(Date.now()), 60_000)
+    return () => window.clearInterval(t)
+  }, [])
 
   async function choose(): Promise<void> {
     const chosen = await window.api.dialog.pickFolder()
     if (chosen) await setPath(chosen)
   }
 
-  async function reset(): Promise<void> {
-    if (defaultPath) await setPath(defaultPath)
-  }
-
-  const canReset = defaultPath !== null && defaultPath !== path
   const busy = loading || reindexing
+  const status: { label: string; tone: 'ok' | 'busy' | 'error' } = !isValid
+    ? { label: 'Path not found', tone: 'error' }
+    : loading
+      ? { label: 'Scanning…', tone: 'busy' }
+      : reindexing
+        ? { label: 'Reindexing…', tone: 'busy' }
+        : count > 0
+          ? { label: 'All recordings indexed', tone: 'ok' }
+          : { label: 'Not yet indexed', tone: 'busy' }
 
   return (
-    <section>
-      <SectionHeading>Recordings folder</SectionHeading>
-      <div className="space-y-3">
+    <SettingsCard
+      icon={Folder}
+      title="Recordings folder"
+      subtitle="Where SuperWhisper saves your transcripts."
+      headerExtra={<StatusPill label={status.label} tone={status.tone} />}
+    >
+      <div className="space-y-4">
         <p
           className="break-all rounded-md bg-foreground/[0.04] px-3 py-2 font-mono text-[12px] leading-relaxed text-muted-foreground"
           title={path ?? 'No folder selected'}
         >
           {path ?? 'No folder selected'}
         </p>
-        <div className="flex items-center gap-2">
-          <span
-            className={cn('h-1.5 w-1.5 rounded-full', isValid ? 'bg-emerald-500' : 'bg-red-500')}
-            aria-hidden
-          />
-          <StatusText
-            isValid={isValid}
-            count={count}
-            indexedAt={indexedAt}
-            loading={loading}
-            reindexing={reindexing}
-          />
-          <div className="flex-1" />
-          <button type="button" onClick={reset} disabled={!canReset} className={CHROME_BUTTON}>
-            Reset to default
-          </button>
+        <div className="grid grid-cols-3 gap-3 border-t border-border pt-4">
+          <Stat label="recordings" value={formatCompact(count)} />
+          <Stat label="audio" value={formatDurationSec(totalDurationSec)} />
+          <Stat label="last indexed" value={indexedAt ? relativeTime(indexedAt) : '—'} />
+        </div>
+        <div className="flex items-center gap-2 border-t border-border pt-4">
           <button type="button" onClick={choose} className={CHROME_BUTTON}>
+            <Folder className="h-3 w-3" strokeWidth={1.8} />
             Choose folder…
           </button>
           <button
@@ -111,7 +130,7 @@ function RecordingsSection(): React.JSX.Element {
             className={CHROME_BUTTON}
           >
             <RefreshCw className={cn('h-3 w-3', reindexing && 'animate-spin')} strokeWidth={1.8} />
-            {reindexing ? 'Reindexing…' : 'Reindex'}
+            {reindexing ? 'Reindexing…' : 'Reindex now'}
           </button>
         </div>
         {error && (
@@ -120,46 +139,40 @@ function RecordingsSection(): React.JSX.Element {
           </p>
         )}
       </div>
-    </section>
+    </SettingsCard>
   )
 }
 
-/** Status copy live-updates so 'last indexed 12s ago' becomes '13s ago' etc. */
-function StatusText({
-  isValid,
-  count,
-  indexedAt,
-  loading,
-  reindexing
-}: {
-  isValid: boolean
-  count: number
-  indexedAt: string | null
-  loading: boolean
-  reindexing: boolean
-}): React.JSX.Element {
-  // Tick every 10s while we have a fresh indexedAt — the relative-time
-  // string drifts slowly, so this is plenty.
-  const [, setNow] = useState(() => Date.now())
-  useEffect(() => {
-    if (!indexedAt) return undefined
-    const t = window.setInterval(() => setNow(Date.now()), 10_000)
-    return () => window.clearInterval(t)
-  }, [indexedAt])
+function Stat({ label, value }: { label: string; value: string }): React.JSX.Element {
+  return (
+    <div>
+      <div className="text-[20px] font-semibold leading-none tabular-nums text-foreground">
+        {value}
+      </div>
+      <div className="mt-1.5 text-[12px] text-muted-foreground">{label}</div>
+    </div>
+  )
+}
 
-  let text: string
-  if (!isValid) {
-    text = 'Path not found'
-  } else if (loading) {
-    text = 'Scanning…'
-  } else if (reindexing) {
-    text = 'Reindexing…'
-  } else if (indexedAt) {
-    text = `${formatNumber(count)} recording${count === 1 ? '' : 's'} · last indexed ${relativeTime(indexedAt)}`
-  } else {
-    text = 'Path valid'
-  }
-  return <span className="text-[12.5px] text-muted-foreground">{text}</span>
+function StatusPill({
+  label,
+  tone
+}: {
+  label: string
+  tone: 'ok' | 'busy' | 'error'
+}): React.JSX.Element {
+  const dot =
+    tone === 'ok'
+      ? 'bg-emerald-500'
+      : tone === 'error'
+        ? 'bg-red-500'
+        : 'bg-amber-500 animate-pulse'
+  return (
+    <span className="inline-flex items-center gap-1.5 text-[12px] text-muted-foreground">
+      <span className={cn('h-1.5 w-1.5 rounded-full', dot)} aria-hidden />
+      {label}
+    </span>
+  )
 }
 
 function relativeTime(iso: string): string {
@@ -176,65 +189,115 @@ function relativeTime(iso: string): string {
   return `${diffD}d ago`
 }
 
-/**
- * Shared chrome-button styling for the Settings action row. h-7 to match
- * IconButton/RangePill, ghost-bordered floating surface, hover lift.
- */
 const CHROME_BUTTON =
   'inline-flex h-7 items-center gap-1.5 rounded-md border border-border bg-floating px-3 text-[12px] text-foreground transition-colors hover:bg-foreground/5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-floating'
 
-function AppearanceSection(): React.JSX.Element {
-  const pref = useThemeStore((s) => s.pref)
-  const setPref = useThemeStore((s) => s.setPref)
+// ---------- Appearance ---------------------------------------------------
 
+function AppearanceCard(): React.JSX.Element {
   return (
-    <section>
-      <SectionHeading>Appearance</SectionHeading>
-      <Segmented value={pref} onChange={setPref} options={APPEARANCE_OPTIONS} ariaLabel="Theme" />
-    </section>
+    <SettingsCard
+      icon={Sun}
+      title="Appearance"
+      subtitle="Match your system theme, or pick a fixed mode."
+    >
+      <AppearancePicker />
+    </SettingsCard>
   )
 }
 
-/**
- * Transcript view-mode picker. Previously a toggle in the navbar; now lives
- * here so the preference is explicit and persists between sessions.
- *   • Segments — block view with [m:ss] timestamp prefix per segment.
- *   • Inline   — flowing prose, no timestamps. Use when the transcript reads
- *                more naturally as a paragraph.
- */
-function TranscriptsSection(): React.JSX.Element {
-  const mode = useUiPrefsStore((s) => s.transcriptViewMode)
-  const setMode = useUiPrefsStore((s) => s.setTranscriptViewMode)
+// ---------- Indexing -----------------------------------------------------
 
+function IndexingCard(): React.JSX.Element {
+  const watchFolder = useConfigStore((s) => s.watchFolder)
+  const setWatchFolder = useConfigStore((s) => s.setWatchFolder)
+  const transcriptsOnly = useConfigStore((s) => s.transcriptsOnly)
+  const setTranscriptsOnly = useConfigStore((s) => s.setTranscriptsOnly)
   return (
-    <section>
-      <SectionHeading>Transcripts</SectionHeading>
-      <div className="space-y-2">
-        <p className="text-[12.5px] text-muted-foreground">
-          How transcripts are laid out in the recording detail view.
-        </p>
-        <Segmented
-          value={mode}
-          onChange={setMode}
-          options={TRANSCRIPT_VIEW_OPTIONS}
-          ariaLabel="Transcript view"
+    <SettingsCard
+      icon={SettingsIcon}
+      title="Indexing"
+      subtitle="Background work that keeps stats fresh."
+    >
+      <div className="divide-y divide-border">
+        <ToggleRow
+          label="Watch folder for new recordings"
+          description="Auto-index any file dropped into the recordings folder."
+          checked={watchFolder}
+          onChange={(next) => void setWatchFolder(next)}
+        />
+        <ToggleRow
+          label="Index transcripts only"
+          description="Skip audio playback and waveform — transcripts only."
+          checked={transcriptsOnly}
+          onChange={(next) => void setTranscriptsOnly(next)}
         />
       </div>
-    </section>
+    </SettingsCard>
   )
 }
 
-/**
- * Editable filler-phrase list. Reads from configStore; each add/remove/reset
- * triggers `setFillerWords` which calls main, recomputes filler-derived
- * aggregates in-place against the cached recordings, and replaces the
- * dataStore payload — so the Language page reflects the change immediately.
- */
-function DictionarySection(): React.JSX.Element {
+interface ToggleRowProps {
+  label: string
+  description: string
+  checked: boolean
+  onChange: (next: boolean) => void
+}
+
+function ToggleRow({ label, description, checked, onChange }: ToggleRowProps): React.JSX.Element {
+  return (
+    <div className="flex items-start justify-between gap-4 py-3 first:pt-0 last:pb-0">
+      <div className="min-w-0 flex-1">
+        <div className="text-[13px] font-medium text-foreground">{label}</div>
+        <div className="mt-0.5 text-[12px] text-muted-foreground">{description}</div>
+      </div>
+      <Switch checked={checked} onChange={onChange} ariaLabel={label} />
+    </div>
+  )
+}
+
+// ---------- Transcripts --------------------------------------------------
+
+function TranscriptsCard(): React.JSX.Element {
+  const mode = useUiPrefsStore((s) => s.transcriptViewMode)
+  const setMode = useUiPrefsStore((s) => s.setTranscriptViewMode)
+  return (
+    <SettingsCard
+      icon={AlignLeft}
+      title="Transcripts"
+      subtitle="How transcripts are laid out in the recording detail view."
+    >
+      <Segmented
+        value={mode}
+        onChange={setMode}
+        options={TRANSCRIPT_VIEW_OPTIONS}
+        ariaLabel="Transcript view"
+      />
+    </SettingsCard>
+  )
+}
+
+// ---------- Dictionary ---------------------------------------------------
+
+function DictionaryCard(): React.JSX.Element {
   const fillerWords = useConfigStore((s) => s.fillerWords)
   const setFillerWords = useConfigStore((s) => s.setFillerWords)
   const [draft, setDraft] = useState('')
+  const [filter, setFilter] = useState('')
   const [busy, setBusy] = useState(false)
+
+  // Normalise the default list once so the "Reset to default" disabled
+  // check matches what main will actually persist.
+  const normalisedDefault = useMemo(() => DEFAULT_FILLER_PHRASES.map((w) => w.toLowerCase()), [])
+  const isDefault =
+    fillerWords.length === normalisedDefault.length &&
+    fillerWords.every((w, i) => w === normalisedDefault[i])
+
+  const visible = useMemo(() => {
+    const q = filter.trim().toLowerCase()
+    if (!q) return fillerWords
+    return fillerWords.filter((w) => w.includes(q))
+  }, [fillerWords, filter])
 
   async function commit(next: string[]): Promise<void> {
     setBusy(true)
@@ -244,10 +307,6 @@ function DictionarySection(): React.JSX.Element {
       setBusy(false)
     }
   }
-
-  const isDefault =
-    fillerWords.length === DEFAULT_FILLER_PHRASES.length &&
-    fillerWords.every((w, i) => w === DEFAULT_FILLER_PHRASES[i]?.toLowerCase())
 
   async function add(): Promise<void> {
     const cleaned = draft.trim().toLowerCase().replace(/\s+/g, ' ')
@@ -269,21 +328,34 @@ function DictionarySection(): React.JSX.Element {
   }
 
   return (
-    <section>
-      <SectionHeading>Dictionary</SectionHeading>
+    <SettingsCard
+      icon={BookOpen}
+      title="Dictionary"
+      subtitle="Phrases counted as fillers in the Language analytics."
+      headerExtra={
+        <span className="text-[12px] text-muted-foreground tabular-nums">
+          {fillerWords.length} phrase{fillerWords.length === 1 ? '' : 's'}
+        </span>
+      }
+    >
       <div className="space-y-3">
-        <p className="text-[12.5px] text-muted-foreground">
-          Phrases counted as fillers in the Language analytics. Edits update the dashboard
-          immediately.
-        </p>
-        <div className="flex flex-wrap gap-1.5">
-          {fillerWords.length === 0 ? (
-            <span className="text-[12px] text-muted-foreground">No filler phrases configured.</span>
+        <input
+          type="search"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          placeholder="Filter phrases…"
+          className="h-7 w-full rounded-md border border-border bg-background px-2 text-[12.5px] text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-foreground/40"
+        />
+        <div className="flex max-h-56 flex-wrap content-start gap-1.5 overflow-y-auto rounded-md border border-border bg-foreground/[0.02] p-2">
+          {visible.length === 0 ? (
+            <span className="px-2 py-1 text-[12px] text-muted-foreground">
+              {fillerWords.length === 0 ? 'No filler phrases configured.' : 'No matches.'}
+            </span>
           ) : (
-            fillerWords.map((phrase) => (
+            visible.map((phrase) => (
               <span
                 key={phrase}
-                className="inline-flex items-center gap-1 rounded-md border border-border bg-secondary px-2 py-0.5 text-[12px] text-secondary-foreground"
+                className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2 py-0.5 text-[12px] text-foreground"
               >
                 {phrase}
                 <button
@@ -329,36 +401,45 @@ function DictionarySection(): React.JSX.Element {
             title={isDefault ? 'Already at defaults' : 'Reset to the built-in phrase list'}
             className={CHROME_BUTTON}
           >
-            Reset to default
+            Reset
           </button>
         </form>
       </div>
-    </section>
+    </SettingsCard>
   )
 }
 
-function AboutSection(): React.JSX.Element {
+// ---------- About --------------------------------------------------------
+
+function AboutCard(): React.JSX.Element {
   function openGithub(): void {
     void window.api.openExternal(GITHUB_URL)
   }
 
   return (
-    <section>
-      <SectionHeading>About</SectionHeading>
-      <div className="space-y-1.5 text-[13px]">
-        <div className="text-foreground">
-          SuperWhisper Analytics <span className="text-muted-foreground">v{__APP_VERSION__}</span>
-        </div>
-        <button
-          type="button"
-          onClick={openGithub}
-          className="inline-flex items-center gap-1.5 text-accent-blue hover:underline"
-        >
-          View on GitHub
-          <ExternalLink className="h-3 w-3" strokeWidth={1.8} />
-        </button>
-        <p className="text-[12.5px] text-muted-foreground">MIT licensed.</p>
-      </div>
-    </section>
+    <SettingsCard icon={Info} title="About" subtitle="Version, source and license.">
+      <dl className="divide-y divide-border text-[13px]">
+        <Row k="Version" v={`v${__APP_VERSION__}`} />
+        <Row k="License" v="MIT" />
+      </dl>
+      <p className="mt-4 text-[12.5px] text-muted-foreground">{DISCLAIMER}</p>
+      <button
+        type="button"
+        onClick={openGithub}
+        className="mt-3 inline-flex items-center gap-1.5 text-[12.5px] text-accent-blue hover:underline"
+      >
+        View on GitHub
+        <ExternalLink className="h-3 w-3" strokeWidth={1.8} />
+      </button>
+    </SettingsCard>
+  )
+}
+
+function Row({ k, v }: { k: string; v: string }): React.JSX.Element {
+  return (
+    <div className="flex items-center justify-between py-2 first:pt-0 last:pb-0">
+      <dt className="text-muted-foreground">{k}</dt>
+      <dd className="tabular-nums text-foreground">{v}</dd>
+    </div>
   )
 }

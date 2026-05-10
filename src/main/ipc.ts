@@ -2,6 +2,7 @@ import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import type { HydratePayload } from '@shared/types'
 import { defaultPath, getConfig, isPathValid, setConfig } from './config'
 import { hydrate, reindex, setFillerWords } from './cache'
+import { disableWatch, enableWatch } from './watcher'
 import type { ConfigStatus } from '../preload/api'
 
 /**
@@ -17,7 +18,20 @@ function buildStatus(): ConfigStatus {
     path: config.superwhisperPath,
     isValid: isPathValid(config.superwhisperPath),
     defaultPath: defaultPath(),
-    fillerWords: config.fillerWords
+    fillerWords: config.fillerWords,
+    watchFolder: config.watchFolder,
+    transcriptsOnly: config.transcriptsOnly
+  }
+}
+
+/** Sync the fs.watch state with whatever the persisted config says.
+ *  Called after any config update that could change path or watch toggle. */
+function syncWatcher(): void {
+  const config = getConfig()
+  if (config.watchFolder && config.superwhisperPath && isPathValid(config.superwhisperPath)) {
+    enableWatch(config.superwhisperPath)
+  } else {
+    disableWatch()
   }
 }
 
@@ -26,6 +40,18 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('config:setPath', (_, path: string | null): ConfigStatus => {
     setConfig({ superwhisperPath: path })
+    syncWatcher()
+    return buildStatus()
+  })
+
+  ipcMain.handle('config:setWatchFolder', (_, enabled: boolean): ConfigStatus => {
+    setConfig({ watchFolder: enabled })
+    syncWatcher()
+    return buildStatus()
+  })
+
+  ipcMain.handle('config:setTranscriptsOnly', (_, enabled: boolean): ConfigStatus => {
+    setConfig({ transcriptsOnly: enabled })
     return buildStatus()
   })
 
@@ -50,4 +76,7 @@ export function registerIpcHandlers(): void {
     'data:setFillerWords',
     (_, words: string[]): HydratePayload => setFillerWords(words)
   )
+
+  // Apply the persisted watch-folder preference on startup.
+  syncWatcher()
 }

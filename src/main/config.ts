@@ -24,7 +24,9 @@ const CANDIDATE_PATHS = [
 function defaultConfig(): Config {
   return {
     superwhisperPath: null,
-    fillerWords: [...DEFAULT_FILLER_PHRASES]
+    fillerWords: [...DEFAULT_FILLER_PHRASES],
+    watchFolder: false,
+    transcriptsOnly: false
   }
 }
 
@@ -46,7 +48,9 @@ export function getConfig(): Config {
       : [...DEFAULT_FILLER_PHRASES]
     return {
       superwhisperPath: parsed.superwhisperPath ?? null,
-      fillerWords
+      fillerWords,
+      watchFolder: parsed.watchFolder === true,
+      transcriptsOnly: parsed.transcriptsOnly === true
     }
   } catch (err) {
     console.warn('[config] failed to read config.json, falling back to defaults:', err)
