@@ -2,14 +2,17 @@ import { Waveform } from '@renderer/components/charts/Waveform'
 import { WordsCard } from '@renderer/components/transcripts/WordsCard'
 import { Card } from '@renderer/components/ui/card'
 import { IconButton } from '@renderer/components/ui/IconButton'
+import { decodePeaks } from '@renderer/lib/audio-peaks'
 import { cn } from '@renderer/lib/cn'
 import { formatClock, formatDurationSec, formatTimestamp } from '@renderer/lib/format'
-import { mock } from '@renderer/lib/mock'
 import type { Recording } from '@renderer/lib/types'
+import { useDataStore } from '@renderer/state/dataStore'
 import { useHeaderActions } from '@renderer/state/headerStore'
 import { AlignJustify, AlignLeft, Copy, Pause, Play } from 'lucide-react'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+
+const WAVEFORM_PEAK_COUNT = 512
 
 const SCRUB_STEP_SEC = 5
 
@@ -17,7 +20,8 @@ type ViewMode = 'inline' | 'block'
 
 export function TranscriptDetail(): React.JSX.Element {
   const { id } = useParams<{ id: string }>()
-  const rec: Recording | undefined = mock.recordings.find((r) => r.id === id)
+  const recordings = useDataStore((s) => s.recordings)
+  const rec: Recording | undefined = recordings.find((r) => r.id === id)
 
   if (!rec) {
     return (
@@ -42,40 +46,59 @@ function DetailView({ rec }: { rec: Recording }): React.JSX.Element {
   // The navbar toggle still flips back to flowing inline prose.
   const [viewMode, setViewMode] = useState<ViewMode>('block')
   const [hoveredWord, setHoveredWord] = useState<string | null>(null)
-  const lastTickRef = useRef<number | null>(null)
+  const [peaks, setPeaks] = useState<number[]>([])
+  const audioRef = useRef<HTMLAudioElement>(null)
   const transcriptRef = useRef<HTMLDivElement>(null)
 
+  const audioUrl = `sw://${rec.id}/output.wav`
+
   const togglePlay = (): void => {
-    setPlaying((p) => !p)
+    const el = audioRef.current
+    if (!el) return
+    if (el.paused) void el.play()
+    else el.pause()
   }
   const seekTo = (sec: number): void => {
-    setCurrentSec(Math.max(0, Math.min(totalSec, sec)))
+    const clamped = Math.max(0, Math.min(totalSec, sec))
+    const el = audioRef.current
+    if (el) el.currentTime = clamped
+    setCurrentSec(clamped)
   }
 
-  // Mock playback timer.
+  // Drive currentSec from the audio element's clock at frame rate while
+  // playing — onTimeUpdate fires only ~4×/s, which feels jittery on the
+  // playhead. The audio element is the source of truth either way; the
+  // RAF just samples it more often.
   useEffect(() => {
-    if (!playing) {
-      lastTickRef.current = null
-      return undefined
-    }
+    if (!playing) return undefined
     let raf = 0
-    const tick = (now: number): void => {
-      if (lastTickRef.current === null) lastTickRef.current = now
-      const dt = (now - lastTickRef.current) / 1000
-      lastTickRef.current = now
-      setCurrentSec((c) => {
-        const nx = c + dt
-        if (nx >= totalSec) {
-          setPlaying(false)
-          return totalSec
-        }
-        return nx
-      })
+    const tick = (): void => {
+      const el = audioRef.current
+      if (el) setCurrentSec(el.currentTime)
       raf = requestAnimationFrame(tick)
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
-  }, [playing, totalSec])
+  }, [playing])
+
+  // Lazy-decode the WAV into ~512 peaks for the waveform. AudioContext
+  // pipeline lives in lib/audio-peaks.ts; results are cached by URL so
+  // re-opening the same recording is instant. The cancelled flag stops
+  // a slow decode from clobbering newer state if the user navigates
+  // between recordings before the previous one finishes.
+  useEffect(() => {
+    let cancelled = false
+    decodePeaks(audioUrl, WAVEFORM_PEAK_COUNT)
+      .then((p) => {
+        if (!cancelled) setPeaks(p)
+      })
+      .catch((err) => {
+        if (!cancelled) console.warn('[TranscriptDetail] failed to decode peaks', err)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [audioUrl])
 
   // Keyboard shortcuts: Space play/pause, arrow keys scrub. Ignore typing.
   useEffect(() => {
@@ -158,6 +181,24 @@ function DetailView({ rec }: { rec: Recording }): React.JSX.Element {
 
   return (
     <div className="flex h-full flex-col gap-3">
+      {/* Hidden <audio> drives playback. State synced via the four event
+          handlers; currentSec sampled at frame rate by the effect above. */}
+      <audio
+        ref={audioRef}
+        src={audioUrl}
+        preload="metadata"
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
+        onEnded={() => {
+          setPlaying(false)
+          setCurrentSec(totalSec)
+        }}
+        onError={(e) => {
+          // Fail quietly — the play button just won't do anything.
+          console.warn('[TranscriptDetail] audio error', audioUrl, e)
+        }}
+      />
+
       {/* Audio player */}
       <Card className="p-3">
         <div className="flex items-center gap-3">
@@ -175,7 +216,7 @@ function DetailView({ rec }: { rec: Recording }): React.JSX.Element {
           </button>
           <div className="min-w-0 flex-1">
             <Waveform
-              peaks={rec.waveform ?? []}
+              peaks={peaks}
               progress={totalSec > 0 ? currentSec / totalSec : 0}
               onSeek={(f) => seekTo(f * totalSec)}
             />
