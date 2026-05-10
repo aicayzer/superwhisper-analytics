@@ -1,5 +1,7 @@
+import { FirstRunModal } from '@renderer/components/FirstRunModal'
 import { formatTimestamp } from '@renderer/lib/format'
 import { mock } from '@renderer/lib/mock'
+import { useConfigStore } from '@renderer/state/configStore'
 import { useLayoutStore } from '@renderer/state/layoutStore'
 import { chartBreadcrumb } from '@renderer/screens/chartRegistry'
 import { Outlet, useLocation, useSearchParams } from 'react-router-dom'
@@ -45,6 +47,8 @@ function titleFor(pathname: string): string {
 export function RootLayout(): React.JSX.Element {
   const sidebarOpen = useLayoutStore((s) => s.sidebarOpen)
   const sidebarWidth = useLayoutStore((s) => s.sidebarWidth)
+  const configHydrated = useConfigStore((s) => s.hydrated)
+  const configValid = useConfigStore((s) => s.isValid)
   const location = useLocation()
   const [params] = useSearchParams()
 
@@ -99,6 +103,7 @@ export function RootLayout(): React.JSX.Element {
         <Outlet />
       </main>
       <CommandPalette />
+      {configHydrated && !configValid && <FirstRunModal />}
     </Window>
   )
 }

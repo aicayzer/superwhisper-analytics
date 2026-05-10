@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { RouterProvider } from 'react-router-dom'
 import { router } from './routes'
+import { useConfigStore } from './state/configStore'
 import { useThemeStore } from './state/themeStore'
 
 /**
@@ -10,6 +11,7 @@ import { useThemeStore } from './state/themeStore'
  */
 function App(): React.JSX.Element {
   const pref = useThemeStore((s) => s.pref)
+  const hydrateConfig = useConfigStore((s) => s.hydrate)
 
   useEffect(() => {
     const mq =
@@ -27,6 +29,12 @@ function App(): React.JSX.Element {
     mq.addEventListener('change', apply)
     return () => mq.removeEventListener('change', apply)
   }, [pref])
+
+  // Pull the persisted config from main on mount. The store handles
+  // auto-adopting the auto-detected path if nothing is saved yet.
+  useEffect(() => {
+    void hydrateConfig()
+  }, [hydrateConfig])
 
   return <RouterProvider router={router} />
 }
