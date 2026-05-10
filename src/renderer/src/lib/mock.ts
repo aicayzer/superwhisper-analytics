@@ -335,6 +335,20 @@ const modeStats: ModeStat[] = Array.from(modeBuckets.values())
   .map((m) => ({ ...m, pct: m.count / recordings.length }))
   .sort((a, b) => b.count - a.count)
 
+/**
+ * Average WPM per mode, top six by recording count. Used by Usage's
+ * "WPM by mode" tile and the matching chart-registry full-screen view.
+ * Sorted by count (so the most-used mode is first), not WPM, because
+ * the tile reads as "for the modes I actually use, how fast do I talk".
+ */
+const wpmByMode: Array<{ mode: string; avgWPM: number; count: number }> = modeStats
+  .slice(0, 6)
+  .map((m) => ({
+    mode: m.modeName,
+    avgWPM: m.totalDurationSec > 0 ? Math.round((m.totalWords / m.totalDurationSec) * 60) : 0,
+    count: m.count
+  }))
+
 const wordCounts = new Map<string, number>()
 for (const r of recordings) {
   for (const w of tokenise(r.result)) {
@@ -620,5 +634,7 @@ export const mock = {
   modeByWeek,
   modeByWeekFlat,
   stackModeKeys,
-  wpmDots
+  wpmDots,
+  // wave 4 polish
+  wpmByMode
 }

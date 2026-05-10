@@ -103,6 +103,20 @@ export const CHART_REGISTRY: Record<string, ChartSpec> = {
       )
     }
   },
+  'wpm-by-mode': {
+    section: 'Usage',
+    sectionPath: '/usage',
+    title: 'WPM by mode',
+    description: 'Average words-per-minute by mode (top 6 by recording count).',
+    render: () => (
+      <HBar
+        data={mock.wpmByMode.map((w) => ({ label: w.mode, count: w.avgWPM }))}
+        xKey="count"
+        yKey="label"
+        labelWidth={120}
+      />
+    )
+  },
   'top-words': {
     section: 'Language',
     sectionPath: '/language',
