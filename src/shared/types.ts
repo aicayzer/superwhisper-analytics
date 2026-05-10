@@ -81,12 +81,6 @@ export interface WordFrequency {
   count: number
 }
 
-export interface HourlyPattern {
-  hour: number // 0-23
-  count: number
-  totalDurationSec: number
-}
-
 export interface DurationBucket {
   label: string
   min: number // seconds, inclusive
@@ -141,17 +135,12 @@ export interface ModeByDay {
   modes: Record<string, number>
 }
 
-/** Average WPM per mode — top N by recording count. */
-export interface WpmByMode {
-  mode: string
-  avgWPM: number
-  count: number
-}
-
 /**
- * The full bundle of aggregates the data store exposes. Mirrors the
- * shape of the legacy `mock` object so swapping mock → real is a
- * one-line import change for every consumer.
+ * The full bundle of aggregates the data store exposes.
+ *
+ * Add a new aggregate shape: declare its interface above, plumb a
+ * `compute*` helper in `aggregates.ts`, surface it on `Aggregates`, and
+ * the renderer reads it via `useFilteredAggregates()` (or `dataStore`).
  */
 export interface Aggregates {
   overview: OverviewStats
@@ -160,7 +149,6 @@ export interface Aggregates {
   modeStats: ModeStat[]
   wordFrequency: WordFrequency[]
   fillerSummary: Array<{ phrase: string; count: number }>
-  hourly: HourlyPattern[]
   heatmap: Heatmap
   durationDist: DurationBucket[]
   usage: UsageStats
@@ -176,7 +164,6 @@ export interface Aggregates {
   modeByWeekFlat: Array<Record<string, unknown>>
   stackModeKeys: string[]
   wpmDots: Array<{ period: string; value: number }>
-  wpmByMode: WpmByMode[]
 }
 
 /**

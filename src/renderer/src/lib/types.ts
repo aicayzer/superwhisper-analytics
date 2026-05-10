@@ -11,7 +11,6 @@ export type {
   DayOfWeekPattern,
   DurationBucket,
   Heatmap,
-  HourlyPattern,
   HydratePayload,
   LanguageStats,
   ModeByDay,
@@ -24,6 +23,5 @@ export type {
   StreakCell,
   TrendPoint,
   UsageStats,
-  WordFrequency,
-  WpmByMode
+  WordFrequency
 } from '@shared/types'

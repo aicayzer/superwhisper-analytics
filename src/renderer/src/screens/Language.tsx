@@ -1,7 +1,7 @@
 import { ActivityArea } from '@renderer/components/charts/ActivityArea'
+import { BarList } from '@renderer/components/charts/BarList'
 import { ChartCard } from '@renderer/components/charts/ChartCard'
 import { DistBar } from '@renderer/components/charts/DistBar'
-import { HBar } from '@renderer/components/charts/HBar'
 import { LineTrend } from '@renderer/components/charts/LineTrend'
 import { PaceTrend } from '@renderer/components/charts/PaceTrend'
 import { KpiRow } from '@renderer/components/KpiRow'
@@ -10,6 +10,9 @@ import { useFilteredAggregates } from '@renderer/state/useFilteredAggregates'
 import { useMemo } from 'react'
 
 const WPM_TARGET = 140
+/** Top-N count for both the Top Words and Filler Words cards. Picked to
+ *  match the visual rhythm of the rest of the dashboard. */
+const TOP_LIST_LIMIT = 10
 /** Maximum scatter points fed to PaceTrend — sampled deterministically. */
 const MAX_WPM_DOTS = 1000
 
@@ -26,14 +29,14 @@ export function Language(): React.JSX.Element {
     sparklines
   } = useFilteredAggregates()
 
-  // Derived chart inputs — memoised so chart leaves' React.memo wrappers
-  // can short-circuit on unchanged references.
+  // Derived chart inputs — memoised so the BarList memo wrappers can
+  // short-circuit on unchanged references.
   const topWords = useMemo(
-    () => wordFrequency.slice(0, 12).map((w) => ({ label: w.word, count: w.count })),
+    () => wordFrequency.slice(0, TOP_LIST_LIMIT).map((w) => ({ label: w.word, count: w.count })),
     [wordFrequency]
   )
   const topFillers = useMemo(
-    () => fillerSummary.slice(0, 8).map((f) => ({ label: f.phrase, count: f.count })),
+    () => fillerSummary.slice(0, TOP_LIST_LIMIT).map((f) => ({ label: f.phrase, count: f.count })),
     [fillerSummary]
   )
   // Sample wpmDots so PaceTrend renders ≤1000 scatter points. On 11k
@@ -75,18 +78,10 @@ export function Language(): React.JSX.Element {
 
       <div className="grid min-h-0 flex-1 grid-cols-2 gap-3">
         <ChartCard title="Top words" slug="top-words">
-          <HBar
-            data={topWords as unknown as Array<Record<string, unknown>>}
-            xKey="count"
-            yKey="label"
-          />
+          <BarList data={topWords} />
         </ChartCard>
         <ChartCard title="Filler words" slug="filler-words">
-          <HBar
-            data={topFillers as unknown as Array<Record<string, unknown>>}
-            xKey="count"
-            yKey="label"
-          />
+          <BarList data={topFillers} />
         </ChartCard>
       </div>
 

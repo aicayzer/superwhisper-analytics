@@ -2,12 +2,14 @@ import { Segmented } from '@renderer/components/Segmented'
 import { useGlobalShortcut } from '@renderer/hooks/useGlobalShortcut'
 import { formatDurationSec, formatTimestamp } from '@renderer/lib/format'
 import type { Recording } from '@renderer/lib/types'
+import { CHART_REGISTRY } from '@renderer/screens/chartRegistry'
 import { useDataStore } from '@renderer/state/dataStore'
 import { usePaletteStore, type PaletteMode } from '@renderer/state/paletteStore'
 import { useThemeStore } from '@renderer/state/themeStore'
 import { Command, useCommandState } from 'cmdk'
 import {
   AudioLines,
+  BarChart3,
   CornerDownLeft,
   House,
   Languages,
@@ -18,7 +20,7 @@ import {
   Sun,
   TextSearch
 } from 'lucide-react'
-import { useCallback } from 'react'
+import { useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 const PALETTE_MODE_OPTIONS: ReadonlyArray<{ value: PaletteMode; label: string }> = [
@@ -32,17 +34,19 @@ const DESTINATIONS = [
   { to: '/language', label: 'Go to Language', icon: Languages },
   { to: '/transcripts', label: 'Go to Transcripts', icon: TextSearch },
   { to: '/settings', label: 'Open Settings', icon: Settings }
-]
+] as const
 
 const SEARCH_MAX_RESULTS = 30
 
 /**
  * Two-mode overlay surface — the same shell renders either:
- *   • Command mode  (⌘K)  — appearance + navigation actions
- *   • Search mode   (⌘P, sidebar 🔍) — substring filter over recordings
+ *   • Command mode  (⌘K)  — appearance + navigation actions, including
+ *                          jumping straight to any chart.
+ *   • Search mode   (⌘P, sidebar 🔍) — substring filter over recordings.
  *
- * The Segmented control in the header top-right swaps between modes in
- * place. The icon left of the input reflects the current mode (⌘ or 🔍).
+ * The mode toggle lives in the footer bottom-right, aligned opposite the
+ * ↑↓ / ↵ / esc shortcut hints. The icon left of the input reflects the
+ * current mode (⌘ or 🔍).
  *
  * Global shortcuts:
  *   • ⌘K — toggle the palette; opens in 'command' mode when previously closed.
@@ -93,25 +97,19 @@ export function CommandPalette(): React.JSX.Element | null {
         shouldFilter={mode === 'command'}
         className="w-full max-w-xl overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-float)]"
       >
-        <PaletteHeader mode={mode} onSwitchMode={setMode} />
+        <PaletteHeader mode={mode} />
 
         {mode === 'command' ? <CommandModeBody close={close} /> : <SearchModeBody close={close} />}
 
-        <PaletteFooter />
+        <PaletteFooter mode={mode} onSwitchMode={setMode} />
       </Command>
     </div>
   )
 }
 
-function PaletteHeader({
-  mode,
-  onSwitchMode
-}: {
-  mode: PaletteMode
-  onSwitchMode: (next: PaletteMode) => void
-}): React.JSX.Element {
+function PaletteHeader({ mode }: { mode: PaletteMode }): React.JSX.Element {
   return (
-    <div className="flex items-center gap-3 border-b border-border px-5 py-3">
+    <div className="flex items-center gap-3 border-b border-border px-5 py-3.5">
       {mode === 'command' ? (
         <CommandGlyph />
       ) : (
@@ -121,13 +119,6 @@ function PaletteHeader({
         autoFocus
         placeholder={mode === 'command' ? 'Run a command…' : 'Search transcripts…'}
         className="flex-1 bg-transparent text-[14px] text-foreground outline-none placeholder:text-muted-foreground"
-      />
-      <Segmented
-        value={mode}
-        onChange={onSwitchMode}
-        options={PALETTE_MODE_OPTIONS}
-        ariaLabel="Palette mode"
-        size="sm"
       />
     </div>
   )
@@ -162,6 +153,18 @@ function CommandModeBody({ close }: { close: () => void }): React.JSX.Element {
     close()
   }
 
+  // Group charts by section so the Navigation list reads "Open Top words",
+  // "Open Speaking pace" rather than a flat list. Sections come straight
+  // out of the registry; new charts appear automatically.
+  const chartDestinations = useMemo(() => {
+    return Object.entries(CHART_REGISTRY).map(([slug, spec]) => ({
+      slug,
+      label: `Open ${spec.title}`,
+      section: spec.section,
+      to: `/chart/${slug}`
+    }))
+  }, [])
+
   return (
     <Command.List className="max-h-[50vh] overflow-y-auto p-2">
       <Command.Empty className="px-3 py-10 text-center text-[13px] text-muted-foreground">
@@ -175,6 +178,18 @@ function CommandModeBody({ close }: { close: () => void }): React.JSX.Element {
             icon={d.icon}
             label={d.label}
             onSelect={() => run(() => navigate(d.to))}
+          />
+        ))}
+      </PaletteGroup>
+
+      <PaletteGroup heading="Charts">
+        {chartDestinations.map((c) => (
+          <PaletteItem
+            key={c.slug}
+            icon={BarChart3}
+            label={c.label}
+            hint={c.section}
+            onSelect={() => run(() => navigate(c.to))}
           />
         ))}
       </PaletteGroup>
@@ -306,6 +321,8 @@ interface PaletteItemProps {
   icon: typeof SearchIcon
   label: string
   shortcut?: string
+  /** Faint right-aligned tag — used to show which screen a chart lives on. */
+  hint?: string
   onSelect: () => void
 }
 
@@ -313,6 +330,7 @@ function PaletteItem({
   icon: Icon,
   label,
   shortcut,
+  hint,
   onSelect
 }: PaletteItemProps): React.JSX.Element {
   return (
@@ -324,12 +342,21 @@ function PaletteItem({
         <Icon className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.8} />
         <span className="truncate">{label}</span>
       </span>
-      {shortcut && <kbd className="text-[11px] text-muted-foreground">{shortcut}</kbd>}
+      <span className="flex items-center gap-2">
+        {hint && <span className="text-[11px] text-muted-foreground/70">{hint}</span>}
+        {shortcut && <kbd className="text-[11px] text-muted-foreground">{shortcut}</kbd>}
+      </span>
     </Command.Item>
   )
 }
 
-function PaletteFooter(): React.JSX.Element {
+function PaletteFooter({
+  mode,
+  onSwitchMode
+}: {
+  mode: PaletteMode
+  onSwitchMode: (next: PaletteMode) => void
+}): React.JSX.Element {
   return (
     <div className="flex items-center gap-4 border-t border-border px-4 py-2 text-[11px] text-muted-foreground">
       <span className="flex items-center gap-1.5">
@@ -347,6 +374,15 @@ function PaletteFooter(): React.JSX.Element {
         <Kbd>esc</Kbd>
         Close
       </span>
+      <div className="ml-auto">
+        <Segmented
+          value={mode}
+          onChange={onSwitchMode}
+          options={PALETTE_MODE_OPTIONS}
+          ariaLabel="Palette mode"
+          size="sm"
+        />
+      </div>
     </div>
   )
 }

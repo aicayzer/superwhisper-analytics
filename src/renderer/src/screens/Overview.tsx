@@ -1,7 +1,5 @@
 import { ActivityArea } from '@renderer/components/charts/ActivityArea'
 import { ChartCard } from '@renderer/components/charts/ChartCard'
-import { DistBar } from '@renderer/components/charts/DistBar'
-import { Heatmap } from '@renderer/components/charts/Heatmap'
 import { KpiRow } from '@renderer/components/KpiRow'
 import { formatActivityTick, formatCompact, formatDurationSec } from '@renderer/lib/format'
 import { useRangeStore, windowFor } from '@renderer/state/rangeStore'
@@ -9,16 +7,18 @@ import { useFilteredAggregates } from '@renderer/state/useFilteredAggregates'
 import { useMemo } from 'react'
 
 /**
- * Overview — landing page. Three rows:
- *   1. KPI strip
- *   2. "When you record" heatmap (3/5) + Duration mix bar (2/5)
- *   3. Activity area chart filling the rest.
+ * Overview — landing page. KPI strip on top, Activity area chart below.
+ *
+ * "When you record" + "Duration mix" used to live here too; in wave 5 they
+ * moved to Usage where the recording-cadence story belongs. A 6-card KPI
+ * grid (with period-over-period comparison) replaces this strip in the
+ * follow-up PR.
  *
  * Range-aware: every aggregate flows through `useFilteredAggregates`, so
- * KPIs + charts all respect the navbar's date pill in lockstep.
+ * KPIs + Activity all respect the navbar's date pill in lockstep.
  */
 export function Overview(): React.JSX.Element {
-  const { overview, daily, heatmap, durationDist, sparklines } = useFilteredAggregates()
+  const { overview, daily, sparklines } = useFilteredAggregates()
   const avgPerRec =
     overview.totalRecordings > 0 ? Math.round(overview.totalWords / overview.totalRecordings) : 0
   const range = useRangeStore((s) => s.range)
@@ -55,28 +55,6 @@ export function Overview(): React.JSX.Element {
         ]}
       />
 
-      {/* Row 2: heatmap (3/5) + duration mix (2/5). Both share a fixed
-          height so they stay readable as the window grows; the Activity
-          row underneath flexes. */}
-      <div className="grid grid-cols-[3fr_2fr] gap-3" style={{ height: 240 }}>
-        <ChartCard title="When you record" slug="when-you-record">
-          <div className="flex h-full flex-col justify-center">
-            <Heatmap matrix={heatmap} cellHeight={20} />
-          </div>
-        </ChartCard>
-        <ChartCard title="Duration mix" slug="duration-mix">
-          <DistBar
-            data={durationDist as unknown as Array<Record<string, unknown>>}
-            xKey="label"
-            yKey="count"
-          />
-        </ChartCard>
-      </div>
-
-      {/* Row 3: Activity. ActivityArea additionally filters by the
-          (from,to) window so its X axis matches the resolved range
-          exactly — even though the underlying `daily` series is already
-          range-scoped through useFilteredAggregates. */}
       <ChartCard title="Activity" slug="activity" className="min-h-0 flex-1">
         <ActivityArea
           data={daily as unknown as Array<Record<string, unknown>>}

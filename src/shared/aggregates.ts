@@ -6,7 +6,6 @@ import type {
   DayOfWeekPattern,
   DurationBucket,
   Heatmap,
-  HourlyPattern,
   LanguageStats,
   ModeByDay,
   ModeStat,
@@ -17,8 +16,7 @@ import type {
   StreakCell,
   TrendPoint,
   UsageStats,
-  WordFrequency,
-  WpmByMode
+  WordFrequency
 } from '@shared/types'
 
 /**
@@ -154,23 +152,6 @@ function computeDayOfWeek(recordings: Recording[]): DayOfWeekPattern[] {
   }))
 }
 
-function computeHourly(recordings: Recording[]): HourlyPattern[] {
-  const out: HourlyPattern[] = Array.from({ length: 24 }, (_, h) => ({
-    hour: h,
-    count: 0,
-    totalDurationSec: 0
-  }))
-  for (const r of recordings) {
-    const d = new Date(r.datetime)
-    if (isNaN(d.getTime())) continue
-    const slot = out[d.getHours()]
-    if (!slot) continue
-    slot.count++
-    slot.totalDurationSec += r.duration / 1000
-  }
-  return out
-}
-
 function computeHeatmap(recordings: Recording[]): Heatmap {
   const matrix: Heatmap = Array.from({ length: 7 }, () => Array(24).fill(0) as number[])
   for (const r of recordings) {
@@ -202,14 +183,6 @@ function computeModeStats(recordings: Recording[]): ModeStat[] {
   return Array.from(buckets.values())
     .map((m) => ({ ...m, pct: m.count / total }))
     .sort((a, b) => b.count - a.count)
-}
-
-function computeWpmByMode(modeStats: ModeStat[]): WpmByMode[] {
-  return modeStats.slice(0, 6).map((m) => ({
-    mode: m.modeName,
-    avgWPM: m.totalDurationSec > 0 ? Math.round((m.totalWords / m.totalDurationSec) * 60) : 0,
-    count: m.count
-  }))
 }
 
 function computeWordFrequency(recordings: Recording[]): {
@@ -496,10 +469,8 @@ export function computeAll(recordings: Recording[], now: Date = new Date()): Agg
   const overview = computeOverview(recordings, totalWords, totalDurationSec)
   const daily = computeDaily(recordings)
   const dayOfWeek = computeDayOfWeek(recordings)
-  const hourly = computeHourly(recordings)
   const heatmap = computeHeatmap(recordings)
   const modeStats = computeModeStats(recordings)
-  const wpmByMode = computeWpmByMode(modeStats)
   const { list: wordFrequency, uniqueCount } = computeWordFrequency(recordings)
   const fillerSummary = computeFillerSummary(recordings)
   const durationDist = computeDurationDist(recordings)
@@ -522,7 +493,6 @@ export function computeAll(recordings: Recording[], now: Date = new Date()): Agg
     modeStats,
     wordFrequency,
     fillerSummary,
-    hourly,
     heatmap,
     durationDist,
     usage,
@@ -537,8 +507,7 @@ export function computeAll(recordings: Recording[], now: Date = new Date()): Agg
     modeByWeek: byWeek,
     modeByWeekFlat: weekFlat,
     stackModeKeys: keys,
-    wpmDots,
-    wpmByMode
+    wpmDots
   }
 }
 

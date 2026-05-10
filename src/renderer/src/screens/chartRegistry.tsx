@@ -1,7 +1,6 @@
 import {
   ActivityChart,
   ByDayOfWeekChart,
-  ByHourOfDayChart,
   DurationMixChart,
   FillerRateChart,
   FillerWordsChart,
@@ -12,8 +11,7 @@ import {
   TopWordsChart,
   VocabularyGrowthChart,
   VolumeOverTimeChart,
-  WhenYouRecordChart,
-  WpmByModeChart
+  WhenYouRecordChart
 } from './chartItems'
 
 export interface ChartSpec {
@@ -31,12 +29,16 @@ export interface ChartSpec {
 
 /**
  * Single source of truth mapping slug → chart. Used by ChartCard's maximise
- * link and by ChartView for the full-screen render. Adding a chart anywhere
- * means adding it here too — keeps the breadcrumb path consistent.
+ * link, by ChartView for the full-screen render, and by the command
+ * palette's Navigation group (so Cmd-K → "Top words" jumps straight in).
  *
- * Each render() returns a small named component (defined in `./chartItems`)
- * rather than an inline lambda that calls hooks. Inline-lambda hooks would
- * violate rules of hooks when navigating between /chart/:slug paths.
+ * Adding a chart anywhere means adding it here too — keeps the breadcrumb
+ * path consistent and the palette autocomplete current.
+ *
+ * Each `render()` returns a small named component (defined in
+ * `./chartItems`) rather than an inline lambda that calls hooks — inline-
+ * lambda hooks would violate rules of hooks when navigating between
+ * `/chart/:slug` paths.
  */
 export const CHART_REGISTRY: Record<string, ChartSpec> = {
   'volume-over-time': {
@@ -47,8 +49,8 @@ export const CHART_REGISTRY: Record<string, ChartSpec> = {
     render: () => <VolumeOverTimeChart />
   },
   'when-you-record': {
-    section: 'Overview',
-    sectionPath: '/',
+    section: 'Usage',
+    sectionPath: '/usage',
     title: 'When you record',
     description: 'Day of week × hour of day. Brighter cells are busier.',
     render: () => <WhenYouRecordChart />
@@ -60,15 +62,9 @@ export const CHART_REGISTRY: Record<string, ChartSpec> = {
     description: 'Daily activity for the last twelve months.',
     render: () => <RecordingStreakChart />
   },
-  'by-hour-of-day': {
+  'duration-mix': {
     section: 'Usage',
     sectionPath: '/usage',
-    title: 'By hour of day',
-    render: () => <ByHourOfDayChart />
-  },
-  'duration-mix': {
-    section: 'Overview',
-    sectionPath: '/',
     title: 'Duration mix',
     description: 'How long recordings tend to run.',
     render: () => <DurationMixChart />
@@ -79,13 +75,6 @@ export const CHART_REGISTRY: Record<string, ChartSpec> = {
     title: 'Mode share',
     description: 'Share of recordings by mode.',
     render: () => <ModePieChart />
-  },
-  'wpm-by-mode': {
-    section: 'Usage',
-    sectionPath: '/usage',
-    title: 'WPM by mode',
-    description: 'Average words-per-minute by mode (top 6 by recording count).',
-    render: () => <WpmByModeChart />
   },
   'top-words': {
     section: 'Language',
