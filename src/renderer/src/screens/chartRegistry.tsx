@@ -109,7 +109,7 @@ export const CHART_REGISTRY: Record<string, ChartSpec> = {
     title: 'Top words',
     render: () => (
       <HBar
-        data={mock.wordFrequency.slice(0, 24).map((w) => ({ label: w.word, count: w.count }))}
+        data={mock.wordFrequency.slice(0, 100).map((w) => ({ label: w.word, count: w.count }))}
         xKey="count"
         yKey="label"
       />
@@ -121,7 +121,7 @@ export const CHART_REGISTRY: Record<string, ChartSpec> = {
     title: 'Filler words',
     render: () => (
       <HBar
-        data={mock.fillerSummary.slice(0, 12).map((f) => ({ label: f.phrase, count: f.count }))}
+        data={mock.fillerSummary.slice(0, 50).map((f) => ({ label: f.phrase, count: f.count }))}
         xKey="count"
         yKey="label"
       />
