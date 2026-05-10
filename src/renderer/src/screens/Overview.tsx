@@ -1,63 +1,72 @@
 import { ActivityArea } from '@renderer/components/charts/ActivityArea'
 import { ChartCard } from '@renderer/components/charts/ChartCard'
-import { KpiRow } from '@renderer/components/KpiRow'
+import { ComparisonKpiGrid } from '@renderer/components/ComparisonKpiGrid'
 import { formatActivityTick, formatCompact, formatDurationSec } from '@renderer/lib/format'
 import { useRangeStore, windowFor } from '@renderer/state/rangeStore'
-import { useFilteredAggregates } from '@renderer/state/useFilteredAggregates'
+import { usePeriodComparison } from '@renderer/state/usePeriodComparison'
+import type { Aggregates } from '@shared/types'
 import { useMemo } from 'react'
 
 /**
- * Overview — landing page. KPI strip on top, Activity area chart below.
+ * Overview — landing page.
  *
- * "When you record" + "Duration mix" used to live here too; in wave 5 they
- * moved to Usage where the recording-cadence story belongs. A 6-card KPI
- * grid (with period-over-period comparison) replaces this strip in the
- * follow-up PR.
- *
- * Range-aware: every aggregate flows through `useFilteredAggregates`, so
- * KPIs + Activity all respect the navbar's date pill in lockstep.
+ *   1. Six-card KPI grid (3 × 2) with period-over-period comparison.
+ *      "Last 30 days" compares to days 31–60 ago; "All time" hides the
+ *      delta row and shows only the current value.
+ *   2. Activity area chart filling the rest of the viewport.
  */
 export function Overview(): React.JSX.Element {
-  const { overview, daily, sparklines } = useFilteredAggregates()
-  const avgPerRec =
-    overview.totalRecordings > 0 ? Math.round(overview.totalWords / overview.totalRecordings) : 0
+  const { current, previous } = usePeriodComparison()
   const range = useRangeStore((s) => s.range)
   const { from, to } = useMemo(() => windowFor(range), [range])
 
+  const getDuration = (a: Aggregates): number => a.overview.totalDurationSec
+  const items = [
+    {
+      label: 'Recordings',
+      current: current.overview.totalRecordings,
+      previous: previous?.overview.totalRecordings ?? null,
+      format: formatCompact
+    },
+    {
+      label: 'Time spoken',
+      current: getDuration(current),
+      previous: previous ? getDuration(previous) : null,
+      format: formatDurationSec
+    },
+    {
+      label: 'Total words',
+      current: current.overview.totalWords,
+      previous: previous?.overview.totalWords ?? null,
+      format: formatCompact
+    },
+    {
+      label: 'Active days',
+      current: current.overview.activeDays,
+      previous: previous?.overview.activeDays ?? null
+    },
+    {
+      label: 'Filler rate',
+      current: current.language.fillerRatePct,
+      previous: previous?.language.fillerRatePct ?? null,
+      format: (v: number) => v.toFixed(2),
+      unit: '%'
+    },
+    {
+      label: 'Avg WPM',
+      current: current.overview.avgWPM,
+      previous: previous?.overview.avgWPM ?? null,
+      unit: 'wpm'
+    }
+  ]
+
   return (
     <div className="flex h-full flex-col gap-3">
-      <KpiRow
-        items={[
-          {
-            label: 'Recordings',
-            value: formatCompact(overview.totalRecordings),
-            sub: `${overview.activeDays} active days`,
-            spark: sparklines.recordings.values
-          },
-          {
-            label: 'Total words',
-            value: formatCompact(overview.totalWords),
-            sub: `${avgPerRec} avg / recording`,
-            spark: sparklines.words.values
-          },
-          {
-            label: 'Time spoken',
-            value: formatDurationSec(overview.totalDurationSec),
-            sub: `${formatDurationSec(overview.avgDurationSec)} avg`,
-            spark: sparklines.duration.values
-          },
-          {
-            label: 'Words / minute',
-            value: String(overview.avgWPM),
-            sub: 'rolling average',
-            spark: sparklines.wpm.values
-          }
-        ]}
-      />
+      <ComparisonKpiGrid items={items} />
 
       <ChartCard title="Activity" slug="activity" className="min-h-0 flex-1">
         <ActivityArea
-          data={daily as unknown as Array<Record<string, unknown>>}
+          data={current.daily as unknown as Array<Record<string, unknown>>}
           xKey="date"
           yKey="count"
           formatTick={formatActivityTick}

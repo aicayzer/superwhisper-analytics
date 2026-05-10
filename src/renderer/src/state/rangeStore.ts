@@ -37,5 +37,24 @@ export function windowFor(range: RangeValue, now: Date = new Date()): DateWindow
   return { from, to }
 }
 
+/**
+ * Resolve the previous-equal-length window for a RangeValue. Used by the
+ * Overview KPI grid to compute period-over-period deltas (`prev → current
+ * ↓ pct`). Returns an empty window when the range is "All time" or any
+ * value that doesn't have a meaningful prior window.
+ *
+ * Example: range = Last 30 days → previous = days 31–60 ago.
+ */
+export function previousWindowFor(range: RangeValue, now: Date = new Date()): DateWindow {
+  const cur = windowFor(range, now)
+  if (!cur.from || !cur.to) return {}
+  const lengthMs = cur.to.getTime() - cur.from.getTime()
+  if (lengthMs <= 0) return {}
+  return {
+    from: new Date(cur.from.getTime() - lengthMs),
+    to: cur.from
+  }
+}
+
 // Re-exported so callers don't need a second import line.
 export { RANGE_PRESETS, type RangeValue }
