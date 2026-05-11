@@ -66,6 +66,7 @@ export function Settings(): React.JSX.Element {
 function RecordingsCard(): React.JSX.Element {
   const path = useConfigStore((s) => s.path)
   const isValid = useConfigStore((s) => s.isValid)
+  const isInsideHome = useConfigStore((s) => s.isInsideHome)
   const setPath = useConfigStore((s) => s.setPath)
   const count = useDataStore((s) => s.count)
   const indexedAt = useDataStore((s) => s.indexedAt)
@@ -142,6 +143,11 @@ function RecordingsCard(): React.JSX.Element {
         {!error && scanErrors > 0 && (
           <p className="text-[12px] text-amber-500" role="status">
             {scanErrors} recording{scanErrors === 1 ? '' : 's'} failed to parse
+          </p>
+        )}
+        {!error && path && !isInsideHome && (
+          <p className="text-[12px] text-amber-500" role="status">
+            Path outside home directory
           </p>
         )}
       </div>

@@ -44,6 +44,10 @@ export interface ConfigStatus {
   path: string | null
   /** True if `path` exists and at least one child has a meta.json. */
   isValid: boolean
+  /** True if `path` resolves under the user's home directory. Soft
+   *  warning — false means Settings surfaces a heads-up but the path
+   *  is still used. */
+  isInsideHome: boolean
   /** Auto-detected default, or null if no candidate exists on disk. */
   defaultPath: string | null
   /** Active filler-phrase list. */

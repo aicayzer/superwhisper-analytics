@@ -1,6 +1,6 @@
 import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import type { HydratePayload } from '@shared/types'
-import { defaultPath, getConfig, isPathValid, setConfig } from './config'
+import { defaultPath, getConfig, isPathInsideHome, isPathValid, setConfig } from './config'
 import { hydrate, reindex, setFillerWords } from './cache'
 import { disableWatch, enableWatch } from './watcher'
 import type { ConfigStatus } from '../preload/api'
@@ -17,6 +17,7 @@ function buildStatus(): ConfigStatus {
   return {
     path: config.superwhisperPath,
     isValid: isPathValid(config.superwhisperPath),
+    isInsideHome: isPathInsideHome(config.superwhisperPath),
     defaultPath: defaultPath(),
     fillerWords: config.fillerWords,
     watchFolder: config.watchFolder,
