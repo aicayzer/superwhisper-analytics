@@ -2,6 +2,7 @@ import { buildFillers } from '@shared/text-metrics'
 import type { Aggregates, HydratePayload, Recording } from '@shared/types'
 import { computeAll, emptyAggregates } from './aggregates'
 import { getConfig, isPathValid, setConfig } from './config'
+import { buildDemoRecordings } from './demo'
 import { scan } from './scanner'
 
 /**
@@ -21,6 +22,7 @@ let recordings: Recording[] = []
 let aggregates: Aggregates = emptyAggregates()
 let indexedAt: string | null = null
 let lastScannedPath: string | null = null
+let lastDemoMode: boolean | null = null
 let scanErrors = 0
 let scanSkipped = 0
 
@@ -41,12 +43,30 @@ function clear(): void {
   aggregates = emptyAggregates()
   indexedAt = null
   lastScannedPath = null
+  lastDemoMode = null
   scanErrors = 0
   scanSkipped = 0
 }
 
 function rescan(): HydratePayload {
   const config = getConfig()
+
+  // Demo mode short-circuits the disk read. The synthetic dataset is
+  // reproducible, so callers can toggle it on and off safely without
+  // losing or mixing real-data state.
+  if (config.demoMode) {
+    const t0 = Date.now()
+    recordings = buildDemoRecordings(new Date(), config.fillerWords)
+    aggregates = computeAll(recordings, new Date())
+    indexedAt = new Date().toISOString()
+    lastScannedPath = null
+    lastDemoMode = true
+    scanErrors = 0
+    scanSkipped = 0
+    console.log(`[cache] generated ${recordings.length} demo recordings in ${Date.now() - t0}ms`)
+    return buildPayload(null)
+  }
+
   const path = config.superwhisperPath
   if (!path) {
     clear()
@@ -64,6 +84,7 @@ function rescan(): HydratePayload {
   aggregates = computeAll(recordings, new Date())
   indexedAt = new Date().toISOString()
   lastScannedPath = path
+  lastDemoMode = false
   scanErrors = result.errors
   scanSkipped = result.skipped
   const t2 = Date.now()
@@ -76,12 +97,20 @@ function rescan(): HydratePayload {
 }
 
 /**
- * Return cached data, rescanning lazily if the cache is empty or the
- * configured path has changed since the last scan.
+ * Return cached data, rescanning lazily if the cache is empty, the
+ * configured path has changed since the last scan, or the demo-mode
+ * flag has flipped (so the renderer sees fresh data on either side of
+ * the toggle).
  */
 export function hydrate(): HydratePayload {
-  const path = getConfig().superwhisperPath
-  if (indexedAt === null || path !== lastScannedPath) return rescan()
+  const config = getConfig()
+  if (
+    indexedAt === null ||
+    config.demoMode !== lastDemoMode ||
+    config.superwhisperPath !== lastScannedPath
+  ) {
+    return rescan()
+  }
   return buildPayload(null)
 }
 

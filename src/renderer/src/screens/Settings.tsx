@@ -22,6 +22,7 @@ import {
   Info,
   RefreshCw,
   Settings as SettingsIcon,
+  Sparkles,
   Sun,
   X
 } from 'lucide-react'
@@ -60,6 +61,7 @@ export function Settings(): React.JSX.Element {
       <RecordingsCard />
       <AppearanceCard />
       <IndexingCard />
+      <DemoModeCard />
       <TranscriptsCard />
       <DictionaryCard />
       <AboutCard />
@@ -271,6 +273,27 @@ function ToggleRow({ label, description, checked, onChange }: ToggleRowProps): R
       </div>
       <Switch checked={checked} onChange={onChange} ariaLabel={label} />
     </div>
+  )
+}
+
+// ---------- Demo mode ----------------------------------------------------
+
+function DemoModeCard(): React.JSX.Element {
+  const demoMode = useConfigStore((s) => s.demoMode)
+  const setDemoMode = useConfigStore((s) => s.setDemoMode)
+  return (
+    <SettingsCard
+      icon={Sparkles}
+      title="Demo data"
+      subtitle="Swap your recordings for a synthetic dataset — handy for screenshots."
+    >
+      <ToggleRow
+        label="Use demo data"
+        description="200 days of synthetic recordings across four modes. Toggle off to return to your real data."
+        checked={demoMode}
+        onChange={(next) => void setDemoMode(next)}
+      />
+    </SettingsCard>
   )
 }
 

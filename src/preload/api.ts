@@ -31,6 +31,10 @@ export interface Config {
   fillerWords: string[]
   watchFolder: boolean
   transcriptsOnly: boolean
+  /** When true, the app feeds the renderer a deterministic synthetic
+   *  dataset instead of scanning the real recordings folder. Used for
+   *  demos and screenshots. */
+  demoMode: boolean
 }
 
 /**
@@ -54,6 +58,7 @@ export interface ConfigStatus {
   fillerWords: string[]
   watchFolder: boolean
   transcriptsOnly: boolean
+  demoMode: boolean
 }
 
 /** Wire callback type for main → renderer push when the indexed dataset
@@ -71,7 +76,11 @@ export const api = {
       ipcRenderer.invoke('config:setWatchFolder', enabled),
     /** Toggle the renderer-side "hide audio UI" preference. */
     setTranscriptsOnly: (enabled: boolean): Promise<ConfigStatus> =>
-      ipcRenderer.invoke('config:setTranscriptsOnly', enabled)
+      ipcRenderer.invoke('config:setTranscriptsOnly', enabled),
+    /** Toggle demo mode. Triggers a fresh hydrate so the renderer's
+     *  dataset swaps in/out without a reload. */
+    setDemoMode: (enabled: boolean): Promise<ConfigStatus> =>
+      ipcRenderer.invoke('config:setDemoMode', enabled)
   },
   data: {
     hydrate: (): Promise<HydratePayload> => ipcRenderer.invoke('data:hydrate'),

@@ -22,7 +22,8 @@ function buildStatus(): ConfigStatus {
     defaultPath: defaultPath(),
     fillerWords: config.fillerWords,
     watchFolder: config.watchFolder,
-    transcriptsOnly: config.transcriptsOnly
+    transcriptsOnly: config.transcriptsOnly,
+    demoMode: config.demoMode
   }
 }
 
@@ -58,6 +59,18 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('config:setTranscriptsOnly', (_, enabled: unknown): ConfigStatus => {
     if (!validBool(enabled)) return buildStatus()
     setConfig({ transcriptsOnly: enabled })
+    return buildStatus()
+  })
+
+  ipcMain.handle('config:setDemoMode', (_, enabled: unknown): ConfigStatus => {
+    if (!validBool(enabled)) return buildStatus()
+    setConfig({ demoMode: enabled })
+    // Disable the watcher when entering demo mode — watching disk in this
+    // state is wasted work, and the demo dataset isn't affected by file
+    // changes anyway. Re-engaging the watch toggle when leaving demo mode
+    // is the user's call.
+    if (enabled) disableWatch()
+    else syncWatcher()
     return buildStatus()
   })
 
