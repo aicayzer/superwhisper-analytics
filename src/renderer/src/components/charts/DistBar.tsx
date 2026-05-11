@@ -3,8 +3,8 @@ import { memo } from 'react'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { ChartTooltip } from './ChartTooltip'
 
-interface DistBarProps {
-  data: Array<Record<string, unknown>>
+interface DistBarProps<T extends object> {
+  data: readonly T[]
   /** Bucket label key — shown on X axis */
   xKey: string
   /** Numeric value key */
@@ -20,10 +20,13 @@ interface DistBarProps {
  * thousands overflowed and Recharts clipped them to a single visible "0".
  * `width={44}` + `formatCompact` keeps "1.2k" style ticks readable.
  */
-function DistBarInner({ data, xKey, yKey }: DistBarProps): React.JSX.Element {
+function DistBarInner<T extends object>({ data, xKey, yKey }: DistBarProps<T>): React.JSX.Element {
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={data} margin={{ top: 8, right: 8, left: -4, bottom: 0 }}>
+      <BarChart
+        data={data as ReadonlyArray<Record<string, unknown>>}
+        margin={{ top: 8, right: 8, left: -4, bottom: 0 }}
+      >
         <CartesianGrid stroke="var(--border)" strokeDasharray="2 4" vertical={false} />
         <XAxis
           dataKey={xKey}
@@ -52,4 +55,4 @@ function DistBarInner({ data, xKey, yKey }: DistBarProps): React.JSX.Element {
   )
 }
 
-export const DistBar = memo(DistBarInner)
+export const DistBar = memo(DistBarInner) as typeof DistBarInner

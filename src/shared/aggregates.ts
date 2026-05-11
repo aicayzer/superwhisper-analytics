@@ -23,10 +23,8 @@ import type {
  * Pure functions that turn a `Recording[]` into the bundle of aggregate
  * shapes the renderer's data store exposes.
  *
- * Mirrors the structure of `lib/mock.ts`'s aggregate computation so the
- * renderer's drop-in swap from mock to real data is type-identical and
- * shape-identical. Anchored to a `now` parameter (defaulting to `new Date()`)
- * so trailing-window aggregates (streakCells, sparklines) behave the same
+ * Anchored to a `now` parameter (defaulting to `new Date()`) so
+ * trailing-window aggregates (streakCells, sparklines) behave the same
  * way every launch — and so unit tests can hold time still if we ever
  * write any.
  */

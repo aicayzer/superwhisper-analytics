@@ -13,11 +13,11 @@ import {
 } from 'recharts'
 import { ChartTooltip } from './ChartTooltip'
 
-interface PaceTrendProps {
+interface PaceTrendProps<T extends object> {
   /** Monthly aggregate (the line). */
-  trend: Array<Record<string, unknown>>
+  trend: readonly T[]
   /** Per-recording values aligned to the same xKey domain (the scatter). */
-  dots: Array<{ period: string; value: number }>
+  dots: ReadonlyArray<{ period: string; value: number }>
   xKey: string
   yKey: string
   /** Optional horizontal target line (e.g. WPM goal). */
@@ -31,23 +31,26 @@ interface PaceTrendProps {
  * average. Custom shape because Recharts' ComposedChart needs both series
  * keyed against the same X axis.
  */
-function PaceTrendInner({
+function PaceTrendInner<T extends object>({
   trend,
   dots,
   xKey,
   yKey,
   reference,
   formatTick
-}: PaceTrendProps): React.JSX.Element {
+}: PaceTrendProps<T>): React.JSX.Element {
   // Merge series so each row has both the monthly average and any per-row
   // points landing in that period. Recharts doesn't render multiple Scatter
   // points on a categorical axis natively, so jitter slightly within the
   // period bucket using a derived numeric x (still rendered as the category
   // by formatter).
-  const merged = trend.map((t) => ({
-    [xKey]: t[xKey],
-    [yKey]: t[yKey]
-  }))
+  const merged = trend.map((t) => {
+    const row = t as Record<string, unknown>
+    return {
+      [xKey]: row[xKey],
+      [yKey]: row[yKey]
+    }
+  })
 
   // Group dots by period for the scatter — Recharts expects rows with
   // numeric x values. We use the same categorical xKey; multiple rows with
@@ -119,4 +122,4 @@ function PaceTrendInner({
   )
 }
 
-export const PaceTrend = memo(PaceTrendInner)
+export const PaceTrend = memo(PaceTrendInner) as typeof PaceTrendInner

@@ -1,6 +1,6 @@
 import { Card } from '@renderer/components/ui/card'
 import { cn } from '@renderer/lib/cn'
-import { tokenise } from '@renderer/lib/text'
+import { tokenise } from '@shared/text-metrics'
 import type { Recording } from '@renderer/lib/types'
 import { useMemo } from 'react'
 

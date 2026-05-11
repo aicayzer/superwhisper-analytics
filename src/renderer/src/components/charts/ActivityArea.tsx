@@ -11,8 +11,8 @@ import {
 } from 'recharts'
 import { ChartTooltip } from './ChartTooltip'
 
-interface ActivityAreaProps {
-  data: Array<Record<string, unknown>>
+interface ActivityAreaProps<T extends object> {
+  data: readonly T[]
   xKey: string
   yKey: string
   /** Tick label formatter for the X axis (date strings). */
@@ -35,7 +35,7 @@ interface ActivityAreaProps {
  * activity counts render properly. Previously a 32px gutter clipped
  * every tick to "0".
  */
-function ActivityAreaInner({
+function ActivityAreaInner<T extends object>({
   data,
   xKey,
   yKey,
@@ -43,7 +43,7 @@ function ActivityAreaInner({
   tickCount = 6,
   from,
   to
-}: ActivityAreaProps): React.JSX.Element {
+}: ActivityAreaProps<T>): React.JSX.Element {
   // Filter once per data/window change. Compares ms — Date.parse on the
   // YYYY-MM-DD strings the data layer produces.
   const filtered = useMemo(() => {
@@ -51,7 +51,7 @@ function ActivityAreaInner({
     const fromMs = from?.getTime() ?? -Infinity
     const toMs = to?.getTime() ?? Infinity
     return data.filter((row) => {
-      const raw = row[xKey]
+      const raw = (row as Record<string, unknown>)[xKey]
       if (typeof raw !== 'string') return true
       const t = Date.parse(raw)
       if (Number.isNaN(t)) return true
@@ -61,7 +61,10 @@ function ActivityAreaInner({
 
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <AreaChart data={filtered} margin={{ top: 8, right: 8, left: -4, bottom: 0 }}>
+      <AreaChart
+        data={filtered as ReadonlyArray<Record<string, unknown>>}
+        margin={{ top: 8, right: 8, left: -4, bottom: 0 }}
+      >
         <defs>
           <linearGradient id="grad-area" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="var(--chart-1)" stopOpacity={0.18} />
@@ -100,4 +103,4 @@ function ActivityAreaInner({
   )
 }
 
-export const ActivityArea = memo(ActivityAreaInner)
+export const ActivityArea = memo(ActivityAreaInner) as typeof ActivityAreaInner

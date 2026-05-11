@@ -95,3 +95,14 @@ export function isPathValid(p: string | null | undefined): boolean {
     return false
   }
 }
+
+/**
+ * Soft check: is the configured path under the user's home directory?
+ * Used to surface a heads-up in Settings — pointing the picker at a
+ * system path or another user's home isn't blocked, just flagged.
+ */
+export function isPathInsideHome(p: string | null | undefined): boolean {
+  if (!p) return true
+  const home = homedir()
+  return p === home || p.startsWith(home + '/')
+}

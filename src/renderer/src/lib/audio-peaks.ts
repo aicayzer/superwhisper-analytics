@@ -17,12 +17,32 @@
  * up) are all worth the small complexity.
  */
 
+/** Maximum entries kept in the in-memory peaks cache. The renderer
+ *  re-decodes any URL evicted past this point — that's ~250ms of work
+ *  for a 30s WAV, indistinguishable from a cold-tab open. 50 covers a
+ *  comfortable browsing session without holding hundreds of MB of decoded
+ *  audio in memory. */
+const CACHE_LIMIT = 50
+
+// Map preserves insertion order. We use that ordering as a recency proxy:
+// every hit re-inserts the entry, every miss appends, and overflow drops
+// from the oldest end of the iterator.
 const cache = new Map<string, Promise<number[]>>()
 let context: AudioContext | null = null
 
 function getAudioContext(): AudioContext {
   if (!context) context = new AudioContext()
   return context
+}
+
+function touch(url: string, value: Promise<number[]>): void {
+  cache.delete(url)
+  cache.set(url, value)
+  while (cache.size > CACHE_LIMIT) {
+    const oldest = cache.keys().next().value
+    if (oldest === undefined) break
+    cache.delete(oldest)
+  }
 }
 
 function decimate(audio: AudioBuffer, peakCount: number): number[] {
@@ -52,7 +72,10 @@ function decimate(audio: AudioBuffer, peakCount: number): number[] {
  */
 export function decodePeaks(url: string, peakCount = 512): Promise<number[]> {
   const cached = cache.get(url)
-  if (cached) return cached
+  if (cached) {
+    touch(url, cached)
+    return cached
+  }
 
   const work = (async (): Promise<number[]> => {
     const res = await fetch(url)
@@ -62,7 +85,7 @@ export function decodePeaks(url: string, peakCount = 512): Promise<number[]> {
     return decimate(audio, peakCount)
   })()
 
-  cache.set(url, work)
+  touch(url, work)
   work.catch(() => cache.delete(url))
   return work
 }

@@ -22,6 +22,8 @@ interface ConfigState {
   defaultPath: string | null
   /** Cheap probe: does `path` look like a SuperWhisper recordings folder? */
   isValid: boolean
+  /** Soft check: is the configured path under the user's home directory? */
+  isInsideHome: boolean
   /** Active filler-phrase list (edited from Settings → Dictionary). */
   fillerWords: string[]
   /** fs.watch on the recordings folder — see main/watcher.ts. */
@@ -49,6 +51,7 @@ function applyStatus(status: ConfigStatus): Partial<ConfigState> {
     path: status.path,
     defaultPath: status.defaultPath,
     isValid: status.isValid,
+    isInsideHome: status.isInsideHome,
     fillerWords: status.fillerWords,
     watchFolder: status.watchFolder,
     transcriptsOnly: status.transcriptsOnly,
@@ -60,6 +63,7 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
   path: null,
   defaultPath: null,
   isValid: false,
+  isInsideHome: true,
   fillerWords: [],
   watchFolder: false,
   transcriptsOnly: false,

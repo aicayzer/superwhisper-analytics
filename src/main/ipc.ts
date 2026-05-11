@@ -1,8 +1,9 @@
 import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import type { HydratePayload } from '@shared/types'
-import { defaultPath, getConfig, isPathValid, setConfig } from './config'
+import { defaultPath, getConfig, isPathInsideHome, isPathValid, setConfig } from './config'
 import { hydrate, reindex, setFillerWords } from './cache'
 import { disableWatch, enableWatch } from './watcher'
+import { validBool, validString, validStringArray } from './validators'
 import type { ConfigStatus } from '../preload/api'
 
 /**
@@ -17,6 +18,7 @@ function buildStatus(): ConfigStatus {
   return {
     path: config.superwhisperPath,
     isValid: isPathValid(config.superwhisperPath),
+    isInsideHome: isPathInsideHome(config.superwhisperPath),
     defaultPath: defaultPath(),
     fillerWords: config.fillerWords,
     watchFolder: config.watchFolder,
@@ -38,19 +40,23 @@ function syncWatcher(): void {
 export function registerIpcHandlers(): void {
   ipcMain.handle('config:status', (): ConfigStatus => buildStatus())
 
-  ipcMain.handle('config:setPath', (_, path: string | null): ConfigStatus => {
+  ipcMain.handle('config:setPath', (_, path: unknown): ConfigStatus => {
+    // Accept string or null; ignore anything else.
+    if (path !== null && !validString(path)) return buildStatus()
     setConfig({ superwhisperPath: path })
     syncWatcher()
     return buildStatus()
   })
 
-  ipcMain.handle('config:setWatchFolder', (_, enabled: boolean): ConfigStatus => {
+  ipcMain.handle('config:setWatchFolder', (_, enabled: unknown): ConfigStatus => {
+    if (!validBool(enabled)) return buildStatus()
     setConfig({ watchFolder: enabled })
     syncWatcher()
     return buildStatus()
   })
 
-  ipcMain.handle('config:setTranscriptsOnly', (_, enabled: boolean): ConfigStatus => {
+  ipcMain.handle('config:setTranscriptsOnly', (_, enabled: unknown): ConfigStatus => {
+    if (!validBool(enabled)) return buildStatus()
     setConfig({ transcriptsOnly: enabled })
     return buildStatus()
   })
@@ -66,16 +72,20 @@ export function registerIpcHandlers(): void {
     return result.filePaths[0] ?? null
   })
 
-  ipcMain.handle('shell:openExternal', async (_, url: string): Promise<void> => {
+  ipcMain.handle('shell:openExternal', async (_, url: unknown): Promise<void> => {
+    if (!validString(url)) return
+    // Reject anything that isn't http(s) — guards against javascript:,
+    // file:, and other unintended openers reaching the system handler.
+    if (!/^https?:\/\//i.test(url)) return
     await shell.openExternal(url)
   })
 
   ipcMain.handle('data:hydrate', (): HydratePayload => hydrate())
   ipcMain.handle('data:reindex', (): HydratePayload => reindex())
-  ipcMain.handle(
-    'data:setFillerWords',
-    (_, words: string[]): HydratePayload => setFillerWords(words)
-  )
+  ipcMain.handle('data:setFillerWords', (_, words: unknown): HydratePayload => {
+    if (!validStringArray(words)) return hydrate()
+    return setFillerWords(words)
+  })
 
   // Apply the persisted watch-folder preference on startup.
   syncWatcher()

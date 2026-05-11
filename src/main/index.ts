@@ -4,6 +4,7 @@ import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { registerIpcHandlers } from './ipc'
 import { registerSwProtocolHandler, registerSwSchemeAsPrivileged } from './protocol'
+import { disableWatch } from './watcher'
 
 // Privileged scheme registration must happen BEFORE app.whenReady — the
 // renderer's session inherits these privileges at startup. Doing this at
@@ -23,7 +24,8 @@ function createWindow(): void {
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      sandbox: false
+      sandbox: false,
+      contextIsolation: true
     }
   })
 
@@ -44,7 +46,7 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
-  electronApp.setAppUserModelId('com.aicayzer.superwhisper-analytics')
+  electronApp.setAppUserModelId('me.cyzr.superwhisper-analytics')
 
   // In dev, the dock icon comes from Electron's bundled framework .app —
   // not from build/icon.icns (which only applies to packaged builds).
@@ -71,4 +73,8 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
   }
+})
+
+app.on('before-quit', () => {
+  disableWatch()
 })

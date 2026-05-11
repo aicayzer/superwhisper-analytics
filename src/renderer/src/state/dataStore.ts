@@ -31,6 +31,11 @@ interface DataState {
   error: string | null
   indexedAt: string | null
   count: number
+  /** Per-scan diagnostics from main. `scanErrors` counts folders whose
+   *  meta.json failed to parse; `scanSkipped` counts folders without a
+   *  meta.json. Surfaced in Settings → Recordings folder. */
+  scanErrors: number
+  scanSkipped: number
 
   /** Pull data from main. Sets loading; clears it on completion. */
   hydrate: () => Promise<void>
@@ -47,7 +52,9 @@ const INITIAL_STATE = {
   reindexing: false,
   error: null as string | null,
   indexedAt: null as string | null,
-  count: 0
+  count: 0,
+  scanErrors: 0,
+  scanSkipped: 0
 }
 
 function applyPayload(payload: HydratePayload): Partial<DataState> {
@@ -56,7 +63,9 @@ function applyPayload(payload: HydratePayload): Partial<DataState> {
     recordings: payload.recordings,
     indexedAt: payload.indexedAt || null,
     count: payload.count,
-    error: payload.error
+    error: payload.error,
+    scanErrors: payload.scanErrors,
+    scanSkipped: payload.scanSkipped
   }
 }
 

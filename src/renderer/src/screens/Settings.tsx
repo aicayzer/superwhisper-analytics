@@ -4,7 +4,7 @@ import { Segmented } from '@renderer/components/Segmented'
 import { Switch } from '@renderer/components/ui/Switch'
 import { cn } from '@renderer/lib/cn'
 import { formatCompact, formatDurationSec } from '@renderer/lib/format'
-import { DEFAULT_FILLER_PHRASES } from '@renderer/lib/text'
+import { DEFAULT_FILLER_PHRASES, normalisePhrases } from '@shared/text-metrics'
 import { useConfigStore } from '@renderer/state/configStore'
 import { useDataStore } from '@renderer/state/dataStore'
 import { useUiPrefsStore, type TranscriptViewMode } from '@renderer/state/uiPrefsStore'
@@ -66,12 +66,14 @@ export function Settings(): React.JSX.Element {
 function RecordingsCard(): React.JSX.Element {
   const path = useConfigStore((s) => s.path)
   const isValid = useConfigStore((s) => s.isValid)
+  const isInsideHome = useConfigStore((s) => s.isInsideHome)
   const setPath = useConfigStore((s) => s.setPath)
   const count = useDataStore((s) => s.count)
   const indexedAt = useDataStore((s) => s.indexedAt)
   const loading = useDataStore((s) => s.loading)
   const reindexing = useDataStore((s) => s.reindexing)
   const error = useDataStore((s) => s.error)
+  const scanErrors = useDataStore((s) => s.scanErrors)
   const reindex = useDataStore((s) => s.reindex)
   const totalDurationSec = useDataStore((s) => s.aggregates.overview.totalDurationSec)
   // Tick once a minute so the "5m ago" string drifts naturally without
@@ -136,6 +138,16 @@ function RecordingsCard(): React.JSX.Element {
         {error && (
           <p className="text-[12px] text-red-500" role="alert">
             {error}
+          </p>
+        )}
+        {!error && scanErrors > 0 && (
+          <p className="text-[12px] text-amber-500" role="status">
+            {scanErrors} recording{scanErrors === 1 ? '' : 's'} failed to parse
+          </p>
+        )}
+        {!error && path && !isInsideHome && (
+          <p className="text-[12px] text-amber-500" role="status">
+            Path outside home directory
           </p>
         )}
       </div>
@@ -309,14 +321,15 @@ function DictionaryCard(): React.JSX.Element {
   }
 
   async function add(): Promise<void> {
-    const cleaned = draft.trim().toLowerCase().replace(/\s+/g, ' ')
-    if (!cleaned) return
-    if (fillerWords.includes(cleaned)) {
-      setDraft('')
-      return
-    }
+    // Run the candidate through the same canon as the persisted list,
+    // then dedupe against the existing entries — `normalisePhrases` returns
+    // an empty list if the draft is blank, a single-entry list otherwise.
+    // Merging then re-normalising gives us trim/lower/dedup semantics for
+    // free, including whitespace- and case-only duplicates.
+    const merged = normalisePhrases([...fillerWords, draft])
     setDraft('')
-    await commit([...fillerWords, cleaned])
+    if (merged.length === fillerWords.length) return
+    await commit(merged)
   }
 
   async function remove(phrase: string): Promise<void> {
