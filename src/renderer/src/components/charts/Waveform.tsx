@@ -68,6 +68,9 @@ export function Waveform({ peaks, progress, onSeek, className }: WaveformProps):
         const y = (VB_H - h) / 2
         const xCenterFrac = (x + stride / 2) / VB_W
         const played = xCenterFrac <= progress
+        // Unplayed peaks render in muted-foreground at low opacity — visible
+        // enough to read as a waveform on both light and dark themes, faint
+        // enough to keep the played portion the dominant signal.
         return (
           <rect
             key={i}
@@ -76,7 +79,8 @@ export function Waveform({ peaks, progress, onSeek, className }: WaveformProps):
             width={stride * 0.7}
             height={h}
             rx={0.6}
-            fill={played ? 'var(--foreground)' : 'var(--border)'}
+            fill={played ? 'var(--foreground)' : 'var(--muted-foreground)'}
+            fillOpacity={played ? 1 : 0.35}
           />
         )
       })}
