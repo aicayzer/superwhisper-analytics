@@ -30,6 +30,9 @@ interface ConfigState {
   watchFolder: boolean
   /** Hide audio + waveform from TranscriptDetail when true. */
   transcriptsOnly: boolean
+  /** When true, the app shows a synthetic demo dataset instead of the
+   *  real recordings folder. */
+  demoMode: boolean
   /** Has the initial round-trip completed? Gates the first-run modal. */
   hydrated: boolean
 
@@ -44,6 +47,8 @@ interface ConfigState {
   setWatchFolder: (enabled: boolean) => Promise<void>
   /** Toggle the "transcripts only" preference (hide audio UI). */
   setTranscriptsOnly: (enabled: boolean) => Promise<void>
+  /** Toggle demo mode + trigger a renderer-side rehydrate. */
+  setDemoMode: (enabled: boolean) => Promise<void>
 }
 
 function applyStatus(status: ConfigStatus): Partial<ConfigState> {
@@ -55,6 +60,7 @@ function applyStatus(status: ConfigStatus): Partial<ConfigState> {
     fillerWords: status.fillerWords,
     watchFolder: status.watchFolder,
     transcriptsOnly: status.transcriptsOnly,
+    demoMode: status.demoMode,
     hydrated: true
   }
 }
@@ -67,6 +73,7 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
   fillerWords: [],
   watchFolder: false,
   transcriptsOnly: false,
+  demoMode: false,
   hydrated: false,
 
   hydrate: async () => {
@@ -114,5 +121,16 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
     set({ transcriptsOnly: enabled })
     const updated = await window.api.config.setTranscriptsOnly(enabled)
     set(applyStatus(updated))
+  },
+
+  setDemoMode: async (enabled) => {
+    // Optimistic flip so the toggle responds instantly while main swaps
+    // the underlying dataset. Real status arrives on the next line.
+    set({ demoMode: enabled })
+    const updated = await window.api.config.setDemoMode(enabled)
+    set(applyStatus(updated))
+    // Force a fresh hydrate so the renderer's dataStore picks up the
+    // new dataset — main has the new payload ready by now.
+    await useDataStore.getState().hydrate()
   }
 }))

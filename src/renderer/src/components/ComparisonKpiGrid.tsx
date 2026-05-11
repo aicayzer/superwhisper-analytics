@@ -1,5 +1,5 @@
 import { cn } from '@renderer/lib/cn'
-import { ArrowDown, ArrowUp } from 'lucide-react'
+import { ArrowDown, ArrowUp, Minus } from 'lucide-react'
 
 interface KpiCardSpec {
   label: string
@@ -60,15 +60,17 @@ function Card({ label, unit, current, previous, format }: KpiCardSpec): React.JS
         <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
           {label}
         </div>
-        {hasPrev && direction !== 'flat' && (
+        {hasPrev && (
           <span
             className="inline-flex items-center gap-0.5 rounded-md bg-foreground/[0.05] px-1.5 py-0.5 text-[11px] tabular-nums text-muted-foreground"
             title={`Previous period: ${fmt(previous!)}${unit ?? ''}`}
           >
             {direction === 'up' ? (
               <ArrowUp className="h-3 w-3" strokeWidth={2} />
-            ) : (
+            ) : direction === 'down' ? (
               <ArrowDown className="h-3 w-3" strokeWidth={2} />
+            ) : (
+              <Minus className="h-3 w-3" strokeWidth={2} />
             )}
             {Math.abs(pct).toFixed(1)}%
           </span>

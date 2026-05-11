@@ -1,6 +1,12 @@
 import { AppearancePicker } from '@renderer/components/settings/AppearancePicker'
 import { SettingsCard } from '@renderer/components/settings/SettingsCard'
-import { Segmented } from '@renderer/components/Segmented'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@renderer/components/ui/select'
 import { Switch } from '@renderer/components/ui/Switch'
 import { cn } from '@renderer/lib/cn'
 import { formatCompact, formatDurationSec } from '@renderer/lib/format'
@@ -16,6 +22,7 @@ import {
   Info,
   RefreshCw,
   Settings as SettingsIcon,
+  Sparkles,
   Sun,
   X
 } from 'lucide-react'
@@ -23,7 +30,7 @@ import { useEffect, useMemo, useState } from 'react'
 
 const GITHUB_URL = 'https://github.com/aicayzer/superwhisper-analytics'
 const DISCLAIMER =
-  'Not affiliated with SuperWhisper. Built out of a love for the app and curiosity about the data behind every recording.'
+  'Personal project, not affiliated with SuperWhisper. Shared in case it’s useful to anyone else.'
 
 const TRANSCRIPT_VIEW_OPTIONS: ReadonlyArray<{ value: TranscriptViewMode; label: string }> = [
   { value: 'block', label: 'Segments' },
@@ -54,6 +61,7 @@ export function Settings(): React.JSX.Element {
       <RecordingsCard />
       <AppearanceCard />
       <IndexingCard />
+      <DemoModeCard />
       <TranscriptsCard />
       <DictionaryCard />
       <AboutCard />
@@ -268,6 +276,27 @@ function ToggleRow({ label, description, checked, onChange }: ToggleRowProps): R
   )
 }
 
+// ---------- Demo mode ----------------------------------------------------
+
+function DemoModeCard(): React.JSX.Element {
+  const demoMode = useConfigStore((s) => s.demoMode)
+  const setDemoMode = useConfigStore((s) => s.setDemoMode)
+  return (
+    <SettingsCard
+      icon={Sparkles}
+      title="Demo data"
+      subtitle="Swap your recordings for a synthetic dataset — handy for screenshots."
+    >
+      <ToggleRow
+        label="Use demo data"
+        description="200 days of synthetic recordings across four modes. Toggle off to return to your real data."
+        checked={demoMode}
+        onChange={(next) => void setDemoMode(next)}
+      />
+    </SettingsCard>
+  )
+}
+
 // ---------- Transcripts --------------------------------------------------
 
 function TranscriptsCard(): React.JSX.Element {
@@ -279,12 +308,21 @@ function TranscriptsCard(): React.JSX.Element {
       title="Transcripts"
       subtitle="How transcripts are laid out in the recording detail view."
     >
-      <Segmented
-        value={mode}
-        onChange={setMode}
-        options={TRANSCRIPT_VIEW_OPTIONS}
-        ariaLabel="Transcript view"
-      />
+      <Select value={mode} onValueChange={(v) => setMode(v as TranscriptViewMode)}>
+        <SelectTrigger
+          aria-label="Transcript view"
+          className="h-8 w-full justify-between text-[12.5px]"
+        >
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {TRANSCRIPT_VIEW_OPTIONS.map((opt) => (
+            <SelectItem key={opt.value} value={opt.value} className="text-[12.5px]">
+              {opt.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </SettingsCard>
   )
 }
@@ -295,7 +333,6 @@ function DictionaryCard(): React.JSX.Element {
   const fillerWords = useConfigStore((s) => s.fillerWords)
   const setFillerWords = useConfigStore((s) => s.setFillerWords)
   const [draft, setDraft] = useState('')
-  const [filter, setFilter] = useState('')
   const [busy, setBusy] = useState(false)
 
   // Normalise the default list once so the "Reset to default" disabled
@@ -304,12 +341,6 @@ function DictionaryCard(): React.JSX.Element {
   const isDefault =
     fillerWords.length === normalisedDefault.length &&
     fillerWords.every((w, i) => w === normalisedDefault[i])
-
-  const visible = useMemo(() => {
-    const q = filter.trim().toLowerCase()
-    if (!q) return fillerWords
-    return fillerWords.filter((w) => w.includes(q))
-  }, [fillerWords, filter])
 
   async function commit(next: string[]): Promise<void> {
     setBusy(true)
@@ -343,7 +374,7 @@ function DictionaryCard(): React.JSX.Element {
   return (
     <SettingsCard
       icon={BookOpen}
-      title="Dictionary"
+      title="Filler words"
       subtitle="Phrases counted as fillers in the Language analytics."
       headerExtra={
         <span className="text-[12px] text-muted-foreground tabular-nums">
@@ -352,20 +383,13 @@ function DictionaryCard(): React.JSX.Element {
       }
     >
       <div className="space-y-3">
-        <input
-          type="search"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          placeholder="Filter phrases…"
-          className="h-7 w-full rounded-md border border-border bg-background px-2 text-[12.5px] text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-foreground/40"
-        />
         <div className="flex max-h-56 flex-wrap content-start gap-1.5 overflow-y-auto rounded-md border border-border bg-foreground/[0.02] p-2">
-          {visible.length === 0 ? (
+          {fillerWords.length === 0 ? (
             <span className="px-2 py-1 text-[12px] text-muted-foreground">
-              {fillerWords.length === 0 ? 'No filler phrases configured.' : 'No matches.'}
+              No filler phrases configured.
             </span>
           ) : (
-            visible.map((phrase) => (
+            fillerWords.map((phrase) => (
               <span
                 key={phrase}
                 className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2 py-0.5 text-[12px] text-foreground"

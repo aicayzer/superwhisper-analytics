@@ -17,8 +17,10 @@ interface BarListProps {
    *  dataset is short. Without this, 3 phrases in a 400px card give
    *  133px-tall bars — visually unbalanced. Default 36. */
   maxRowHeight?: number
-  /** Width of the label column in px. */
-  labelWidth?: number
+  /** Maximum width of the label column in px. Labels auto-size to the
+   *  widest entry within this bound — short label sets give skinnier
+   *  columns and longer bars. Default 140. */
+  maxLabelWidth?: number
   className?: string
 }
 
@@ -41,7 +43,7 @@ function BarListInner({
   data,
   minRowHeight = 22,
   maxRowHeight = 36,
-  labelWidth = 96,
+  maxLabelWidth = 140,
   className
 }: BarListProps): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -74,24 +76,32 @@ function BarListInner({
   const visible = data.slice(0, Math.min(visibleCount, data.length))
   const max = visible.reduce((m, d) => (d.count > m ? d.count : m), 0) || 1
 
+  // Grid: three columns (label content-sized, bar fills, count fixed) plus
+  // one row per item bounded by min/max-row-height. Rows distribute the
+  // available height evenly without forcing wide gutters when labels are
+  // short.
   return (
-    <div ref={containerRef} className={cn('flex h-full flex-col overflow-hidden', className)}>
+    <div
+      ref={containerRef}
+      className={cn('grid h-full overflow-hidden px-1', className)}
+      style={{
+        gridTemplateColumns: 'minmax(0, max-content) minmax(0, 1fr) auto',
+        gridTemplateRows: `repeat(${visible.length}, minmax(${minRowHeight}px, ${maxRowHeight}px))`,
+        columnGap: '0.5rem'
+      }}
+    >
       {visible.map((d, i) => {
         const pct = (d.count / max) * 100
         return (
-          <div
-            key={`${i}-${d.label}`}
-            className="flex items-center gap-2 px-1"
-            style={{ flex: '1 1 0', minHeight: 0, maxHeight: maxRowHeight }}
-          >
+          <div key={`${i}-${d.label}`} className="contents">
             <span
-              className="shrink-0 truncate text-right text-[11.5px] text-muted-foreground"
-              style={{ width: labelWidth }}
+              className="flex min-w-0 items-center truncate text-right text-[11.5px] text-muted-foreground"
+              style={{ maxWidth: maxLabelWidth }}
               title={d.label}
             >
               {d.label}
             </span>
-            <div className="relative flex min-w-0 flex-1 items-center">
+            <div className="flex items-center">
               <div className="h-2.5 w-full overflow-hidden rounded-sm bg-foreground/[0.06]">
                 <div
                   className="h-full rounded-sm bg-[var(--chart-1)] transition-[width] duration-200 ease-out"
@@ -99,7 +109,7 @@ function BarListInner({
                 />
               </div>
             </div>
-            <span className="w-12 shrink-0 text-right tabular-nums text-[11.5px] text-muted-foreground">
+            <span className="flex w-12 items-center justify-end text-right tabular-nums text-[11.5px] text-muted-foreground">
               {d.count.toLocaleString()}
             </span>
           </div>

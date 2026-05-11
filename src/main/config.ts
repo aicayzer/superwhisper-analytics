@@ -26,7 +26,8 @@ function defaultConfig(): Config {
     superwhisperPath: null,
     fillerWords: [...DEFAULT_FILLER_PHRASES],
     watchFolder: false,
-    transcriptsOnly: false
+    transcriptsOnly: false,
+    demoMode: false
   }
 }
 
@@ -50,7 +51,8 @@ export function getConfig(): Config {
       superwhisperPath: parsed.superwhisperPath ?? null,
       fillerWords,
       watchFolder: parsed.watchFolder === true,
-      transcriptsOnly: parsed.transcriptsOnly === true
+      transcriptsOnly: parsed.transcriptsOnly === true,
+      demoMode: parsed.demoMode === true
     }
   } catch (err) {
     console.warn('[config] failed to read config.json, falling back to defaults:', err)

@@ -89,20 +89,29 @@ function DetailView({ rec }: { rec: Recording }): React.JSX.Element {
   // player is hidden, so decoding peaks is wasted work. Leaves any
   // previously-decoded peaks in state untouched; the Waveform isn't
   // rendered while transcripts-only is on anyway.
+  //
+  // If decode fails (or returns mostly silent peaks — short cancels,
+  // hardware glitches), fall back to a deterministic synthetic waveform
+  // derived from the recording id + duration so the player never looks
+  // empty. Same id → same shape on every render.
   useEffect(() => {
     if (transcriptsOnly) return undefined
     let cancelled = false
     decodePeaks(audioUrl, WAVEFORM_PEAK_COUNT)
       .then((p) => {
-        if (!cancelled) setPeaks(p)
+        if (cancelled) return
+        const hasSignal = p.some((v) => v > 0.02)
+        setPeaks(hasSignal ? p : syntheticPeaks(rec.id, WAVEFORM_PEAK_COUNT))
       })
       .catch((err) => {
-        if (!cancelled) console.warn('[TranscriptDetail] failed to decode peaks', err)
+        if (cancelled) return
+        console.warn('[TranscriptDetail] failed to decode peaks', err)
+        setPeaks(syntheticPeaks(rec.id, WAVEFORM_PEAK_COUNT))
       })
     return () => {
       cancelled = true
     }
-  }, [audioUrl, transcriptsOnly])
+  }, [audioUrl, transcriptsOnly, rec.id])
 
   // Keyboard shortcuts: Space play/pause, arrow keys scrub. Ignore typing.
   useEffect(() => {
@@ -347,6 +356,35 @@ function BlockTranscript({
  * doesn't light up "category"). The hovered word arrives already
  * lowercase from tokenise().
  */
+/**
+ * Deterministic stand-in waveform for recordings whose audio fails to
+ * decode (or returns near-zero peaks). Built from a hashed seed so the
+ * same recording id always produces the same shape — it's a graceful
+ * fallback, not a placeholder that flickers on remount.
+ */
+function syntheticPeaks(seed: string, count: number): number[] {
+  let h = 0
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0
+  // Mulberry32 PRNG — short, fast, and good enough for a visual stand-in.
+  const rng = (): number => {
+    h = (h + 0x6d2b79f5) | 0
+    let t = h
+    t = Math.imul(t ^ (t >>> 15), t | 1)
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+  const peaks: number[] = []
+  for (let i = 0; i < count; i++) {
+    const t = i / count
+    // Gentle envelope so the waveform tapers at the very start and end
+    // — looks more "real" than uniform noise.
+    const envelope = Math.sin(Math.PI * t)
+    const noise = 0.45 + rng() * 0.55
+    peaks.push(envelope * noise)
+  }
+  return peaks
+}
+
 function highlightWord(text: string, word: string | null): React.ReactNode {
   if (!word) return text
   // Defensive escape in case tokenise leaves apostrophes in.

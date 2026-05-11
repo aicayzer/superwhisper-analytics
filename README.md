@@ -2,7 +2,7 @@
 
 A local Mac desktop app for browsing your SuperWhisper recording history. Reads your recordings from disk, never sends them anywhere. No telemetry. No accounts.
 
-> _**Unofficial.** Not endorsed by, affiliated with, or sponsored by SuperWhisper. Built out of personal enthusiasm for the app._
+> _**Personal project, not affiliated with SuperWhisper.** Shared in case it’s useful to anyone else._
 
 ## Why this exists
 

@@ -158,22 +158,22 @@ export function TranscriptsList(): React.JSX.Element {
   return (
     <div className="flex h-full flex-col">
       <Card className="flex min-h-0 flex-1 flex-col overflow-hidden p-0">
-        {/* Toolbar sits above the table, flush with the card edge. Hosts the
-            column-visibility menu (previously lived in the navbar). */}
-        <div className="flex items-center justify-end border-b border-border px-4 py-1.5">
-          <ColumnsMenu visibility={visibility} onToggle={toggleColumn} />
-        </div>
         <div className="min-h-0 flex-1 overflow-y-auto">
           <table className="w-full text-[13px]">
             <thead className="sticky top-0 z-10 bg-card">
               <tr className="text-[12px] font-medium text-foreground">
-                {visibleCols.map((c) => (
+                {visibleCols.map((c, i) => (
                   <SortHeader
                     key={c.key}
                     col={c}
                     active={c.sortKey === sortKey}
                     direction={dir}
                     onClick={c.sortKey ? () => toggleSort(c.sortKey!) : undefined}
+                    trailing={
+                      i === visibleCols.length - 1 ? (
+                        <ColumnsMenu visibility={visibility} onToggle={toggleColumn} />
+                      ) : undefined
+                    }
                   />
                 ))}
               </tr>
@@ -271,42 +271,59 @@ interface SortHeaderProps {
   active: boolean
   direction: Direction
   onClick?: () => void
+  /** Element rendered at the far end of the cell — used to host the
+   *  column-visibility menu inside the rightmost header. */
+  trailing?: React.ReactNode
 }
 
-function SortHeader({ col, active, direction, onClick }: SortHeaderProps): React.JSX.Element {
+function SortHeader({
+  col,
+  active,
+  direction,
+  onClick,
+  trailing
+}: SortHeaderProps): React.JSX.Element {
   const sortable = Boolean(onClick)
+  const labelNode = sortable ? (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'inline-flex items-center gap-1 rounded transition-colors hover:text-foreground',
+        active && 'text-foreground',
+        col.align === 'right' && 'flex-row-reverse'
+      )}
+    >
+      {col.label}
+      {active &&
+        (direction === 'asc' ? (
+          <ChevronUp className="h-3 w-3" strokeWidth={2} />
+        ) : (
+          <ChevronDown className="h-3 w-3" strokeWidth={2} />
+        ))}
+    </button>
+  ) : (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1 text-muted-foreground',
+        col.align === 'right' && 'flex-row-reverse'
+      )}
+    >
+      {col.label}
+    </span>
+  )
   return (
     <th
       className="border-b border-border px-4 py-2.5 font-medium"
       style={{ width: col.width, textAlign: col.align }}
     >
-      {sortable ? (
-        <button
-          type="button"
-          onClick={onClick}
-          className={cn(
-            'inline-flex items-center gap-1 rounded transition-colors hover:text-foreground',
-            active && 'text-foreground',
-            col.align === 'right' && 'flex-row-reverse'
-          )}
-        >
-          {col.label}
-          {active &&
-            (direction === 'asc' ? (
-              <ChevronUp className="h-3 w-3" strokeWidth={2} />
-            ) : (
-              <ChevronDown className="h-3 w-3" strokeWidth={2} />
-            ))}
-        </button>
+      {trailing ? (
+        <div className="flex items-center justify-between gap-2">
+          {labelNode}
+          {trailing}
+        </div>
       ) : (
-        <span
-          className={cn(
-            'inline-flex items-center gap-1 text-muted-foreground',
-            col.align === 'right' && 'flex-row-reverse'
-          )}
-        >
-          {col.label}
-        </span>
+        labelNode
       )}
     </th>
   )
