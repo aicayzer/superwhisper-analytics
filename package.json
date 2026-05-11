@@ -1,9 +1,13 @@
 {
   "name": "superwhisper-analytics",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Local Mac desktop app for visualising SuperWhisper recording history",
   "main": "./out/main/index.js",
-  "author": "August Cayzer",
+  "author": {
+    "name": "August Cayzer",
+    "email": "hello@cyzr.me",
+    "url": "https://cyzr.me"
+  },
   "license": "MIT",
   "private": false,
   "homepage": "https://github.com/aicayzer/superwhisper-analytics",
@@ -11,6 +15,23 @@
     "type": "git",
     "url": "git+https://github.com/aicayzer/superwhisper-analytics.git"
   },
+  "bugs": {
+    "email": "hello@cyzr.me",
+    "url": "https://github.com/aicayzer/superwhisper-analytics/issues"
+  },
+  "keywords": [
+    "superwhisper",
+    "analytics",
+    "electron",
+    "macos",
+    "transcription",
+    "voice-dictation"
+  ],
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=11.0.0"
+  },
+  "packageManager": "pnpm@11.0.9",
   "scripts": {
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -67,11 +88,5 @@
     "typescript": "^5.9.3",
     "vite": "^7.2.6",
     "vitest": "^3.2.4"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "electron",
-      "esbuild"
-    ]
   }
 }
