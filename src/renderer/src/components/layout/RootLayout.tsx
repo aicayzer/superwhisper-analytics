@@ -88,9 +88,24 @@ export function RootLayout(): React.JSX.Element {
     title = titleFor(location.pathname)
   }
 
+  // Soft fade behind the navbar — opaque against the background at the
+  // top, transparent below the header. Keeps tall scrolling content from
+  // visually colliding with the breadcrumb / range pills.
+  const maskHeight = HEADER_TOP + HEADER_H + FRAME_GAP + 16
   return (
     <Window>
       <Sidebar />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute top-0 z-20 transition-[left] duration-200 ease-out"
+        style={{
+          left: leftPad - CONTENT_GUTTER / 2,
+          right: 0,
+          height: maskHeight,
+          background:
+            'linear-gradient(to bottom, var(--background) 0%, var(--background) 55%, color-mix(in srgb, var(--background) 60%, transparent) 80%, transparent 100%)'
+        }}
+      />
       <MainHeader title={title} leftPad={leftPad} rightPad={CONTENT_GUTTER} />
       <main
         className="absolute inset-0 overflow-y-auto bg-background transition-[padding] duration-200 ease-out"
