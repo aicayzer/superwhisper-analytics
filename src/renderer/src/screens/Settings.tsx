@@ -1,6 +1,12 @@
 import { AppearancePicker } from '@renderer/components/settings/AppearancePicker'
 import { SettingsCard } from '@renderer/components/settings/SettingsCard'
-import { Segmented } from '@renderer/components/Segmented'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@renderer/components/ui/select'
 import { Switch } from '@renderer/components/ui/Switch'
 import { cn } from '@renderer/lib/cn'
 import { formatCompact, formatDurationSec } from '@renderer/lib/format'
@@ -279,12 +285,21 @@ function TranscriptsCard(): React.JSX.Element {
       title="Transcripts"
       subtitle="How transcripts are laid out in the recording detail view."
     >
-      <Segmented
-        value={mode}
-        onChange={setMode}
-        options={TRANSCRIPT_VIEW_OPTIONS}
-        ariaLabel="Transcript view"
-      />
+      <Select value={mode} onValueChange={(v) => setMode(v as TranscriptViewMode)}>
+        <SelectTrigger
+          aria-label="Transcript view"
+          className="h-8 w-full justify-between text-[12.5px]"
+        >
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {TRANSCRIPT_VIEW_OPTIONS.map((opt) => (
+            <SelectItem key={opt.value} value={opt.value} className="text-[12.5px]">
+              {opt.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </SettingsCard>
   )
 }
