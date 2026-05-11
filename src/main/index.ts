@@ -4,6 +4,7 @@ import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { registerIpcHandlers } from './ipc'
 import { registerSwProtocolHandler, registerSwSchemeAsPrivileged } from './protocol'
+import { disableWatch } from './watcher'
 
 // Privileged scheme registration must happen BEFORE app.whenReady — the
 // renderer's session inherits these privileges at startup. Doing this at
@@ -72,4 +73,8 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
   }
+})
+
+app.on('before-quit', () => {
+  disableWatch()
 })
