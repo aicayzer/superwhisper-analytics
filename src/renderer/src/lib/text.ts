@@ -6,6 +6,7 @@
 export {
   buildFillers,
   DEFAULT_FILLER_PHRASES,
+  normalisePhrases,
   STOP_WORDS,
   tokenise,
   type FillerSummary

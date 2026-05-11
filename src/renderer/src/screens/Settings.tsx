@@ -4,7 +4,7 @@ import { Segmented } from '@renderer/components/Segmented'
 import { Switch } from '@renderer/components/ui/Switch'
 import { cn } from '@renderer/lib/cn'
 import { formatCompact, formatDurationSec } from '@renderer/lib/format'
-import { DEFAULT_FILLER_PHRASES } from '@renderer/lib/text'
+import { DEFAULT_FILLER_PHRASES, normalisePhrases } from '@renderer/lib/text'
 import { useConfigStore } from '@renderer/state/configStore'
 import { useDataStore } from '@renderer/state/dataStore'
 import { useUiPrefsStore, type TranscriptViewMode } from '@renderer/state/uiPrefsStore'
@@ -321,14 +321,15 @@ function DictionaryCard(): React.JSX.Element {
   }
 
   async function add(): Promise<void> {
-    const cleaned = draft.trim().toLowerCase().replace(/\s+/g, ' ')
-    if (!cleaned) return
-    if (fillerWords.includes(cleaned)) {
-      setDraft('')
-      return
-    }
+    // Run the candidate through the same canon as the persisted list,
+    // then dedupe against the existing entries — `normalisePhrases` returns
+    // an empty list if the draft is blank, a single-entry list otherwise.
+    // Merging then re-normalising gives us trim/lower/dedup semantics for
+    // free, including whitespace- and case-only duplicates.
+    const merged = normalisePhrases([...fillerWords, draft])
     setDraft('')
-    await commit([...fillerWords, cleaned])
+    if (merged.length === fillerWords.length) return
+    await commit(merged)
   }
 
   async function remove(phrase: string): Promise<void> {
