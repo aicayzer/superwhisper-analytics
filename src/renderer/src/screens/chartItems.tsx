@@ -25,7 +25,7 @@ export function VolumeOverTimeChart(): React.JSX.Element {
   const { daily } = useFilteredAggregates()
   return (
     <ActivityArea
-      data={daily as unknown as Array<Record<string, unknown>>}
+      data={daily}
       xKey="date"
       yKey="count"
       formatTick={(v) => {
@@ -50,13 +50,7 @@ export function RecordingStreakChart(): React.JSX.Element {
 
 export function DurationMixChart(): React.JSX.Element {
   const { durationDist } = useFilteredAggregates()
-  return (
-    <DistBar
-      data={durationDist as unknown as Array<Record<string, unknown>>}
-      xKey="label"
-      yKey="count"
-    />
-  )
+  return <DistBar data={durationDist} xKey="label" yKey="count" />
 }
 
 export function ModePieChart(): React.JSX.Element {
@@ -97,7 +91,7 @@ export function SpeakingPaceChart(): React.JSX.Element {
   const { wpmTrend, wpmDots } = useFilteredAggregates()
   return (
     <PaceTrend
-      trend={wpmTrend as unknown as Array<Record<string, unknown>>}
+      trend={wpmTrend}
       dots={wpmDots}
       xKey="period"
       yKey="value"
@@ -111,7 +105,7 @@ export function FillerRateChart(): React.JSX.Element {
   const { fillerTrend } = useFilteredAggregates()
   return (
     <LineTrend
-      data={fillerTrend as unknown as Array<Record<string, unknown>>}
+      data={fillerTrend}
       xKey="period"
       yKey="value"
       formatTick={(v) => String(v).replace(/^\d{4}-/, '')}
@@ -122,20 +116,14 @@ export function FillerRateChart(): React.JSX.Element {
 
 export function SentenceLengthChart(): React.JSX.Element {
   const { sentenceDist } = useFilteredAggregates()
-  return (
-    <DistBar
-      data={sentenceDist as unknown as Array<Record<string, unknown>>}
-      xKey="label"
-      yKey="count"
-    />
-  )
+  return <DistBar data={sentenceDist} xKey="label" yKey="count" />
 }
 
 export function VocabularyGrowthChart(): React.JSX.Element {
   const { vocabGrowth } = useFilteredAggregates()
   return (
     <ActivityArea
-      data={vocabGrowth as unknown as Array<Record<string, unknown>>}
+      data={vocabGrowth}
       xKey="period"
       yKey="value"
       formatTick={(v) => String(v).replace(/^\d{4}-/, '')}
@@ -147,7 +135,7 @@ export function ActivityChart(): React.JSX.Element {
   const { daily } = useFilteredAggregates()
   return (
     <ActivityArea
-      data={daily as unknown as Array<Record<string, unknown>>}
+      data={daily}
       xKey="date"
       yKey="count"
       formatTick={(v) => {
@@ -162,11 +150,5 @@ export function ActivityChart(): React.JSX.Element {
 
 export function ByDayOfWeekChart(): React.JSX.Element {
   const { dayOfWeek } = useFilteredAggregates()
-  return (
-    <VBar
-      data={dayOfWeek as unknown as Array<Record<string, unknown>>}
-      xKey="dayName"
-      yKey="count"
-    />
-  )
+  return <VBar data={dayOfWeek} xKey="dayName" yKey="count" />
 }

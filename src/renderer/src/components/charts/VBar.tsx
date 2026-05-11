@@ -3,8 +3,8 @@ import { memo } from 'react'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { ChartTooltip } from './ChartTooltip'
 
-interface VBarProps {
-  data: Array<Record<string, unknown>>
+interface VBarProps<T extends object> {
+  data: readonly T[]
   xKey: string
   yKey: string
   /** Bar fill — defaults to monotone foreground */
@@ -19,16 +19,19 @@ interface VBarProps {
  * collapsed to a single visible "0" on counts ≥1000. `width={44}` +
  * `formatCompact` resolves it.
  */
-function VBarInner({
+function VBarInner<T extends object>({
   data,
   xKey,
   yKey,
   fill = 'var(--chart-1)',
   maxBarSize = 32
-}: VBarProps): React.JSX.Element {
+}: VBarProps<T>): React.JSX.Element {
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={data} margin={{ top: 8, right: 8, left: -4, bottom: 0 }}>
+      <BarChart
+        data={data as ReadonlyArray<Record<string, unknown>>}
+        margin={{ top: 8, right: 8, left: -4, bottom: 0 }}
+      >
         <CartesianGrid stroke="var(--border)" strokeDasharray="2 4" vertical={false} />
         <XAxis
           dataKey={xKey}
@@ -57,4 +60,4 @@ function VBarInner({
   )
 }
 
-export const VBar = memo(VBarInner)
+export const VBar = memo(VBarInner) as typeof VBarInner

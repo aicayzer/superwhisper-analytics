@@ -90,11 +90,7 @@ export function Usage(): React.JSX.Element {
           (3/5, wide GitHub-style year grid). */}
       <div className="grid min-h-0 flex-1 grid-cols-[2fr_3fr] gap-3">
         <ChartCard title="Duration mix" slug="duration-mix">
-          <DistBar
-            data={durationDist as unknown as Array<Record<string, unknown>>}
-            xKey="label"
-            yKey="count"
-          />
+          <DistBar data={durationDist} xKey="label" yKey="count" />
         </ChartCard>
         <ChartCard title="Recording streak" slug="recording-streak">
           <StreakCalendar data={streakCells} />

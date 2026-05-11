@@ -66,7 +66,7 @@ export function Overview(): React.JSX.Element {
 
       <ChartCard title="Activity" slug="activity" className="min-h-0 flex-1">
         <ActivityArea
-          data={current.daily as unknown as Array<Record<string, unknown>>}
+          data={current.daily}
           xKey="date"
           yKey="count"
           formatTick={formatActivityTick}

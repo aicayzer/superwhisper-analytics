@@ -88,7 +88,7 @@ export function Language(): React.JSX.Element {
       <div className="grid min-h-0 flex-1 grid-cols-2 gap-3">
         <ChartCard title="Speaking pace" slug="speaking-pace">
           <PaceTrend
-            trend={wpmTrend as unknown as Array<Record<string, unknown>>}
+            trend={wpmTrend}
             dots={sampledDots}
             xKey="period"
             yKey="value"
@@ -103,7 +103,7 @@ export function Language(): React.JSX.Element {
         </ChartCard>
         <ChartCard title="Filler rate over time" slug="filler-rate">
           <LineTrend
-            data={fillerTrend as unknown as Array<Record<string, unknown>>}
+            data={fillerTrend}
             xKey="period"
             yKey="value"
             formatTick={(v) => String(v).replace(/^\d{4}-/, '')}
@@ -114,15 +114,11 @@ export function Language(): React.JSX.Element {
 
       <div className="grid min-h-0 flex-1 grid-cols-2 gap-3">
         <ChartCard title="Sentence length" slug="sentence-length">
-          <DistBar
-            data={sentenceDist as unknown as Array<Record<string, unknown>>}
-            xKey="label"
-            yKey="count"
-          />
+          <DistBar data={sentenceDist} xKey="label" yKey="count" />
         </ChartCard>
         <ChartCard title="Vocabulary growth" slug="vocabulary-growth">
           <ActivityArea
-            data={vocabGrowth as unknown as Array<Record<string, unknown>>}
+            data={vocabGrowth}
             xKey="period"
             yKey="value"
             formatTick={(v) => String(v).replace(/^\d{4}-/, '')}

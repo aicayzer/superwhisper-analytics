@@ -12,8 +12,8 @@ import {
 } from 'recharts'
 import { ChartTooltip } from './ChartTooltip'
 
-interface LineTrendProps {
-  data: Array<Record<string, unknown>>
+interface LineTrendProps<T extends object> {
+  data: readonly T[]
   xKey: string
   yKey: string
   /** Optional horizontal target line (e.g. WPM goal). */
@@ -29,18 +29,21 @@ interface LineTrendProps {
  * Optional dashed reference line for a target value (e.g. 140 WPM). Fills
  * its container.
  */
-function LineTrendInner({
+function LineTrendInner<T extends object>({
   data,
   xKey,
   yKey,
   reference,
   formatTick,
   formatYTick
-}: LineTrendProps): React.JSX.Element {
+}: LineTrendProps<T>): React.JSX.Element {
   const yTick = formatYTick ?? ((v: number) => formatCompact(v))
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <LineChart data={data} margin={{ top: 8, right: 8, left: -4, bottom: 0 }}>
+      <LineChart
+        data={data as ReadonlyArray<Record<string, unknown>>}
+        margin={{ top: 8, right: 8, left: -4, bottom: 0 }}
+      >
         <CartesianGrid stroke="var(--border)" strokeDasharray="2 4" vertical={false} />
         <XAxis
           dataKey={xKey}
@@ -90,4 +93,4 @@ function LineTrendInner({
   )
 }
 
-export const LineTrend = memo(LineTrendInner)
+export const LineTrend = memo(LineTrendInner) as typeof LineTrendInner
