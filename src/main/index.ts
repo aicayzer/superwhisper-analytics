@@ -44,7 +44,7 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
-  electronApp.setAppUserModelId('com.aicayzer.superwhisper-analytics')
+  electronApp.setAppUserModelId('me.cyzr.superwhisper-analytics')
 
   // In dev, the dock icon comes from Electron's bundled framework .app —
   // not from build/icon.icns (which only applies to packaged builds).
