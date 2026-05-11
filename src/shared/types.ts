@@ -179,4 +179,8 @@ export interface HydratePayload {
   count: number
   /** Populated when scan failed (path missing/invalid). */
   error: string | null
+  /** Folders we tried to parse but couldn't (invalid JSON). */
+  scanErrors: number
+  /** Folders skipped because they didn't contain a `meta.json`. */
+  scanSkipped: number
 }

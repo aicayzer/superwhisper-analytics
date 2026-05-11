@@ -21,6 +21,8 @@ let recordings: Recording[] = []
 let aggregates: Aggregates = emptyAggregates()
 let indexedAt: string | null = null
 let lastScannedPath: string | null = null
+let scanErrors = 0
+let scanSkipped = 0
 
 function buildPayload(error: string | null = null): HydratePayload {
   return {
@@ -28,7 +30,9 @@ function buildPayload(error: string | null = null): HydratePayload {
     aggregates,
     indexedAt: indexedAt ?? '',
     count: recordings.length,
-    error
+    error,
+    scanErrors,
+    scanSkipped
   }
 }
 
@@ -37,6 +41,8 @@ function clear(): void {
   aggregates = emptyAggregates()
   indexedAt = null
   lastScannedPath = null
+  scanErrors = 0
+  scanSkipped = 0
 }
 
 function rescan(): HydratePayload {
@@ -58,6 +64,8 @@ function rescan(): HydratePayload {
   aggregates = computeAll(recordings, new Date())
   indexedAt = new Date().toISOString()
   lastScannedPath = path
+  scanErrors = result.errors
+  scanSkipped = result.skipped
   const t2 = Date.now()
   console.log(
     `[cache] scanned ${recordings.length} recordings in ${t1 - t0}ms, aggregated in ${t2 - t1}ms` +

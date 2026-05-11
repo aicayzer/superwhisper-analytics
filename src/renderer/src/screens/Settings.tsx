@@ -72,6 +72,7 @@ function RecordingsCard(): React.JSX.Element {
   const loading = useDataStore((s) => s.loading)
   const reindexing = useDataStore((s) => s.reindexing)
   const error = useDataStore((s) => s.error)
+  const scanErrors = useDataStore((s) => s.scanErrors)
   const reindex = useDataStore((s) => s.reindex)
   const totalDurationSec = useDataStore((s) => s.aggregates.overview.totalDurationSec)
   // Tick once a minute so the "5m ago" string drifts naturally without
@@ -136,6 +137,11 @@ function RecordingsCard(): React.JSX.Element {
         {error && (
           <p className="text-[12px] text-red-500" role="alert">
             {error}
+          </p>
+        )}
+        {!error && scanErrors > 0 && (
+          <p className="text-[12px] text-amber-500" role="status">
+            {scanErrors} recording{scanErrors === 1 ? '' : 's'} failed to parse
           </p>
         )}
       </div>
