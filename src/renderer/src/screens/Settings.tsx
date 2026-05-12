@@ -93,40 +93,67 @@ function RecordingsCard(): React.JSX.Element {
           ? { label: 'All recordings indexed', tone: 'ok' }
           : { label: 'Not yet indexed', tone: 'busy' }
 
+  // Top-right of the card header now mirrors the sidebar footer pattern:
+  // a small status line + a refresh icon button. Folder picking lives
+  // inline at the right edge of the path bar. The previous "Choose folder
+  // / Reindex now" button row is gone — both actions are now reachable
+  // from the header / path bar.
+  const headerExtra = (
+    <div className="flex items-center gap-1.5">
+      <StatusLine
+        label={status.label}
+        tone={status.tone}
+        indexedAt={indexedAt}
+        busy={busy}
+        reindexing={reindexing}
+      />
+      <button
+        type="button"
+        onClick={() => void reindex()}
+        disabled={!isValid || busy}
+        title={isValid ? 'Reindex recordings' : 'Pick a valid folder first'}
+        aria-label="Reindex recordings"
+        className={cn(
+          'inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors',
+          'hover:bg-foreground/5 hover:text-foreground',
+          'disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground'
+        )}
+      >
+        <RefreshCw className={cn('h-3.5 w-3.5', reindexing && 'animate-spin')} strokeWidth={1.8} />
+      </button>
+    </div>
+  )
+
   return (
     <SettingsCard
       icon={Folder}
       title="Recordings folder"
       subtitle="Where SuperWhisper saves your transcripts."
-      headerExtra={<StatusPill label={status.label} tone={status.tone} />}
+      headerExtra={headerExtra}
     >
       <div className="space-y-4">
-        <p
-          className="break-all rounded-md bg-foreground/[0.04] px-3 py-2 font-mono text-[12px] leading-relaxed text-muted-foreground"
+        {/* Path + inline "Choose…" affordance. The path stretches; the
+            button sits on the right inside the same surface so the row
+            reads as one editable field. */}
+        <div
+          className="flex items-center gap-2 rounded-md bg-foreground/[0.04] py-1.5 pl-3 pr-1.5"
           title={path ?? 'No folder selected'}
         >
-          {path ?? 'No folder selected'}
-        </p>
+          <span className="min-w-0 flex-1 truncate font-mono text-[12px] leading-relaxed text-muted-foreground">
+            {path ?? 'No folder selected'}
+          </span>
+          <button
+            type="button"
+            onClick={choose}
+            className="inline-flex h-6 shrink-0 items-center rounded-[5px] border border-border bg-floating px-2 text-[11.5px] text-foreground transition-colors hover:bg-foreground/5"
+          >
+            Choose…
+          </button>
+        </div>
         <div className="grid grid-cols-3 gap-3 border-t border-border pt-4">
           <Stat label="recordings" value={formatCompact(count)} />
           <Stat label="audio" value={formatDurationSec(totalDurationSec)} />
           <Stat label="last indexed" value={indexedAt ? relativeTime(indexedAt) : '—'} />
-        </div>
-        <div className="flex items-center gap-2 border-t border-border pt-4">
-          <button type="button" onClick={choose} className={CHROME_BUTTON}>
-            <Folder className="h-3 w-3" strokeWidth={1.8} />
-            Choose folder…
-          </button>
-          <button
-            type="button"
-            onClick={() => void reindex()}
-            disabled={!isValid || busy}
-            title={isValid ? 'Rescan the recordings folder' : 'Pick a valid folder first'}
-            className={CHROME_BUTTON}
-          >
-            <RefreshCw className={cn('h-3 w-3', reindexing && 'animate-spin')} strokeWidth={1.8} />
-            {reindexing ? 'Reindexing…' : 'Reindex now'}
-          </button>
         </div>
         {error && (
           <p className="text-[12px] text-red-500" role="alert">
@@ -159,12 +186,26 @@ function Stat({ label, value }: { label: string; value: string }): React.JSX.Ele
   )
 }
 
-function StatusPill({
+/** Status line shown in the Recordings card header. Mirrors the sidebar
+ *  footer: a status dot, an "Indexed Xm ago" / "Scanning…" string, and
+ *  a refresh button rendered alongside (handled by the caller).
+ *
+ *  When valid + idle, the text is `Indexed Xm ago` so the user gets the
+ *  same affordance the sidebar provides without scanning to a separate
+ *  Stat below. Other states (scanning, reindexing, error, not-found)
+ *  surface their own dedicated copy. */
+function StatusLine({
   label,
-  tone
+  tone,
+  indexedAt,
+  busy,
+  reindexing
 }: {
   label: string
   tone: 'ok' | 'busy' | 'error'
+  indexedAt: string | null
+  busy: boolean
+  reindexing: boolean
 }): React.JSX.Element {
   const dot =
     tone === 'ok'
@@ -172,10 +213,16 @@ function StatusPill({
       : tone === 'error'
         ? 'bg-red-500'
         : 'bg-amber-500 animate-pulse'
+  const text = (() => {
+    if (reindexing) return 'Reindexing…'
+    if (busy) return label
+    if (tone === 'ok' && indexedAt) return `Indexed ${relativeTime(indexedAt)}`
+    return label
+  })()
   return (
     <span className="inline-flex items-center gap-1.5 text-[12px] text-muted-foreground">
       <span className={cn('h-1.5 w-1.5 rounded-full', dot)} aria-hidden />
-      {label}
+      {text}
     </span>
   )
 }
