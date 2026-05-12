@@ -13,24 +13,21 @@ interface DistBarProps<T extends object> {
 
 /**
  * Vertical bar chart over labelled buckets — duration distribution,
- * sentence-length distribution etc. Fills its container. Slightly muted
- * fill to distinguish from the primary VBar.
+ * sentence-length distribution etc. Fills its container.
  *
- * Y-axis was previously 32px wide with no tickFormatter — counts in the
- * thousands overflowed and Recharts clipped them to a single visible "0".
- * `width={44}` + `formatCompact` keeps "1.2k" style ticks readable.
- *
- * Margin-left is tuned (negative) so the y-axis tick labels render close
- * to the card's left edge, visually aligned with the card title. Without
- * the offset, ticks float ~14px right of the title which reads as a
- * misalignment between heading and y-axis.
+ * Y-axis labels are rendered with a custom tick component that left-
+ * anchors them at the chart's left edge. The default Recharts y-axis
+ * right-anchors labels inside its `width` box, which placed them well
+ * inside the card and read as misaligned against the card title. A
+ * left-anchored custom tick (and a small left margin) puts the y-axis
+ * label values flush with the card title's x position.
  */
 function DistBarInner<T extends object>({ data, xKey, yKey }: DistBarProps<T>): React.JSX.Element {
   return (
     <ResponsiveContainer width="100%" height="100%">
       <BarChart
         data={data as ReadonlyArray<Record<string, unknown>>}
-        margin={{ top: 8, right: 8, left: -24, bottom: 0 }}
+        margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
       >
         <CartesianGrid stroke="var(--border)" strokeDasharray="2 4" vertical={false} />
         <XAxis
@@ -40,7 +37,7 @@ function DistBarInner<T extends object>({ data, xKey, yKey }: DistBarProps<T>): 
           axisLine={false}
         />
         <YAxis
-          tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }}
+          tick={YTick}
           tickLine={false}
           axisLine={false}
           width={44}
@@ -57,6 +54,37 @@ function DistBarInner<T extends object>({ data, xKey, yKey }: DistBarProps<T>): 
         />
       </BarChart>
     </ResponsiveContainer>
+  )
+}
+
+/**
+ * Custom Y-axis tick: left-anchors the label at x=0 of the chart so the
+ * value text starts at the card's left edge (visually aligned with the
+ * card title). The native YAxis tick right-anchors inside the YAxis
+ * `width` box, which left the labels visibly offset from the title.
+ */
+// Recharts' YAxisTickContentProps types `x` / `y` as `number | string`,
+// so we accept both and coerce. Realistically Recharts only emits
+// numbers — the loose type is a known quirk.
+interface YTickProps {
+  x?: number | string
+  y?: number | string
+  payload?: { value: number | string }
+}
+
+function YTick(props: YTickProps): React.JSX.Element {
+  const value = props.payload?.value ?? ''
+  return (
+    <text
+      x={0}
+      y={typeof props.y === 'number' ? props.y : Number(props.y) || 0}
+      dy={4}
+      fontSize={11}
+      fill="var(--muted-foreground)"
+      textAnchor="start"
+    >
+      {formatCompact(Number(value))}
+    </text>
   )
 }
 

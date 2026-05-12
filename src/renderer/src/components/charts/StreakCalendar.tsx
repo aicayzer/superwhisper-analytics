@@ -15,9 +15,11 @@ interface StreakCalendarProps {
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const
 
 /** Minimum span (in calendar months) shown by the grid. Even at 7d the
- *  user sees the previous and current month edge-to-edge so the grid
- *  isn't a thin sliver. */
-const MIN_VISIBLE_MONTHS = 2
+ *  user sees roughly the last six months edge-to-edge so the calendar
+ *  reads as a substantial picture of recording history rather than a
+ *  short strip. Out-of-range cells render at the dimmer shade defined
+ *  below so the active window still pops visually. */
+const MIN_VISIBLE_MONTHS = 6
 
 interface GridCell {
   /** ISO date string yyyy-MM-dd. */
