@@ -5,6 +5,7 @@ import { ModePie } from '@renderer/components/charts/ModePie'
 import { StreakCalendar } from '@renderer/components/charts/StreakCalendar'
 import { KpiRow } from '@renderer/components/KpiRow'
 import { formatDurationSec } from '@renderer/lib/format'
+import { useRangeStore, windowFor } from '@renderer/state/rangeStore'
 import { useFilteredAggregates } from '@renderer/state/useFilteredAggregates'
 import { useMemo } from 'react'
 
@@ -15,21 +16,29 @@ import { useMemo } from 'react'
  * aspect that fits it best:
  *
  *   ┌──────────────────────────┬──────────────────┐
- *   │  When you record (3/5)   │  Mode share (2/5)│
- *   │  (hour × day heatmap)    │  (pie)           │
- *   ├──────────────────┬───────┴──────────────────┤
- *   │  Duration mix    │  Streak calendar (3/5)   │
- *   │  (2/5, square)   │  (year of days, github)  │
- *   └──────────────────┴──────────────────────────┘
+ *   │  Recordings by hour 3fr  │  by duration 2fr │
+ *   │  (hour × day heatmap)    │  (distribution)  │
+ *   ├──────────────────────────┴──────────────────┤
+ *   │  Daily activity 2fr      │  by mode 1fr     │
+ *   │  (year of days, calendar)│  (donut)         │
+ *   └─────────────────────────────────────────────┘
  *
- * Top row is "rectangular left, square right". Bottom flips that —
- * a more square duration chart sits beside the wide streak calendar.
+ * The bottom row is two-thirds / one-third so the year-grid calendar
+ * (which reads best wide) gets the real estate while the donut keeps
+ * just enough room for its outside labels + leader lines.
+ *
  * Every aggregate flows through `useFilteredAggregates`, so the cards
  * update with the navbar range pill.
  */
 export function Usage(): React.JSX.Element {
   const { overview, usage, heatmap, durationDist, modeStats, sparklines, streakCells } =
     useFilteredAggregates()
+  const range = useRangeStore((s) => s.range)
+  // The streak calendar wants to know which days are inside the active
+  // range so it can shade them. Range = "All time" returns {} — pass
+  // undefined to the calendar in that case and every cell renders at
+  // full intensity.
+  const { from: rangeFrom, to: rangeTo } = useMemo(() => windowFor(range), [range])
 
   const modePieData = useMemo(
     () => modeStats.map((m) => ({ name: m.modeName, value: m.count })),
@@ -37,11 +46,6 @@ export function Usage(): React.JSX.Element {
   )
 
   return (
-    // CSS grid for the page layout so the two chart rows always share the
-    // remaining height equally. Flex-col with flex-1 children let
-    // intrinsic content drive a taller row than 1fr — which caused the
-    // Duration mix / Streak row to push past the viewport and add a
-    // scrollbar. Explicit `auto_1fr_1fr` guarantees equal split.
     <div className="grid h-full grid-rows-[auto_1fr_1fr] gap-3">
       <KpiRow
         items={[
@@ -67,26 +71,23 @@ export function Usage(): React.JSX.Element {
         ]}
       />
 
-      {/* Top row — Recordings by hour (3/5) + Recordings by mode (2/5). */}
+      {/* Top row — Recordings by hour (3fr) + Recordings by duration (2fr). */}
       <div className="grid min-h-0 grid-cols-[3fr_2fr] gap-3">
         <ChartCard title="Recordings by hour" slug="when-you-record">
-          {/* No fixed cell height — Heatmap stretches its 7 day rows to
-              fill the card so the grid grows with the window. */}
           <Heatmap matrix={heatmap} />
         </ChartCard>
-        <ChartCard title="Recordings by mode" slug="mode-pie" className="min-w-[280px]">
-          <ModePie data={modePieData} />
+        <ChartCard title="Recordings by duration" slug="duration-mix" className="min-w-[260px]">
+          <DistBar data={durationDist} xKey="label" yKey="count" />
         </ChartCard>
       </div>
 
-      {/* Bottom row — Recordings by duration (2/5) + Daily activity grid
-          (3/5, GitHub-style). */}
-      <div className="grid min-h-0 grid-cols-[2fr_3fr] gap-3">
-        <ChartCard title="Recordings by duration" slug="duration-mix" className="min-w-[280px]">
-          <DistBar data={durationDist} xKey="label" yKey="count" />
-        </ChartCard>
+      {/* Bottom row — Daily activity (2fr) + Recordings by mode (1fr). */}
+      <div className="grid min-h-0 grid-cols-[2fr_1fr] gap-3">
         <ChartCard title="Daily activity" slug="recording-streak">
-          <StreakCalendar data={streakCells} />
+          <StreakCalendar data={streakCells} rangeFrom={rangeFrom} rangeTo={rangeTo} />
+        </ChartCard>
+        <ChartCard title="Recordings by mode" slug="mode-pie" className="min-w-[240px]">
+          <ModePie data={modePieData} />
         </ChartCard>
       </div>
     </div>

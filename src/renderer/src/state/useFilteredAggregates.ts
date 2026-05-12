@@ -84,18 +84,18 @@ export function useFilteredAggregates(): Aggregates {
       Math.round(((window.to ?? new Date()).getTime() - (window.from?.getTime() ?? 0)) / DAY_MS)
     )
     const bucketBy = pickBucketBy(windowDays)
-    const streakWindowDays = Math.min(365, windowDays)
     const slice = filterByRange(recordings, window)
-    const filtered = computeAll(slice, new Date(), { bucketBy, streakWindowDays })
-    // Sparklines stay tied to the full unfiltered dataset — they give
-    // recent-trend context behind the big KPI number, and tying them to
-    // the range would shrink "Last 7 days" sparklines into 7 points padded
-    // with 23 zeros, reading as a flat line. Streak cells, however, DO
-    // follow the range now (A2 in the polish pass) so the grid matches
-    // what the rest of the screen is showing.
+    const filtered = computeAll(slice, new Date(), { bucketBy })
+    // Sparklines + streak cells stay tied to the full unfiltered dataset.
+    // Sparklines: shrinking to 7 points padded with zeros reads as a flat
+    // line. Streak cells: the calendar always shows full calendar months
+    // and shades cells inside the range darker than the ones outside — so
+    // it needs the full last-365-days dataset to compute against, with
+    // the active range used only for shading.
     return {
       ...filtered,
-      sparklines: fullAggregates.sparklines
+      sparklines: fullAggregates.sparklines,
+      streakCells: fullAggregates.streakCells
     }
   }, [recordings, fullAggregates, range])
 }
