@@ -3,13 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <title>SuperWhisper Analytics</title>
-    <!-- sw: appears on media-src (for <audio src="sw://..."/>) and on
-         connect-src (for fetch() in audio-peaks.ts during waveform decode).
-         Without these the renderer's CSP falls back to default-src 'self'
-         which blocks every sw:// load. -->
+    <!-- sw: appears on media-src so the renderer's <audio> element can
+         stream from the custom protocol. Without this the renderer's CSP
+         falls back to default-src 'self' which blocks every sw:// load. -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; media-src 'self' sw:; connect-src 'self' sw:"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; media-src 'self' sw:"
     />
   </head>
 
