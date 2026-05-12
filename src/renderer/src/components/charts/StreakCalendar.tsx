@@ -170,7 +170,10 @@ export function StreakCalendar({
 
   return (
     <div
-      className="relative flex h-full min-h-[110px] w-full flex-col gap-1 text-[10px] text-muted-foreground"
+      // py-2 leaves a small inset above the grid and below the axis so
+      // the chart isn't flush against the card's title and bottom edge —
+      // matches the Heatmap's inset for visual consistency.
+      className="relative flex h-full min-h-[110px] w-full flex-col gap-1 py-2 text-[10px] text-muted-foreground"
       onPointerLeave={() => setTip(null)}
     >
       {/* Main grid: day-of-week label column + N week columns. */}

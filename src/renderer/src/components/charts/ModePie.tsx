@@ -130,17 +130,19 @@ export function ModePie({
 
   return (
     <ResponsiveContainer width="100%" height="100%">
-      {/* Generous horizontal margin so the outside labels (~70px wide on
-          each side at the chart's longest names) have room without
-          clipping. The donut radii are kept small as a fraction of the
-          container so the leader lines fit too. */}
-      <PieChart margin={{ top: 8, right: 56, bottom: 8, left: 56 }}>
+      {/* Margin balance: just enough horizontal room for the outside
+          labels + their short leader lines, but tight enough that the
+          donut itself fills the card. Previous 56/56 left the donut
+          looking dwarfed by the empty label gutters; 44/44 pulls the
+          donut closer to its natural size while still keeping labels
+          legible. */}
+      <PieChart margin={{ top: 8, right: 44, bottom: 8, left: 44 }}>
         <Pie
           data={data}
           dataKey="value"
           nameKey="name"
-          innerRadius={donut ? '40%' : 0}
-          outerRadius="70%"
+          innerRadius={donut ? '45%' : 0}
+          outerRadius="82%"
           stroke="var(--card)"
           strokeWidth={1.5}
           isAnimationActive={false}

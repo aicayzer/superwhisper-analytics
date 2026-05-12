@@ -75,10 +75,13 @@ export function Heatmap({
 
   return (
     <div
+      // Tiny inset (py-2) so the grid doesn't sit flush against the card's
+      // title or its bottom edge. Matches the StreakCalendar's inset so
+      // the two grids feel like a consistent visual family.
       className={
         stretch
-          ? 'relative flex h-full min-h-[110px] w-full flex-col text-[10px] text-muted-foreground'
-          : 'relative min-h-[110px] w-full text-[10px] text-muted-foreground'
+          ? 'relative flex h-full min-h-[110px] w-full flex-col py-2 text-[10px] text-muted-foreground'
+          : 'relative min-h-[110px] w-full py-2 text-[10px] text-muted-foreground'
       }
       onPointerLeave={() => setTip(null)}
     >

@@ -46,9 +46,13 @@ export function Settings(): React.JSX.Element {
       <RecordingsCard />
       <AppearanceCard />
       <IndexingCard />
-      <DemoModeCard />
       <TranscriptsCard />
       <DictionaryCard />
+      {/* Demo data sits second-to-last — it's a toggle for showcasing
+          the app rather than a primary preference, so it shouldn't
+          compete for attention with Indexing / Transcripts / Dictionary
+          higher up in the list. */}
+      <DemoModeCard />
       <AboutCard />
     </div>
   )
