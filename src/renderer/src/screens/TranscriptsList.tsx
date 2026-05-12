@@ -61,9 +61,9 @@ const COLS: ColSpec[] = [
   },
   {
     key: 'wordsPerMinute',
-    label: 'Words per minute',
+    label: 'WPM',
     align: 'right',
-    width: '120px',
+    width: '80px',
     sortKey: 'wordsPerMinute',
     defaultVisible: true
   },
