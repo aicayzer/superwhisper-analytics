@@ -45,9 +45,24 @@ export function getConfig(): Config {
     // Normalise fillerWords if present; fall back to the canonical
     // default otherwise. An empty array is a legitimate user choice
     // ("no filler words") and is preserved.
-    const fillerWords = Array.isArray(parsed.fillerWords)
+    //
+    // Additive migration: any phrase that ships in DEFAULT_FILLER_PHRASES
+    // but is absent from the persisted list gets appended. Existing user
+    // entries (including custom ones) keep their order; users who have
+    // explicitly removed a default phrase by editing the list will see it
+    // reappear — accepted trade-off, since the alternative is shipping new
+    // hesitations that never reach existing installs. An empty array
+    // ([] = "no filler words") is treated as intentional and untouched.
+    const persisted = Array.isArray(parsed.fillerWords)
       ? normalisePhrases(parsed.fillerWords)
-      : [...DEFAULT_FILLER_PHRASES]
+      : null
+    const fillerWords: string[] = (() => {
+      if (persisted === null) return [...DEFAULT_FILLER_PHRASES]
+      if (persisted.length === 0) return []
+      const known = new Set(persisted.map((p) => p.toLowerCase()))
+      const missing = DEFAULT_FILLER_PHRASES.filter((p) => !known.has(p.toLowerCase()))
+      return missing.length === 0 ? persisted : normalisePhrases([...persisted, ...missing])
+    })()
     return {
       superwhisperPath: parsed.superwhisperPath ?? null,
       fillerWords,

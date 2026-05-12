@@ -41,7 +41,7 @@ export function RangePill({ value, onChange }: RangePillProps): React.JSX.Elemen
     <div
       role="radiogroup"
       aria-label="Date range"
-      className="inline-flex h-7 items-center rounded-md border border-border bg-foreground/[0.03] p-0.5 [-webkit-app-region:no-drag]"
+      className="inline-flex h-7 items-center rounded-[8px] border border-border bg-foreground/[0.03] p-0.5 [-webkit-app-region:no-drag]"
     >
       {RANGE_PRESETS.map((p) => {
         const active = value.id === p.id
@@ -114,7 +114,7 @@ function ActivePill(): React.JSX.Element {
   return (
     <span
       aria-hidden
-      className="absolute inset-x-0 top-px bottom-px rounded-[4px] bg-background shadow-[0_0_0_1px_var(--border)]"
+      className="absolute inset-x-0 top-px bottom-px rounded-[5px] bg-background shadow-[0_0_0_1px_var(--border)]"
     />
   )
 }

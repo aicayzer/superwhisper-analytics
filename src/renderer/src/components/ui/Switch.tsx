@@ -43,11 +43,16 @@ export function Switch({
         checked ? 'bg-foreground' : 'bg-foreground/[0.18]'
       )}
     >
+      {/* Thumb. Track is 36×22 with a 2px inset for the thumb on both
+          axes — at translate-x 2 the thumb sits 2px from the left, at
+          translate-x 16 the thumb sits 2px from the right. The previous
+          translate-x of 18 sent the thumb flush against the right edge,
+          which read as "not aligned" against the symmetric off state. */}
       <span
         aria-hidden
         className={cn(
           'inline-block h-[18px] w-[18px] rounded-full bg-background shadow-sm transition-transform',
-          checked ? 'translate-x-[18px]' : 'translate-x-0.5'
+          checked ? 'translate-x-[16px]' : 'translate-x-0.5'
         )}
       />
     </button>
