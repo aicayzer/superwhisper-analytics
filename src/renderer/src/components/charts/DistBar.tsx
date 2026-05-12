@@ -24,7 +24,7 @@ interface DistBarProps<T extends object> {
  */
 function DistBarInner<T extends object>({ data, xKey, yKey }: DistBarProps<T>): React.JSX.Element {
   return (
-    <ResponsiveContainer width="100%" height="100%">
+    <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 1, height: 1 }}>
       <BarChart
         data={data as ReadonlyArray<Record<string, unknown>>}
         margin={{ top: 8, right: 8, left: 0, bottom: 0 }}

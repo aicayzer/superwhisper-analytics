@@ -35,6 +35,8 @@ interface ConfigState {
   demoMode: boolean
   /** When true, sidebar auto-collapses on narrow windows. */
   autoHideSidebar: boolean
+  /** When true, DevTools are open. Persisted across restarts. */
+  devTools: boolean
   /** Has the initial round-trip completed? Gates the first-run modal. */
   hydrated: boolean
   /** Transient flag — when true, force the welcome modal regardless
@@ -60,6 +62,8 @@ interface ConfigState {
   setDemoMode: (enabled: boolean) => Promise<void>
   /** Toggle the auto-hide sidebar behaviour. */
   setAutoHideSidebar: (enabled: boolean) => Promise<void>
+  /** Toggle DevTools open/close. Persists across restarts. */
+  setDevTools: (enabled: boolean) => Promise<void>
   /** Wipe the persisted config back to defaults and force the welcome
    *  modal to re-appear. Used by Settings → About → Reset app. */
   resetApp: () => Promise<void>
@@ -79,6 +83,7 @@ function applyStatus(status: ConfigStatus): Partial<ConfigState> {
     transcriptsOnly: status.transcriptsOnly,
     demoMode: status.demoMode,
     autoHideSidebar: status.autoHideSidebar,
+    devTools: status.devTools,
     hydrated: true
   }
 }
@@ -93,6 +98,7 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
   transcriptsOnly: false,
   demoMode: false,
   autoHideSidebar: true,
+  devTools: false,
   hydrated: false,
   welcomeForceShow: false,
 
@@ -157,6 +163,12 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
   setAutoHideSidebar: async (enabled) => {
     set({ autoHideSidebar: enabled })
     const updated = await window.api.config.setAutoHideSidebar(enabled)
+    set(applyStatus(updated))
+  },
+
+  setDevTools: async (enabled) => {
+    set({ devTools: enabled })
+    const updated = await window.api.config.setDevTools(enabled)
     set(applyStatus(updated))
   },
 
