@@ -5,10 +5,13 @@ import { useConfigStore } from '@renderer/state/configStore'
 import { useDataStore } from '@renderer/state/dataStore'
 import { SIDEBAR_AUTO_HIDE_BELOW, useLayoutStore } from '@renderer/state/layoutStore'
 import { chartBreadcrumb } from '@renderer/screens/chartRegistry'
+import type { Recording } from '@shared/types'
+import { Copy } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { CommandPalette } from '../command-palette/CommandPalette'
 import { MainHeader, type Breadcrumb } from './MainHeader'
+import { NavActionPill } from './NavActionPill'
 import { Sidebar } from './Sidebar'
 import { Window } from './Window'
 
@@ -33,6 +36,25 @@ const TITLES: Record<string, string> = {
 function titleFor(pathname: string): string {
   if (pathname.startsWith('/transcripts/')) return 'Transcripts'
   return TITLES[pathname] ?? 'SuperWhisper'
+}
+
+/**
+ * Build the clipboard-ready transcript text. `rec.result` is the cleaned
+ * server-side transcript (no timestamps) but we defensively strip any
+ * `[m:ss]` style segment prefixes that some upstream tooling adds, and
+ * normalise consecutive whitespace so the pasted output reads as a
+ * single paragraph rather than the segmented block-view the UI shows.
+ */
+function transcriptForClipboard(rec: Recording): string {
+  const source = rec.result || rec.segments.map((s) => s.text).join(' ')
+  return source
+    .replace(/\[\d+:\d{2}\]\s*/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function copyTranscript(rec: Recording): void {
+  void navigator.clipboard.writeText(transcriptForClipboard(rec))
 }
 
 /**
@@ -180,6 +202,21 @@ export function RootLayout(): React.JSX.Element {
         // be meaningless. Every other route (including the maximised
         // chart view) keeps the pill.
         showRange={!transcriptRec}
+        // Single-transcript page swaps the range pill for a "Copy
+        // transcript" action pill in the same slot. The action used to
+        // live as an IconButton in the DetailsCard header; moving it
+        // up here makes it more discoverable and gives the navbar's
+        // top-right corner a deliberate action across every route.
+        rightAction={
+          transcriptRec ? (
+            <NavActionPill
+              icon={Copy}
+              label="Copy transcript"
+              ariaLabel="Copy transcript to clipboard"
+              onClick={() => copyTranscript(transcriptRec)}
+            />
+          ) : undefined
+        }
       />
       <main
         ref={mainRef}

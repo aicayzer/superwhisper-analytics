@@ -78,6 +78,7 @@ export function ModePie({
     const {
       cx = 0,
       cy = 0,
+      innerRadius = 0,
       outerRadius = 0,
       midAngle = 0,
       percent = 0,
@@ -85,6 +86,40 @@ export function ModePie({
       fill = 'var(--foreground)'
     } = args
     if (percent < minLabelFraction) return null
+
+    // Dominant-slice fallback: when a slice is ≥85% of the total there
+    // isn't a sensible side of the donut to anchor an outside label to —
+    // the leader line ends up rendering past the card edge and clips the
+    // label text (see "100% Default" case where "Default" became
+    // ")efault" against a narrow card). For that case we drop the leader
+    // line entirely and render the label centred in the donut hole.
+    if (percent >= 0.85) {
+      return (
+        <g pointerEvents="none">
+          <text
+            x={cx}
+            y={cy - 6}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fill="var(--foreground)"
+            style={{ fontSize: 12, fontWeight: 600 }}
+          >
+            {String(name)}
+          </text>
+          <text
+            x={cx}
+            y={cy + 9}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fill="var(--muted-foreground)"
+            style={{ fontSize: 11 }}
+          >
+            {Math.round(percent * 100)}%
+          </text>
+        </g>
+      )
+    }
+
     const RAD = Math.PI / 180
     const sin = Math.sin(-midAngle * RAD)
     const cos = Math.cos(-midAngle * RAD)
@@ -97,6 +132,9 @@ export function ModePie({
     const ey = my
     const textAnchor = isRightSide ? 'start' : 'end'
     const labelX = ex + (isRightSide ? 4 : -4)
+    // Reference innerRadius to silence unused-destructure warnings; the
+    // value is only consulted in the dominant-slice branch above.
+    void innerRadius
     return (
       <g pointerEvents="none">
         <path

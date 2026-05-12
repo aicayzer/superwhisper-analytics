@@ -23,6 +23,10 @@ interface MainHeaderProps {
    *  routes where the pill would be meaningless (e.g. an individual
    *  transcript). Default true. */
   showRange?: boolean
+  /** Optional element rendered in the navbar's top-right slot in place of
+   *  the range pill. Used by the transcript-detail route to surface a
+   *  "Copy transcript" pill. Ignored when `showRange` is true. */
+  rightAction?: React.ReactNode
 }
 
 /**
@@ -41,7 +45,8 @@ export function MainHeader({
   title,
   leftPad,
   rightPad,
-  showRange = true
+  showRange = true,
+  rightAction
 }: MainHeaderProps): React.JSX.Element {
   const range = useRangeStore((s) => s.range)
   const setRange = useRangeStore((s) => s.setRange)
@@ -80,11 +85,15 @@ export function MainHeader({
       <div className="min-w-0 flex-1 [-webkit-app-region:no-drag]">
         <TitleNode title={title} />
       </div>
-      {showRange && (
+      {showRange ? (
         <div className="flex shrink-0 items-center gap-1 [-webkit-app-region:no-drag]">
           <RangePill value={range} onChange={setRange} />
         </div>
-      )}
+      ) : rightAction ? (
+        <div className="flex shrink-0 items-center gap-1 [-webkit-app-region:no-drag]">
+          {rightAction}
+        </div>
+      ) : null}
     </div>
   )
 }
