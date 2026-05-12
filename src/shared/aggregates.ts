@@ -477,9 +477,20 @@ function computeModeByDay(
   return { byDay, byWeek, weekFlat, keys }
 }
 
-function computeWpmDots(recordings: Recording[]): Array<{ period: string; value: number }> {
+function computeWpmDots(
+  recordings: Recording[],
+  bucketBy: BucketBy
+): Array<{ period: string; value: number }> {
+  // Each dot is one recording placed on the trend's X axis. The bucket
+  // key has to match the trend's bucketing — otherwise the dots stack
+  // monthly even when the trend is daily/weekly, which used to render
+  // as a vertical "histogram bar" at the start of every calendar month.
   return [...recordings]
-    .map((r) => ({ period: r.datetime.slice(0, 7), value: r.wordsPerMinute }))
+    .map((r) => {
+      const d = new Date(r.datetime)
+      const period = isNaN(d.getTime()) ? r.datetime.slice(0, 7) : bucketKey(d, bucketBy)
+      return { period, value: r.wordsPerMinute }
+    })
     .sort((a, b) => a.period.localeCompare(b.period))
 }
 
@@ -523,7 +534,7 @@ export function computeAll(
   const streakCells = computeStreakCells(daily, now, streakWindowDays)
   const topModes = modeStats.slice(0, 5).map((m) => m.modeName)
   const { byDay, byWeek, weekFlat, keys } = computeModeByDay(recordings, daily, topModes)
-  const wpmDots = computeWpmDots(recordings)
+  const wpmDots = computeWpmDots(recordings, bucketBy)
 
   return {
     overview,
