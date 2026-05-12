@@ -23,7 +23,8 @@ function buildStatus(): ConfigStatus {
     fillerWords: config.fillerWords,
     watchFolder: config.watchFolder,
     transcriptsOnly: config.transcriptsOnly,
-    demoMode: config.demoMode
+    demoMode: config.demoMode,
+    autoHideSidebar: config.autoHideSidebar
   }
 }
 
@@ -71,6 +72,12 @@ export function registerIpcHandlers(): void {
     // is the user's call.
     if (enabled) disableWatch()
     else syncWatcher()
+    return buildStatus()
+  })
+
+  ipcMain.handle('config:setAutoHideSidebar', (_, enabled: unknown): ConfigStatus => {
+    if (!validBool(enabled)) return buildStatus()
+    setConfig({ autoHideSidebar: enabled })
     return buildStatus()
   })
 

@@ -233,6 +233,8 @@ function IndexingCard(): React.JSX.Element {
   const setWatchFolder = useConfigStore((s) => s.setWatchFolder)
   const transcriptsOnly = useConfigStore((s) => s.transcriptsOnly)
   const setTranscriptsOnly = useConfigStore((s) => s.setTranscriptsOnly)
+  const autoHideSidebar = useConfigStore((s) => s.autoHideSidebar)
+  const setAutoHideSidebar = useConfigStore((s) => s.setAutoHideSidebar)
   return (
     <SettingsCard
       icon={SettingsIcon}
@@ -251,6 +253,12 @@ function IndexingCard(): React.JSX.Element {
           description="Skip audio playback and waveform — transcripts only."
           checked={transcriptsOnly}
           onChange={(next) => void setTranscriptsOnly(next)}
+        />
+        <ToggleRow
+          label="Auto-hide sidebar on narrow windows"
+          description="Collapse the sidebar when the window is under 900px wide. Reopen with Cmd-B or the navbar icon."
+          checked={autoHideSidebar}
+          onChange={(next) => void setAutoHideSidebar(next)}
         />
       </div>
     </SettingsCard>

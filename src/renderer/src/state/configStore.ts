@@ -33,6 +33,8 @@ interface ConfigState {
   /** When true, the app shows a synthetic demo dataset instead of the
    *  real recordings folder. */
   demoMode: boolean
+  /** When true, sidebar auto-collapses on narrow windows. */
+  autoHideSidebar: boolean
   /** Has the initial round-trip completed? Gates the first-run modal. */
   hydrated: boolean
 
@@ -49,6 +51,8 @@ interface ConfigState {
   setTranscriptsOnly: (enabled: boolean) => Promise<void>
   /** Toggle demo mode + trigger a renderer-side rehydrate. */
   setDemoMode: (enabled: boolean) => Promise<void>
+  /** Toggle the auto-hide sidebar behaviour. */
+  setAutoHideSidebar: (enabled: boolean) => Promise<void>
 }
 
 function applyStatus(status: ConfigStatus): Partial<ConfigState> {
@@ -61,6 +65,7 @@ function applyStatus(status: ConfigStatus): Partial<ConfigState> {
     watchFolder: status.watchFolder,
     transcriptsOnly: status.transcriptsOnly,
     demoMode: status.demoMode,
+    autoHideSidebar: status.autoHideSidebar,
     hydrated: true
   }
 }
@@ -74,6 +79,7 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
   watchFolder: false,
   transcriptsOnly: false,
   demoMode: false,
+  autoHideSidebar: true,
   hydrated: false,
 
   hydrate: async () => {
@@ -132,5 +138,11 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
     // Force a fresh hydrate so the renderer's dataStore picks up the
     // new dataset — main has the new payload ready by now.
     await useDataStore.getState().hydrate()
+  },
+
+  setAutoHideSidebar: async (enabled) => {
+    set({ autoHideSidebar: enabled })
+    const updated = await window.api.config.setAutoHideSidebar(enabled)
+    set(applyStatus(updated))
   }
 }))

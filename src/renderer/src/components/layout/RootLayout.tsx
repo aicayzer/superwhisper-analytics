@@ -3,7 +3,7 @@ import { useGlobalShortcut } from '@renderer/hooks/useGlobalShortcut'
 import { formatTimestamp } from '@renderer/lib/format'
 import { useConfigStore } from '@renderer/state/configStore'
 import { useDataStore } from '@renderer/state/dataStore'
-import { useLayoutStore } from '@renderer/state/layoutStore'
+import { SIDEBAR_AUTO_HIDE_BELOW, useLayoutStore } from '@renderer/state/layoutStore'
 import { chartBreadcrumb } from '@renderer/screens/chartRegistry'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
@@ -50,10 +50,28 @@ export function RootLayout(): React.JSX.Element {
   const sidebarOpen = useLayoutStore((s) => s.sidebarOpen)
   const sidebarWidth = useLayoutStore((s) => s.sidebarWidth)
   const toggleSidebar = useLayoutStore((s) => s.toggleSidebar)
+  const setSidebarOpen = useLayoutStore((s) => s.setSidebarOpen)
+  const setPeek = useLayoutStore((s) => s.setPeek)
   const configHydrated = useConfigStore((s) => s.hydrated)
   const configValid = useConfigStore((s) => s.isValid)
+  const autoHideSidebar = useConfigStore((s) => s.autoHideSidebar)
   const recordings = useDataStore((s) => s.recordings)
   const location = useLocation()
+
+  // Auto-collapse the sidebar when the window narrows past the threshold.
+  // Re-expand on widen is intentionally NOT wired — that'd cause flicker
+  // for users who hand-resized to ~900px and toggled the sidebar manually.
+  useEffect(() => {
+    if (!autoHideSidebar) return undefined
+    const apply = (): void => {
+      if (window.innerWidth < SIDEBAR_AUTO_HIDE_BELOW) {
+        if (useLayoutStore.getState().sidebarOpen) setSidebarOpen(false)
+      }
+    }
+    apply()
+    window.addEventListener('resize', apply)
+    return () => window.removeEventListener('resize', apply)
+  }, [autoHideSidebar, setSidebarOpen])
 
   // Cmd-B is the only way to reopen the sidebar once it's collapsed (the
   // header used to host a toggle button; it doesn't any more). Mounted at
@@ -120,6 +138,18 @@ export function RootLayout(): React.JSX.Element {
   const maskHeight = HEADER_TOP + HEADER_H + FRAME_GAP + 16
   return (
     <Window>
+      {/* Peek hit-zone — invisible 12px column on the window's left edge.
+          When the sidebar is collapsed, hovering this strip flips peek
+          on, which renders the sidebar at its open transform without
+          flipping the persisted open flag. Pointerleave on the sidebar
+          bounds clears it. */}
+      {!sidebarOpen && (
+        <div
+          aria-hidden
+          onPointerEnter={() => setPeek(true)}
+          className="absolute bottom-0 left-0 top-0 z-30 w-3"
+        />
+      )}
       <Sidebar />
       <div
         aria-hidden

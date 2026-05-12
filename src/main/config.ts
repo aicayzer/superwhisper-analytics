@@ -27,7 +27,8 @@ function defaultConfig(): Config {
     fillerWords: [...DEFAULT_FILLER_PHRASES],
     watchFolder: false,
     transcriptsOnly: false,
-    demoMode: false
+    demoMode: false,
+    autoHideSidebar: true
   }
 }
 
@@ -52,7 +53,10 @@ export function getConfig(): Config {
       fillerWords,
       watchFolder: parsed.watchFolder === true,
       transcriptsOnly: parsed.transcriptsOnly === true,
-      demoMode: parsed.demoMode === true
+      demoMode: parsed.demoMode === true,
+      // Default ON when absent — first-launch behaviour is auto-hide on
+      // narrow windows, which matches the plan's UX intent.
+      autoHideSidebar: parsed.autoHideSidebar !== false
     }
   } catch (err) {
     console.warn('[config] failed to read config.json, falling back to defaults:', err)

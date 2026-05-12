@@ -65,6 +65,9 @@ export function Sidebar(): React.JSX.Element {
   const sidebarWidth = useLayoutStore((s) => s.sidebarWidth)
   const setSidebarWidth = useLayoutStore((s) => s.setSidebarWidth)
   const toggleSidebar = useLayoutStore((s) => s.toggleSidebar)
+  const setSidebarOpen = useLayoutStore((s) => s.setSidebarOpen)
+  const peekActive = useLayoutStore((s) => s.peekActive)
+  const setPeek = useLayoutStore((s) => s.setPeek)
   const openPalette = usePaletteStore((s) => s.openWith)
   const indexedAt = useDataStore((s) => s.indexedAt)
   const loading = useDataStore((s) => s.loading)
@@ -93,15 +96,27 @@ export function Sidebar(): React.JSX.Element {
     return configValid ? 'Not yet indexed' : 'No folder configured'
   })()
 
+  // "visible" covers both the locked-open state and the transient peek
+  // state — visually identical, but peek doesn't persist on click-outside.
+  const visible = sidebarOpen || peekActive
   return (
     <aside
       style={{ width: sidebarWidth }}
-      aria-hidden={!sidebarOpen}
+      aria-hidden={!visible}
+      onPointerLeave={() => {
+        if (!sidebarOpen && peekActive) setPeek(false)
+      }}
+      onClick={() => {
+        // Promote a peek into a locked-open sidebar on any click inside.
+        // The user has signalled intent, so keep it on screen until they
+        // explicitly close it with Cmd-B or the toggle.
+        if (!sidebarOpen && peekActive) setSidebarOpen(true)
+      }}
       className={cn(
         'absolute bottom-2 left-2 top-2 z-20',
         'flex flex-col rounded-xl border border-border bg-floating shadow-[var(--shadow-float)] [-webkit-app-region:drag]',
         !isResizing && 'transition-[transform,opacity] duration-200 ease-out',
-        !sidebarOpen && '-translate-x-[calc(100%+0.5rem)] opacity-0 pointer-events-none'
+        !visible && '-translate-x-[calc(100%+0.5rem)] opacity-0 pointer-events-none'
       )}
     >
       {/* Header band — traffic lights live in the left third (Electron-native,
