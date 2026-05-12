@@ -5,8 +5,8 @@ import { useConfigStore } from '@renderer/state/configStore'
 import { useDataStore } from '@renderer/state/dataStore'
 import { useLayoutStore } from '@renderer/state/layoutStore'
 import { chartBreadcrumb } from '@renderer/screens/chartRegistry'
-import { useEffect, useRef, useState } from 'react'
-import { Outlet, useLocation } from 'react-router-dom'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { CommandPalette } from '../command-palette/CommandPalette'
 import { MainHeader, type Breadcrumb } from './MainHeader'
 import { Sidebar } from './Sidebar'
@@ -59,6 +59,14 @@ export function RootLayout(): React.JSX.Element {
   // header used to host a toggle button; it doesn't any more). Mounted at
   // layout level so the shortcut is live on every screen.
   useGlobalShortcut({ key: 'b', mod: true }, toggleSidebar)
+
+  // Cmd-, matches the macOS convention for opening app preferences.
+  // Pushes a /settings navigation regardless of the current route.
+  const navigate = useNavigate()
+  const openSettings = useCallback(() => {
+    navigate('/settings')
+  }, [navigate])
+  useGlobalShortcut({ key: ',', mod: true }, openSettings)
 
   // When the sidebar is open it covers the traffic-light area; when it's
   // closed the navbar/content need to indent past the traffic lights so
