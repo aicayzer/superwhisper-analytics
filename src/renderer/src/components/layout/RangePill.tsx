@@ -53,14 +53,13 @@ export function RangePill({ value, onChange }: RangePillProps): React.JSX.Elemen
             aria-checked={active}
             onClick={() => onChange({ id: p.id })}
             className={cn(
-              'inline-flex h-6 items-center rounded-[4px] px-2 text-[11.5px] font-medium transition-colors',
+              'relative inline-flex h-6 items-center px-2 text-[11.5px] font-medium transition-colors',
               'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/40',
-              active
-                ? 'bg-background text-foreground shadow-[0_0_0_1px_var(--border)]'
-                : 'text-muted-foreground hover:text-foreground'
+              active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
             )}
           >
-            {p.pill}
+            {active && <ActivePill />}
+            <span className="relative">{p.pill}</span>
           </button>
         )
       })}
@@ -69,14 +68,13 @@ export function RangePill({ value, onChange }: RangePillProps): React.JSX.Elemen
           role="radio"
           aria-checked={isCustomActive}
           className={cn(
-            'inline-flex h-6 items-center rounded-[4px] px-2 text-[11.5px] font-medium transition-colors',
+            'relative inline-flex h-6 items-center px-2 text-[11.5px] font-medium transition-colors',
             'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/40',
-            isCustomActive
-              ? 'bg-background text-foreground shadow-[0_0_0_1px_var(--border)]'
-              : 'text-muted-foreground hover:text-foreground'
+            isCustomActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
           )}
         >
-          <span className="tabular-nums">
+          {isCustomActive && <ActivePill />}
+          <span className="relative tabular-nums">
             {isCustomActive && value.from ? rangeShortLabel(value) : 'Custom'}
           </span>
         </PopoverTrigger>
@@ -104,5 +102,19 @@ export function RangePill({ value, onChange }: RangePillProps): React.JSX.Elemen
         </PopoverContent>
       </Popover>
     </div>
+  )
+}
+
+/**
+ * The "white pill" that demarcates the active segment. Inset 1px from the
+ * top and bottom of the button so the highlight sits visibly inside the
+ * surrounding track instead of filling it edge-to-edge.
+ */
+function ActivePill(): React.JSX.Element {
+  return (
+    <span
+      aria-hidden
+      className="absolute inset-x-0 top-px bottom-px rounded-[4px] bg-background shadow-[0_0_0_1px_var(--border)]"
+    />
   )
 }

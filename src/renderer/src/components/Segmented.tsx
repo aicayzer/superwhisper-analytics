@@ -60,15 +60,23 @@ export function Segmented<T extends string>({
             aria-checked={active}
             onClick={() => onChange(opt.value)}
             className={cn(
-              'font-medium transition-colors',
+              'relative inline-flex items-center justify-center font-medium transition-colors',
               'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/40',
               BUTTON_BY_SIZE[size],
-              active
-                ? 'bg-background text-foreground shadow-[0_0_0_1px_var(--border)]'
-                : 'text-muted-foreground hover:text-foreground'
+              active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
             )}
           >
-            {opt.label}
+            {active && (
+              <span
+                aria-hidden
+                className={cn(
+                  'absolute inset-x-0 top-px bottom-px bg-background shadow-[0_0_0_1px_var(--border)]',
+                  // Match the button's own corner radius so the highlight tracks it.
+                  size === 'sm' ? 'rounded-[4px]' : 'rounded-[5px]'
+                )}
+              />
+            )}
+            <span className="relative">{opt.label}</span>
           </button>
         )
       })}
