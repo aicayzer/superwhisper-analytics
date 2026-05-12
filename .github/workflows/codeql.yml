@@ -8,8 +8,8 @@
 name: CodeQL
 
 on:
-  push:
-    branches: [main]
+  # `push: main` would just duplicate the PR run since every change
+  # reaches main via PR — dropped to save CI minutes.
   pull_request:
     branches: [main]
   schedule:
