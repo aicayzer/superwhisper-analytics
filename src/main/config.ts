@@ -28,7 +28,8 @@ function defaultConfig(): Config {
     watchFolder: false,
     transcriptsOnly: false,
     demoMode: false,
-    autoHideSidebar: true
+    autoHideSidebar: true,
+    devTools: false
   }
 }
 
@@ -71,7 +72,8 @@ export function getConfig(): Config {
       demoMode: parsed.demoMode === true,
       // Default ON when absent — first-launch behaviour is auto-hide on
       // narrow windows, which matches the plan's UX intent.
-      autoHideSidebar: parsed.autoHideSidebar !== false
+      autoHideSidebar: parsed.autoHideSidebar !== false,
+      devTools: parsed.devTools === true
     }
   } catch (err) {
     console.warn('[config] failed to read config.json, falling back to defaults:', err)

@@ -40,6 +40,8 @@ export interface Config {
    *  navbar PanelLeft icon; widening the window again does NOT auto-
    *  expand, so user intent always wins. Default true. */
   autoHideSidebar: boolean
+  /** When true, DevTools open on launch. Equivalent to Cmd+Option+I. */
+  devTools: boolean
 }
 
 /**
@@ -65,6 +67,7 @@ export interface ConfigStatus {
   transcriptsOnly: boolean
   demoMode: boolean
   autoHideSidebar: boolean
+  devTools: boolean
 }
 
 /** Wire callback type for main → renderer push when the indexed dataset
@@ -104,6 +107,9 @@ export const api = {
      *  it entirely via Cmd-B / the navbar icon. */
     setAutoHideSidebar: (enabled: boolean): Promise<ConfigStatus> =>
       ipcRenderer.invoke('config:setAutoHideSidebar', enabled),
+    /** Toggle DevTools open/close. Persists across restarts. */
+    setDevTools: (enabled: boolean): Promise<ConfigStatus> =>
+      ipcRenderer.invoke('config:setDevTools', enabled),
     /** Wipe the persisted config back to defaults — clears the saved
      *  folder, demo flag, custom filler dictionary, etc. The renderer
      *  follows up by triggering a fresh hydrate so the dataStore picks

@@ -104,7 +104,7 @@ function ActivityAreaInner<T extends object>({
   const effectiveTickFormatter = monthTicks ? monthLabel : formatTick
 
   return (
-    <ResponsiveContainer width="100%" height="100%">
+    <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 1, height: 1 }}>
       <AreaChart
         data={filtered as ReadonlyArray<Record<string, unknown>>}
         margin={{ top: 8, right: 8, left: -4, bottom: 0 }}

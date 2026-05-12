@@ -11,6 +11,7 @@ import { useUiPrefsStore } from '@renderer/state/uiPrefsStore'
 import {
   AlignLeft,
   BookOpen,
+  Code2,
   ExternalLink,
   Folder,
   Info,
@@ -78,6 +79,7 @@ export function Settings(): React.JSX.Element {
         <>
           <AboutCard />
           <ResetAppCard />
+          <DeveloperCard />
         </>
       )}
     </div>
@@ -625,6 +627,23 @@ function ResetAppCard(): React.JSX.Element {
           </button>
         )}
       </div>
+    </SettingsCard>
+  )
+}
+
+// ---------- Developer ----------------------------------------------------
+
+function DeveloperCard(): React.JSX.Element {
+  const devTools = useConfigStore((s) => s.devTools)
+  const setDevTools = useConfigStore((s) => s.setDevTools)
+  return (
+    <SettingsCard icon={Code2} title="Developer" subtitle="Tools for debugging and development.">
+      <ToggleRow
+        label="Enable DevTools"
+        description="Open the Chromium DevTools panel. Equivalent to Cmd+Option+I — persists across restarts."
+        checked={devTools}
+        onChange={(next) => void setDevTools(next)}
+      />
     </SettingsCard>
   )
 }

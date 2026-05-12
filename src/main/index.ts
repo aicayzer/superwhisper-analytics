@@ -6,6 +6,7 @@ import { registerIpcHandlers } from './ipc'
 import { registerSwProtocolHandler, registerSwSchemeAsPrivileged } from './protocol'
 import { initAutoUpdater } from './updater'
 import { disableWatch } from './watcher'
+import { getConfig } from './config'
 
 // Privileged scheme registration must happen BEFORE app.whenReady — the
 // renderer's session inherits these privileges at startup. Doing this at
@@ -32,6 +33,7 @@ function createWindow(): void {
 
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
+    if (getConfig().devTools) mainWindow.webContents.openDevTools()
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {

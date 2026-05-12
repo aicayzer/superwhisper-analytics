@@ -58,7 +58,7 @@ function PaceTrendInner<T extends object>({
   const dotRows = dots.map((d) => ({ [xKey]: d.period, dotValue: d.value }))
 
   return (
-    <ResponsiveContainer width="100%" height="100%">
+    <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 1, height: 1 }}>
       <ComposedChart
         data={[...merged, ...dotRows]}
         margin={{ top: 8, right: 8, left: -4, bottom: 0 }}

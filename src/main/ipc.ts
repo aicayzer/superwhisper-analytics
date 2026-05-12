@@ -33,7 +33,8 @@ function buildStatus(): ConfigStatus {
     watchFolder: config.watchFolder,
     transcriptsOnly: config.transcriptsOnly,
     demoMode: config.demoMode,
-    autoHideSidebar: config.autoHideSidebar
+    autoHideSidebar: config.autoHideSidebar,
+    devTools: config.devTools
   }
 }
 
@@ -92,6 +93,17 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('config:setAutoHideSidebar', (_, enabled: unknown): ConfigStatus => {
     if (!validBool(enabled)) return buildStatus()
     setConfig({ autoHideSidebar: enabled })
+    return buildStatus()
+  })
+
+  ipcMain.handle('config:setDevTools', (event, enabled: unknown): ConfigStatus => {
+    if (!validBool(enabled)) return buildStatus()
+    setConfig({ devTools: enabled })
+    const win = BrowserWindow.fromWebContents(event.sender)
+    if (win) {
+      if (enabled) win.webContents.openDevTools()
+      else win.webContents.closeDevTools()
+    }
     return buildStatus()
   })
 

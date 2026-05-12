@@ -39,7 +39,7 @@ function LineTrendInner<T extends object>({
 }: LineTrendProps<T>): React.JSX.Element {
   const yTick = formatYTick ?? ((v: number) => formatCompact(v))
   return (
-    <ResponsiveContainer width="100%" height="100%">
+    <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 1, height: 1 }}>
       <LineChart
         data={data as ReadonlyArray<Record<string, unknown>>}
         margin={{ top: 8, right: 8, left: -4, bottom: 0 }}
