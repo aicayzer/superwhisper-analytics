@@ -1,5 +1,6 @@
 import { buildFillers, DEFAULT_FILLER_PHRASES } from '@shared/text-metrics'
 import type { Recording } from '@shared/types'
+import { ENGLISH_WORDS } from './demoVocab'
 
 /**
  * Deterministic synthetic dataset used by demo mode.
@@ -770,6 +771,13 @@ function pick<T>(arr: readonly T[], rng: () => number): T {
   return arr[Math.floor(rng() * arr.length)] as T
 }
 
+/** Pull a single common English word from the bundled wordlist. Used by
+ *  the vocab-spreading templates below — randomly sampling from a 9k-word
+ *  pool is what gives the Vocabulary growth curve its real range. */
+function richNoun(rng: () => number): string {
+  return pick(ENGLISH_WORDS, rng)
+}
+
 // =========================================================================
 // Templates per bucket
 // =========================================================================
@@ -781,6 +789,12 @@ function pick<T>(arr: readonly T[], rng: () => number): T {
 
 type Template = (rng: () => number) => string
 
+// Each bucket additionally carries "vocab-spreading" templates that pull
+// from the bundled ENGLISH_WORDS pool via richNoun(). These give the
+// Vocabulary growth chart its real range — the curated banks above cap
+// out around ~700 unique tokens, so without a wider pool the curve
+// plateaued in the mid-hundreds. With ~40% of clauses sampling the rich
+// pool, vocab climbs into the high-thousands across a 200-day window.
 const TEMPLATES: Record<BucketLabel, Template[]> = {
   '<=5': [
     () => 'Confirmed.',
@@ -806,7 +820,15 @@ const TEMPLATES: Record<BucketLabel, Template[]> = {
     (r) => `${pick(BANK.verbPast, r)} the ${pick(BANK.artifact, r)}.`,
     (r) => `Will ${pick(BANK.verbActive, r)} ${pick(BANK.timeShort, r)}.`,
     (r) => `${pick(BANK.adjective, r)} ${pick(BANK.problem, r)}.`,
-    (r) => `Need to ${pick(BANK.verbActive, r)}.`
+    (r) => `Need to ${pick(BANK.verbActive, r)}.`,
+    // Vocab-spreading variants.
+    (r) => `Note: ${richNoun(r)}.`,
+    (r) => `${richNoun(r)} update.`,
+    (r) => `Tag ${richNoun(r)}.`,
+    (r) => `${richNoun(r)} review.`,
+    (r) => `Capture: ${richNoun(r)}.`,
+    (r) => `Re: ${richNoun(r)}.`,
+    (r) => `${richNoun(r)} follow-up.`
   ],
   '6-10': [
     (r) =>
@@ -826,7 +848,15 @@ const TEMPLATES: Record<BucketLabel, Template[]> = {
       `${pick(BANK.subject, r)} ${pick(BANK.verbPast, r)} a ${pick(BANK.adjective, r)} fix ${pick(BANK.time, r)}.`,
     (r) => `Will ${pick(BANK.verbActive, r)} ${pick(BANK.topic, r)} before the review.`,
     (r) => `${pick(BANK.subject, r)} owns the ${pick(BANK.artifact, r)} rollout this sprint.`,
-    (r) => `Pause on ${pick(BANK.topic, r)} until ${pick(BANK.reason, r)} clears.`
+    (r) => `Pause on ${pick(BANK.topic, r)} until ${pick(BANK.reason, r)} clears.`,
+    // Vocab-spreading variants.
+    (r) => `Quick note on ${richNoun(r)} for follow-up.`,
+    (r) => `Worth a follow-up on ${richNoun(r)} and ${richNoun(r)}.`,
+    (r) => `Two themes from today: ${richNoun(r)} and ${richNoun(r)}.`,
+    (r) => `Reference ${richNoun(r)} and ${richNoun(r)} in the writeup.`,
+    (r) => `Capture ${richNoun(r)}, ${richNoun(r)}, ${richNoun(r)} for later.`,
+    (r) => `${richNoun(r)} thread: needs revisiting before standup.`,
+    (r) => `Tag the ${richNoun(r)} call as needing review.`
   ],
   '11-15': [
     (r) =>
@@ -844,7 +874,17 @@ const TEMPLATES: Record<BucketLabel, Template[]> = {
     (r) =>
       `${pick(BANK.subject, r)} ${pick(BANK.verbSay, r)} the ${pick(BANK.problem, r)} which means ${pick(BANK.reason, r)} needs revisiting.`,
     (r) =>
-      `Worth scoping the ${pick(BANK.artifact, r)} into a ${pick(BANK.adjective, r)} delivery before ${pick(BANK.topic, r)} ships.`
+      `Worth scoping the ${pick(BANK.artifact, r)} into a ${pick(BANK.adjective, r)} delivery before ${pick(BANK.topic, r)} ships.`,
+    // Vocab-spreading variants.
+    (r) =>
+      `Three threads from today's standup: ${richNoun(r)}, ${richNoun(r)}, and ${richNoun(r)} — all need follow-up.`,
+    (r) =>
+      `Capture for the writeup: ${richNoun(r)} as the headline, ${richNoun(r)} as a secondary thread.`,
+    (r) =>
+      `Quick mental note linking ${richNoun(r)} to ${richNoun(r)}, with ${richNoun(r)} as the connector.`,
+    (r) =>
+      `${richNoun(r)} and ${richNoun(r)} both surfaced in review — worth a brief follow-up note.`,
+    (r) => `Reference ${richNoun(r)}, ${richNoun(r)} and the ${richNoun(r)} read-out from earlier.`
   ],
   '16-20': [
     (r) =>
@@ -860,7 +900,16 @@ const TEMPLATES: Record<BucketLabel, Template[]> = {
     (r) =>
       `${pick(BANK.subject, r)} ${pick(BANK.verbSay, r)} the ${pick(BANK.problem, r)} in standup and the ${pick(BANK.adjective, r)} response is to revisit ${pick(BANK.topic, r)} ${pick(BANK.time, r)}.`,
     (r) =>
-      `${pick(BANK.qualifier, r)}, the ${pick(BANK.domain, r)} of the ${pick(BANK.artifact, r)} is the deciding factor here and ${pick(BANK.subjectLower, r)} should treat it as a first-class concern ${pick(BANK.time, r)}.`
+      `${pick(BANK.qualifier, r)}, the ${pick(BANK.domain, r)} of the ${pick(BANK.artifact, r)} is the deciding factor here and ${pick(BANK.subjectLower, r)} should treat it as a first-class concern ${pick(BANK.time, r)}.`,
+    // Vocab-spreading variants.
+    (r) =>
+      `Four open threads to track this week: ${richNoun(r)}, ${richNoun(r)}, the ${richNoun(r)} hand-off, and the ${richNoun(r)} review.`,
+    (r) =>
+      `Reflecting on yesterday's session — the main strands were ${richNoun(r)}, ${richNoun(r)}, and ${richNoun(r)}, with ${richNoun(r)} as the through-line.`,
+    (r) =>
+      `Three references for the writeup: ${richNoun(r)}, ${richNoun(r)}, and ${richNoun(r)} — plus a quick note on ${richNoun(r)} for context.`,
+    (r) =>
+      `Catalogue of points worth revisiting: ${richNoun(r)}, ${richNoun(r)}, ${richNoun(r)}, and the open ${richNoun(r)} question.`
   ],
   '21-25': [
     (r) =>
@@ -874,7 +923,16 @@ const TEMPLATES: Record<BucketLabel, Template[]> = {
     (r) =>
       `Looking at the dependency chain, ${pick(BANK.subjectLower, r)} should ${pick(BANK.verbActive, r)} the ${pick(BANK.artifact, r)} ${pick(BANK.time, r)} but only after ${pick(BANK.reason, r)} has been worked through with the broader group.`,
     (r) =>
-      `On the ${pick(BANK.domain, r)} question for ${pick(BANK.topic, r)}: the ${pick(BANK.adjective, r)} answer is to ${pick(BANK.verbActive, r)} the ${pick(BANK.artifact, r)} ${pick(BANK.time, r)} and review the ${pick(BANK.problem, r)} once data lands.`
+      `On the ${pick(BANK.domain, r)} question for ${pick(BANK.topic, r)}: the ${pick(BANK.adjective, r)} answer is to ${pick(BANK.verbActive, r)} the ${pick(BANK.artifact, r)} ${pick(BANK.time, r)} and review the ${pick(BANK.problem, r)} once data lands.`,
+    // Vocab-spreading variants.
+    (r) =>
+      `Topics surfaced in today's review, ordered by urgency: ${richNoun(r)}, ${richNoun(r)}, ${richNoun(r)}, the ${richNoun(r)} hand-off, and a brief note on ${richNoun(r)} for next week.`,
+    (r) =>
+      `Capture of the conversation themes — ${richNoun(r)} as the entry point, ${richNoun(r)} as the supporting thread, ${richNoun(r)} as the open question, and ${richNoun(r)} flagged for follow-up.`,
+    (r) =>
+      `Reading back the notes from yesterday: ${richNoun(r)} kept resurfacing, ${richNoun(r)} was the counter-frame, and ${richNoun(r)} together with ${richNoun(r)} need a separate writeup ${pick(BANK.time, r)}.`,
+    (r) =>
+      `Three open threads from the offsite: the ${richNoun(r)} programme, the ${richNoun(r)} alignment, and the ${richNoun(r)} working group — each needs a directly responsible owner ${pick(BANK.time, r)}.`
   ],
   '25+': [
     (r) =>
@@ -886,7 +944,14 @@ const TEMPLATES: Record<BucketLabel, Template[]> = {
     (r) =>
       `Reflecting on the standup conversation about ${pick(BANK.topic, r)}, I think the ${pick(BANK.adjective, r)} path is to ${pick(BANK.verbActive, r)} the ${pick(BANK.artifact, r)} ${pick(BANK.time, r)}, file the open questions back to ${pick(BANK.subjectLower, r)}, and revisit once ${pick(BANK.reason, r)} has been worked through end to end.`,
     (r) =>
-      `Looking at the ${pick(BANK.domain, r)} characteristics of the ${pick(BANK.artifact, r)} alongside the ${pick(BANK.domain, r)} requirements of ${pick(BANK.topic, r)}, the right move is to ${pick(BANK.verbActive, r)} ${pick(BANK.time, r)} and let ${pick(BANK.subjectLower, r)} validate the ${pick(BANK.problem, r)} fix once the trace data is in.`
+      `Looking at the ${pick(BANK.domain, r)} characteristics of the ${pick(BANK.artifact, r)} alongside the ${pick(BANK.domain, r)} requirements of ${pick(BANK.topic, r)}, the right move is to ${pick(BANK.verbActive, r)} ${pick(BANK.time, r)} and let ${pick(BANK.subjectLower, r)} validate the ${pick(BANK.problem, r)} fix once the trace data is in.`,
+    // Vocab-spreading variants.
+    (r) =>
+      `Snapshot of the threads we're tracking this cycle, in rough order of priority: ${richNoun(r)}, ${richNoun(r)}, ${richNoun(r)}, the ${richNoun(r)} migration, the ${richNoun(r)} review, ${richNoun(r)} as the open thread, and ${richNoun(r)} flagged as a possible follow-up for the next planning round.`,
+    (r) =>
+      `Reading through the session transcript afterward, the recurring concepts were ${richNoun(r)}, ${richNoun(r)}, and ${richNoun(r)}, with ${richNoun(r)} appearing in nearly every exchange and ${richNoun(r)} surfacing as the unexpected through-line that probably deserves its own ${pick(BANK.time, r)} writeup.`,
+    (r) =>
+      `Capturing the cross-cutting themes from the offsite for the broader team: ${richNoun(r)} as the headline programme, ${richNoun(r)} and ${richNoun(r)} as the supporting workstreams, and the open questions around ${richNoun(r)}, ${richNoun(r)}, and ${richNoun(r)} which need explicit owners ${pick(BANK.time, r)}.`
   ]
 }
 
