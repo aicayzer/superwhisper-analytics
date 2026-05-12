@@ -74,3 +74,35 @@ export function formatActivityTick(raw: unknown): string {
   const d = new Date(String(raw))
   return isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' })
 }
+
+/**
+ * Format a TrendPoint.period string for an X-axis tick. The period string
+ * can come in three shapes depending on the active range bucketing:
+ *   • YYYY-MM-DD  → "5 Mar"          (daily)
+ *   • YYYY-Www    → "W12"            (weekly)
+ *   • YYYY-MM     → "Mar 26"         (monthly, with 2-digit year)
+ * Falls back to the raw string if the shape doesn't match.
+ */
+export function formatTrendTick(raw: unknown): string {
+  const v = String(raw)
+  // Daily: 2026-03-05
+  const dayMatch = v.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (dayMatch) {
+    const d = new Date(Number(dayMatch[1]), Number(dayMatch[2]) - 1, Number(dayMatch[3]))
+    return isNaN(d.getTime())
+      ? v
+      : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+  }
+  // Weekly: 2026-W12 — just emit the W## (year crossover is visually inferable).
+  const weekMatch = v.match(/^(\d{4})-W(\d{2})$/)
+  if (weekMatch) return `W${weekMatch[2]}`
+  // Monthly: 2026-03
+  const monthMatch = v.match(/^(\d{4})-(\d{2})$/)
+  if (monthMatch) {
+    const d = new Date(Number(monthMatch[1]), Number(monthMatch[2]) - 1, 1)
+    return isNaN(d.getTime())
+      ? v
+      : d.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' })
+  }
+  return v
+}

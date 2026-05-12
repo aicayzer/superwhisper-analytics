@@ -7,6 +7,7 @@ import { ModePie } from '@renderer/components/charts/ModePie'
 import { PaceTrend } from '@renderer/components/charts/PaceTrend'
 import { StreakCalendar } from '@renderer/components/charts/StreakCalendar'
 import { VBar } from '@renderer/components/charts/VBar'
+import { formatActivityTick, formatTrendTick } from '@renderer/lib/format'
 import { useFilteredAggregates } from '@renderer/state/useFilteredAggregates'
 import { useMemo } from 'react'
 
@@ -23,19 +24,7 @@ import { useMemo } from 'react'
 
 export function VolumeOverTimeChart(): React.JSX.Element {
   const { daily } = useFilteredAggregates()
-  return (
-    <ActivityArea
-      data={daily}
-      xKey="date"
-      yKey="count"
-      formatTick={(v) => {
-        const d = new Date(String(v))
-        return isNaN(d.getTime())
-          ? ''
-          : d.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' })
-      }}
-    />
-  )
+  return <ActivityArea data={daily} xKey="date" yKey="count" formatTick={formatActivityTick} />
 }
 
 export function WhenYouRecordChart(): React.JSX.Element {
@@ -96,7 +85,7 @@ export function SpeakingPaceChart(): React.JSX.Element {
       xKey="period"
       yKey="value"
       reference={{ value: 140, label: '140' }}
-      formatTick={(v) => String(v).replace(/^\d{4}-/, '')}
+      formatTick={formatTrendTick}
     />
   )
 }
@@ -108,7 +97,7 @@ export function FillerRateChart(): React.JSX.Element {
       data={fillerTrend}
       xKey="period"
       yKey="value"
-      formatTick={(v) => String(v).replace(/^\d{4}-/, '')}
+      formatTick={formatTrendTick}
       formatYTick={(v) => `${v}%`}
     />
   )
@@ -121,31 +110,12 @@ export function SentenceLengthChart(): React.JSX.Element {
 
 export function VocabularyGrowthChart(): React.JSX.Element {
   const { vocabGrowth } = useFilteredAggregates()
-  return (
-    <ActivityArea
-      data={vocabGrowth}
-      xKey="period"
-      yKey="value"
-      formatTick={(v) => String(v).replace(/^\d{4}-/, '')}
-    />
-  )
+  return <ActivityArea data={vocabGrowth} xKey="period" yKey="value" formatTick={formatTrendTick} />
 }
 
 export function ActivityChart(): React.JSX.Element {
   const { daily } = useFilteredAggregates()
-  return (
-    <ActivityArea
-      data={daily}
-      xKey="date"
-      yKey="count"
-      formatTick={(v) => {
-        const d = new Date(String(v))
-        return isNaN(d.getTime())
-          ? ''
-          : d.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' })
-      }}
-    />
-  )
+  return <ActivityArea data={daily} xKey="date" yKey="count" formatTick={formatActivityTick} />
 }
 
 export function ByDayOfWeekChart(): React.JSX.Element {

@@ -5,7 +5,7 @@ import { DistBar } from '@renderer/components/charts/DistBar'
 import { LineTrend } from '@renderer/components/charts/LineTrend'
 import { PaceTrend } from '@renderer/components/charts/PaceTrend'
 import { KpiRow } from '@renderer/components/KpiRow'
-import { formatNumber } from '@renderer/lib/format'
+import { formatNumber, formatTrendTick } from '@renderer/lib/format'
 import { useFilteredAggregates } from '@renderer/state/useFilteredAggregates'
 import { useMemo } from 'react'
 
@@ -86,27 +86,22 @@ export function Language(): React.JSX.Element {
       </div>
 
       <div className="grid min-h-0 flex-1 grid-cols-2 gap-3">
-        <ChartCard title="Speaking pace" slug="speaking-pace">
+        <ChartCard title="Words per minute" slug="speaking-pace">
           <PaceTrend
             trend={wpmTrend}
             dots={sampledDots}
             xKey="period"
             yKey="value"
             reference={{ value: WPM_TARGET, label: `${WPM_TARGET}` }}
-            formatTick={(v) => {
-              const [y, m] = String(v).split('-')
-              if (!y || !m) return String(v)
-              const d = new Date(Number(y), Number(m) - 1, 1)
-              return d.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' })
-            }}
+            formatTick={formatTrendTick}
           />
         </ChartCard>
-        <ChartCard title="Filler rate over time" slug="filler-rate">
+        <ChartCard title="Filler rate" slug="filler-rate">
           <LineTrend
             data={fillerTrend}
             xKey="period"
             yKey="value"
-            formatTick={(v) => String(v).replace(/^\d{4}-/, '')}
+            formatTick={formatTrendTick}
             formatYTick={(v) => `${v}%`}
           />
         </ChartCard>
@@ -121,7 +116,7 @@ export function Language(): React.JSX.Element {
             data={vocabGrowth}
             xKey="period"
             yKey="value"
-            formatTick={(v) => String(v).replace(/^\d{4}-/, '')}
+            formatTick={formatTrendTick}
             tickCount={5}
           />
         </ChartCard>
