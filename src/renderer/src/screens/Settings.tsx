@@ -20,6 +20,7 @@ import {
   X
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
+import type { UpdaterStatus } from '../../../preload/api'
 
 const GITHUB_URL = 'https://github.com/aicayzer/superwhisper-analytics'
 const DISCLAIMER =
@@ -478,14 +479,30 @@ function AboutCard(): React.JSX.Element {
     void window.api.openExternal(GITHUB_URL)
   }
 
+  // Updater state. Initialised from main on mount, then re-rendered via
+  // the push subscription on every status change.
+  const [status, setStatus] = useState<UpdaterStatus>({ kind: 'idle' })
+  useEffect(() => {
+    void window.api.updater.status().then(setStatus)
+    const off = window.api.updater.onStatus(setStatus)
+    return off
+  }, [])
+
+  const checking = status.kind === 'checking' || status.kind === 'downloading'
+
+  function check(): void {
+    void window.api.updater.check().then(setStatus)
+  }
+
   // Layout:
   //   1. Tagline — what the app is in one sentence.
-  //   2. Version / License metadata in a small label-value table.
-  //   3. Source link as its own subtle action row.
-  //   4. Disclaimer footnote at the bottom, separated by a divider so
+  //   2. Version / License / Source / Updates in a single label-value
+  //      table. The Updates row carries the current updater state +
+  //      a manual "Check now" trigger.
+  //   3. Disclaimer footnote at the bottom, separated by a divider so
   //      the legal-style copy isn't mixed with the rest of the card.
   return (
-    <SettingsCard icon={Info} title="About" subtitle="Version, source and license.">
+    <SettingsCard icon={Info} title="About" subtitle="Version, source, license and updates.">
       <p className="text-[12.5px] leading-relaxed text-foreground">
         SuperWhisper Analytics is a local companion. Nothing leaves your machine.
       </p>
@@ -505,12 +522,43 @@ function AboutCard(): React.JSX.Element {
             </button>
           </dd>
         </div>
+        <div className="flex items-center justify-between py-2">
+          <dt className="text-muted-foreground">Updates</dt>
+          <dd className="flex items-center gap-2">
+            <span className="text-[12.5px] text-muted-foreground">{describeStatus(status)}</span>
+            <button type="button" onClick={check} disabled={checking} className={CHROME_BUTTON}>
+              <RefreshCw className={cn('h-3 w-3', checking && 'animate-spin')} strokeWidth={1.8} />
+              Check now
+            </button>
+          </dd>
+        </div>
       </dl>
       <p className="mt-4 border-t border-border pt-3 text-[11.5px] leading-relaxed text-muted-foreground">
         {DISCLAIMER}
       </p>
     </SettingsCard>
   )
+}
+
+/** Plain-language summary of the updater state, shown next to the
+ *  "Check now" button. */
+function describeStatus(s: UpdaterStatus): string {
+  switch (s.kind) {
+    case 'idle':
+      return 'Not checked yet'
+    case 'checking':
+      return 'Checking…'
+    case 'up-to-date':
+      return 'Up to date'
+    case 'available':
+      return `Update available (v${s.version})`
+    case 'downloading':
+      return `Downloading… ${s.percent}%`
+    case 'downloaded':
+      return `Update downloaded (v${s.version}) — restart to install`
+    case 'error':
+      return `Couldn't check (${s.message})`
+  }
 }
 
 function Row({ k, v }: { k: string; v: string }): React.JSX.Element {

@@ -4,6 +4,7 @@ import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { registerIpcHandlers } from './ipc'
 import { registerSwProtocolHandler, registerSwSchemeAsPrivileged } from './protocol'
+import { initAutoUpdater } from './updater'
 import { disableWatch } from './watcher'
 
 // Privileged scheme registration must happen BEFORE app.whenReady — the
@@ -63,6 +64,11 @@ app.whenReady().then(() => {
   registerSwProtocolHandler()
 
   createWindow()
+
+  // Production-only: kick off a silent check for a newer release on
+  // GitHub. Dev builds skip this — electron-updater errors on a
+  // non-packaged app.
+  if (!is.dev) initAutoUpdater()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

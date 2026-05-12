@@ -2,6 +2,7 @@ import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import type { HydratePayload } from '@shared/types'
 import { defaultPath, getConfig, isPathInsideHome, isPathValid, setConfig } from './config'
 import { hydrate, reindex, setFillerWords } from './cache'
+import { checkForUpdatesManually, getUpdaterStatus, type UpdaterStatus } from './updater'
 import { disableWatch, enableWatch } from './watcher'
 import { validBool, validString, validStringArray } from './validators'
 import type { ConfigStatus } from '../preload/api'
@@ -105,6 +106,15 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('data:setFillerWords', (_, words: unknown): HydratePayload => {
     if (!validStringArray(words)) return hydrate()
     return setFillerWords(words)
+  })
+
+  // Updater — current snapshot + manual trigger. Push notifications
+  // happen out-of-band via `updater:status` on each main → renderer
+  // broadcast (see `updater.ts`).
+  ipcMain.handle('updater:status', (): UpdaterStatus => getUpdaterStatus())
+  ipcMain.handle('updater:check', async (): Promise<UpdaterStatus> => {
+    await checkForUpdatesManually()
+    return getUpdaterStatus()
   })
 
   // Apply the persisted watch-folder preference on startup.

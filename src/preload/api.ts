@@ -71,6 +71,18 @@ export interface ConfigStatus {
  *  invalidates (today: fs.watch debounce on the recordings folder). */
 type Unsubscribe = () => void
 
+/** Status of the in-app auto-updater. Mirrors the implementation in
+ *  `src/main/updater.ts`; lives here so the IPC contract is in one
+ *  place. */
+export type UpdaterStatus =
+  | { kind: 'idle' }
+  | { kind: 'checking' }
+  | { kind: 'up-to-date'; version: string }
+  | { kind: 'available'; version: string }
+  | { kind: 'downloading'; percent: number }
+  | { kind: 'downloaded'; version: string }
+  | { kind: 'error'; message: string }
+
 export const api = {
   config: {
     status: (): Promise<ConfigStatus> => ipcRenderer.invoke('config:status'),
@@ -116,6 +128,19 @@ export const api = {
   },
   dialog: {
     pickFolder: (): Promise<string | null> => ipcRenderer.invoke('dialog:pickFolder')
+  },
+  updater: {
+    /** Return the latest cached updater status. The renderer also
+     *  subscribes to `onStatus` below to get push updates. */
+    status: (): Promise<UpdaterStatus> => ipcRenderer.invoke('updater:status'),
+    /** Force a check now (Settings → Check for updates). */
+    check: (): Promise<UpdaterStatus> => ipcRenderer.invoke('updater:check'),
+    /** Subscribe to push status updates from the main-process updater. */
+    onStatus: (handler: (status: UpdaterStatus) => void): Unsubscribe => {
+      const listener = (_e: unknown, payload: UpdaterStatus): void => handler(payload)
+      ipcRenderer.on('updater:status', listener)
+      return () => ipcRenderer.removeListener('updater:status', listener)
+    }
   },
   openExternal: (url: string): Promise<void> => ipcRenderer.invoke('shell:openExternal', url)
 }
