@@ -1,28 +1,35 @@
-# Dependabot keeps npm + GitHub Actions dependencies fresh and surfaces
-# security advisories as PRs. Weekly cadence is enough for a personal
-# project — daily PRs would just be noise. Groups patch-level updates
-# together so the bulk of PRs are batched.
+# Dependabot keeps deps fresh and surfaces security advisories. Tuned
+# to be quiet:
+#   • monthly cadence — once a month, not every Monday
+#   • single combined group per ecosystem — one PR for all non-major
+#     bumps instead of per-package noise
+#   • low PR limits — at most 2 npm + 1 actions PR open at a time
+#   • majors of risky / config-shifting packages are ignored
+#     (Electron, Vite, @vitejs/plugin-react, TypeScript, ESLint,
+#     @types/node, vitest) — bump them manually after a config audit
+#
+# Security advisories arrive regardless of any of this — they're a
+# separate channel that always opens a PR when a CVE applies.
 
 version: 2
 updates:
   - package-ecosystem: npm
     directory: '/'
     schedule:
-      interval: weekly
+      interval: monthly
       day: monday
       time: '08:00'
       timezone: Europe/London
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 2
     labels:
       - dependencies
     groups:
-      patches:
+      # Everything non-major lands in ONE PR per month so reviewing
+      # them is a single sitting, not a deluge.
+      non-major:
         applies-to: version-updates
         update-types:
           - patch
-      minor:
-        applies-to: version-updates
-        update-types:
           - minor
     ignore:
       # Electron majors get manual bumps — too much risk of subtle
@@ -54,22 +61,32 @@ updates:
       - dependency-name: eslint
         update-types:
           - version-update:semver-major
+      # @types/node tracks Node majors and is purely dev-time; not
+      # worth the churn for a monthly major bump.
+      - dependency-name: '@types/node'
+        update-types:
+          - version-update:semver-major
+      # vitest majors typically change config / setup-file semantics —
+      # needs a manual review when we want it.
+      - dependency-name: vitest
+        update-types:
+          - version-update:semver-major
 
   - package-ecosystem: github-actions
     directory: '/'
     schedule:
-      interval: weekly
+      interval: monthly
       day: monday
       time: '08:00'
       timezone: Europe/London
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 1
     labels:
       - dependencies
       - github-actions
     groups:
-      # Batch every actions update into a single PR per week so the
-      # repo doesn't get N parallel actions/checkout / setup-node /
-      # codeql-action / etc bumps each cycle.
+      # Every actions update — patch, minor, major — into a single
+      # monthly PR. Actions bumps are low-risk and reviewing one PR
+      # is fine.
       all-actions:
         applies-to: version-updates
         patterns:
