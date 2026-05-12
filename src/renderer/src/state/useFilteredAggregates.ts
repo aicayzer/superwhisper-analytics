@@ -10,15 +10,22 @@ const DAY_MS = 24 * 3600 * 1000
 /**
  * Pick a trend-bucket granularity from a window-in-days. Daily reads well
  * up to ~30 buckets; weekly up to ~13 (a quarter); beyond that monthly.
+ *
+ * Exported for direct unit-testing — see `useFilteredAggregates.test.ts`.
+ * The hook itself is React glue; the bucketing thresholds are the
+ * logic worth pinning down.
  */
-function pickBucketBy(days: number): BucketBy {
+export function pickBucketBy(days: number): BucketBy {
   if (days <= 29) return 'day'
   if (days <= 90) return 'week'
   return 'month'
 }
 
-/** Total span (days) covered by the recording dataset, used when range="all". */
-function datasetSpanDays(recordings: ReadonlyArray<Recording>): number {
+/**
+ * Total span (days) covered by the recording dataset, used when
+ * range="all". Exported for direct unit-testing.
+ */
+export function datasetSpanDays(recordings: ReadonlyArray<Recording>): number {
   if (recordings.length === 0) return 0
   let min = Infinity
   let max = -Infinity
