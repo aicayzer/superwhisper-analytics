@@ -1,11 +1,9 @@
 import type { StreakCell } from '@renderer/lib/types'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo } from 'react'
 
 interface StreakCalendarProps {
   /** One entry per day, ordered oldest → newest. */
   data: StreakCell[]
-  /** Gap between cells. */
-  cellGap?: number
 }
 
 const DAY_LABELS = ['Mon', '', 'Wed', '', 'Fri', '', ''] as const
@@ -23,22 +21,27 @@ const MONTH_LABELS = [
   'Nov',
   'Dec'
 ] as const
-const LABEL_GUTTER = 22
-const MONTH_ROW_H = 12
-const MIN_CELL = 5
-const MAX_CELL = 16
 
 /**
- * GitHub-style streak grid — up to 53 weeks × 7 days, Mon-start.
+ * Recording streak grid — up to 53 weeks × 7 days, Mon-start.
  *
- * Cell size adapts to the container via ResizeObserver — the grid stays
- * proportional to whatever cell it's dropped into. A narrow card gives
- * small cells; a wide card gives chunky ones. Capped at [MIN_CELL,
- * MAX_CELL] so cells never disappear or look comical.
+ * Rendered as an HTML/CSS grid (matching the When You Record heatmap)
+ * rather than SVG. Each column = one ISO week; each row = one day of
+ * week. Columns are `minmax(0, 1fr)` so they expand to fill the
+ * container; rows are fixed-fraction rows so they distribute the
+ * available height evenly. Labels sit at fixed CSS font-size and never
+ * scale with the grid — the SVG implementation that this replaces
+ * scaled labels alongside cells, which read as inconsistent against
+ * the neighbouring HTML-grid heatmap.
+ *
+ * The grid takes whatever shape the container hands it: tall and narrow
+ * cards give tall narrow cells, wide cards give wide cells. No square
+ * lock-in, matching the heatmap's behaviour.
  */
-export function StreakCalendar({ data, cellGap = 2 }: StreakCalendarProps): React.JSX.Element {
-  // Compute layout once per data change. Columns + month markers stay
-  // stable across resize ticks — only the visual cellSize changes.
+export function StreakCalendar({ data }: StreakCalendarProps): React.JSX.Element {
+  // Bucket cells into ISO-week columns (Mon-start). Pre-padding the first
+  // week with nulls keeps every column exactly 7 rows tall and keeps
+  // day-of-week alignment intact across the grid.
   const { columns, monthMarkers, max } = useMemo(() => {
     const cols: Array<Array<StreakCell | null>> = []
     let m = 0
@@ -72,113 +75,80 @@ export function StreakCalendar({ data, cellGap = 2 }: StreakCalendarProps): Reac
     return { columns: cols, monthMarkers: markers, max: m || 1 }
   }, [data])
 
-  // Pick the natural cellSize that fits both dimensions of the container
-  // at this exact data length, then clamp to [MIN_CELL, MAX_CELL]. When the
-  // container is too narrow to hold even MIN_CELL × cols, the SVG's
-  // preserveAspectRatio downscales the natural viewBox to fit — preferred
-  // over overflowing into the neighbouring chart.
-  const wrapRef = useRef<HTMLDivElement>(null)
-  const [cellSize, setCellSize] = useState<number>(11)
-  useEffect(() => {
-    const el = wrapRef.current
-    if (!el) return undefined
-    const compute = (): void => {
-      const w = el.clientWidth
-      const h = el.clientHeight
-      if (w <= 0 || h <= 0 || columns.length === 0) return
-      const colCount = columns.length
-      const byW = (w - LABEL_GUTTER) / colCount - cellGap
-      const byH = (h - MONTH_ROW_H) / 7 - cellGap
-      const natural = Math.floor(Math.min(byW, byH))
-      const next = Math.max(MIN_CELL, Math.min(MAX_CELL, natural))
-      setCellSize(next)
-    }
-    compute()
-    const ro = new ResizeObserver(compute)
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [columns.length, cellGap])
-
-  const stride = cellSize + cellGap
-  const width = LABEL_GUTTER + columns.length * stride
-  const height = MONTH_ROW_H + 7 * stride
+  if (columns.length === 0) {
+    return (
+      <div className="flex h-full items-center justify-center text-[10px] text-muted-foreground">
+        No data.
+      </div>
+    )
+  }
 
   return (
-    <div ref={wrapRef} className="h-full min-h-[110px] w-full">
-      <svg
-        role="img"
-        aria-label="Recording streak calendar"
-        width="100%"
-        height="100%"
-        viewBox={`0 0 ${width} ${height}`}
-        preserveAspectRatio="xMidYMid meet"
+    <div className="flex h-full min-h-[110px] w-full flex-col gap-1 text-[10px] text-muted-foreground">
+      {/* Month label strip — sits above the grid, indexed by column. The
+          gutter on the left mirrors the day-label column below so the
+          two grids line up flush. */}
+      <div
+        className="grid gap-px"
+        style={{
+          gridTemplateColumns: `22px repeat(${columns.length}, minmax(0, 1fr))`,
+          height: 12
+        }}
       >
-        {/* Day labels (left column) */}
-        {DAY_LABELS.map((label, i) =>
-          label ? (
-            <text
-              key={i}
-              x={0}
-              y={MONTH_ROW_H + i * stride + cellSize - 1}
-              fontSize={9}
-              fill="var(--muted-foreground)"
-            >
-              {label}
-            </text>
-          ) : null
-        )}
-        {/* Month labels (top row) */}
-        {monthMarkers.map((mm, i) => (
-          <text
-            key={i}
-            x={LABEL_GUTTER + mm.col * stride}
-            y={9}
-            fontSize={9}
-            fill="var(--muted-foreground)"
+        <div />
+        {columns.map((_, col) => {
+          const marker = monthMarkers.find((m) => m.col === col)
+          return (
+            <div key={col} className="text-[9px] leading-none">
+              {marker ? marker.label : ''}
+            </div>
+          )
+        })}
+      </div>
+      {/* Main grid: day-of-week label column + N week columns. */}
+      <div
+        className="grid min-h-0 flex-1 gap-px"
+        style={{
+          gridTemplateColumns: `22px repeat(${columns.length}, minmax(0, 1fr))`,
+          gridTemplateRows: 'repeat(7, minmax(0, 1fr))'
+        }}
+      >
+        {DAY_LABELS.map((label, row) => (
+          <div
+            key={`label-${row}`}
+            className="pr-1 text-right text-[9px] leading-none"
+            style={{ gridColumn: 1, gridRow: row + 1 }}
           >
-            {mm.label}
-          </text>
+            {label}
+          </div>
         ))}
-        {/* Cells */}
-        {columns.map((week, c) =>
-          week.map((cell, r) => {
-            const x = LABEL_GUTTER + c * stride
-            const y = MONTH_ROW_H + r * stride
+        {columns.map((week, col) =>
+          week.map((cell, row) => {
+            const key = `${col}-${row}`
             if (!cell) {
-              return (
-                <rect
-                  key={`${c}-${r}`}
-                  x={x}
-                  y={y}
-                  width={cellSize}
-                  height={cellSize}
-                  fill="transparent"
-                />
-              )
+              return <div key={key} style={{ gridColumn: col + 2, gridRow: row + 1 }} aria-hidden />
             }
             const intensity =
               cell.count === 0 ? 0 : Math.max(8, Math.round((cell.count / max) * 100))
-            const fill =
+            const background =
               cell.count === 0
                 ? 'var(--muted)'
                 : `color-mix(in oklab, var(--chart-1) ${intensity}%, var(--muted))`
             return (
-              <rect
-                key={`${c}-${r}`}
-                x={x}
-                y={y}
-                width={cellSize}
-                height={cellSize}
-                rx={2}
-                ry={2}
-                fill={fill}
-              >
-                <title>{`${cell.date} — ${cell.count}`}</title>
-              </rect>
+              <div
+                key={key}
+                title={`${cell.date} — ${cell.count}`}
+                className="rounded-[2px]"
+                style={{
+                  gridColumn: col + 2,
+                  gridRow: row + 1,
+                  backgroundColor: background
+                }}
+              />
             )
           })
         )}
-      </svg>
+      </div>
     </div>
   )
 }

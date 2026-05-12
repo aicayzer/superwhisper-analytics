@@ -53,7 +53,12 @@ export function Language(): React.JSX.Element {
   }, [wpmDots])
 
   return (
-    <div className="flex h-full flex-col gap-3">
+    // CSS grid (not flex-col) for the outer layout so the three chart
+    // rows ALWAYS share the same height. With a flex-col, flex-1 children
+    // can be pushed taller than 1/3 when their intrinsic content drives a
+    // larger min-content — which is what caused Filler Words to visually
+    // bleed into the row below when the dataset only had a few entries.
+    <div className="grid h-full grid-rows-[auto_1fr_1fr_1fr] gap-3">
       <KpiRow
         items={[
           {
@@ -80,7 +85,7 @@ export function Language(): React.JSX.Element {
         ]}
       />
 
-      <div className="grid min-h-0 flex-1 grid-cols-2 gap-3">
+      <div className="grid min-h-0 grid-cols-2 gap-3">
         <ChartCard title="Top words" slug="top-words" className="min-w-[220px]">
           <BarList data={topWords} columns={2} />
         </ChartCard>
@@ -89,7 +94,7 @@ export function Language(): React.JSX.Element {
         </ChartCard>
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-2 gap-3">
+      <div className="grid min-h-0 grid-cols-2 gap-3">
         <ChartCard title="Words per minute" slug="speaking-pace">
           <PaceTrend
             trend={wpmTrend}
@@ -111,7 +116,7 @@ export function Language(): React.JSX.Element {
         </ChartCard>
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-2 gap-3">
+      <div className="grid min-h-0 grid-cols-2 gap-3">
         <ChartCard title="Sentence length" slug="sentence-length">
           <DistBar data={sentenceDist} xKey="label" yKey="count" />
         </ChartCard>

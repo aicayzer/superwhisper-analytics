@@ -35,7 +35,7 @@ export function ChartCard({
   const location = useLocation()
   const fromHere = encodeURIComponent(location.pathname + location.search)
   return (
-    <Card className={cn('group flex flex-col px-4 pt-3 pb-1.5', className)}>
+    <Card className={cn('group flex min-h-0 flex-col overflow-hidden px-4 pt-3 pb-1.5', className)}>
       <div className="mb-2 flex items-center justify-between gap-2">
         <h3 className="truncate text-[13px] font-semibold tracking-tight text-foreground">
           {title}

@@ -22,9 +22,14 @@ interface BarListProps {
    *  columns and longer bars. Default 140. */
   maxLabelWidth?: number
   /** When `2`, render two side-by-side columns of bars (data split
-   *  left/right). Default `1` (single column). Used on the Language
-   *  preview cards where each card has a wide aspect ratio. */
+   *  left/right). Default `1` (single column). When the dataset is
+   *  smaller than `singleColumnBelow` the layout always collapses to
+   *  one column regardless of this prop — splitting 3 entries 2/1 looks
+   *  silly. */
   columns?: 1 | 2
+  /** Threshold (count) at and below which `columns=2` collapses to one
+   *  full-width column. Default 6. */
+  singleColumnBelow?: number
   className?: string
 }
 
@@ -49,8 +54,13 @@ function BarListInner({
   maxRowHeight = 28,
   maxLabelWidth = 140,
   columns = 1,
+  singleColumnBelow = 6,
   className
 }: BarListProps): React.JSX.Element {
+  // Collapse to one column when there are too few entries to split — a
+  // 2/1 split on three phrases reads as broken.
+  const effectiveColumns: 1 | 2 = columns === 2 && data.length > singleColumnBelow ? 2 : 1
+
   const containerRef = useRef<HTMLDivElement>(null)
   const [visibleCount, setVisibleCount] = useState<number>(data.length)
 
@@ -64,13 +74,13 @@ function BarListInner({
     const compute = (): void => {
       const h = el.clientHeight
       const rowsPerColumn = Math.max(1, Math.floor(h / minRowHeight))
-      setVisibleCount(rowsPerColumn * columns)
+      setVisibleCount(rowsPerColumn * effectiveColumns)
     }
     compute()
     const ro = new ResizeObserver(compute)
     ro.observe(el)
     return () => ro.disconnect()
-  }, [minRowHeight, columns])
+  }, [minRowHeight, effectiveColumns])
 
   if (data.length === 0) {
     return (
@@ -86,7 +96,7 @@ function BarListInner({
   // the same width as the left column's bigger ones.
   const max = visible.reduce((m, d) => (d.count > m ? d.count : m), 0) || 1
 
-  if (columns === 2) {
+  if (effectiveColumns === 2) {
     const half = Math.ceil(visible.length / 2)
     const left = visible.slice(0, half)
     const right = visible.slice(half)

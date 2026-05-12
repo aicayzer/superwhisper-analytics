@@ -1,19 +1,12 @@
 import { AppearancePicker } from '@renderer/components/settings/AppearancePicker'
 import { SettingsCard } from '@renderer/components/settings/SettingsCard'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '@renderer/components/ui/select'
 import { Switch } from '@renderer/components/ui/Switch'
 import { cn } from '@renderer/lib/cn'
 import { formatCompact, formatDurationSec } from '@renderer/lib/format'
 import { DEFAULT_FILLER_PHRASES, normalisePhrases } from '@shared/text-metrics'
 import { useConfigStore } from '@renderer/state/configStore'
 import { useDataStore } from '@renderer/state/dataStore'
-import { useUiPrefsStore, type TranscriptViewMode } from '@renderer/state/uiPrefsStore'
+import { useUiPrefsStore } from '@renderer/state/uiPrefsStore'
 import {
   AlignLeft,
   BookOpen,
@@ -32,11 +25,6 @@ const GITHUB_URL = 'https://github.com/aicayzer/superwhisper-analytics'
 const DISCLAIMER =
   'Personal project, not affiliated with SuperWhisper. Shared in case it’s useful to anyone else.'
 
-const TRANSCRIPT_VIEW_OPTIONS: ReadonlyArray<{ value: TranscriptViewMode; label: string }> = [
-  { value: 'block', label: 'Segments' },
-  { value: 'inline', label: 'Inline' }
-]
-
 /**
  * Card-based Settings page. Each section is a `<SettingsCard>` with an
  * icon header + body content. Sections, in order:
@@ -50,14 +38,11 @@ const TRANSCRIPT_VIEW_OPTIONS: ReadonlyArray<{ value: TranscriptViewMode; label:
  *              and an "unaffiliated" disclaimer.
  */
 export function Settings(): React.JSX.Element {
+  // No top header: the navbar already shows "Settings" in the title row,
+  // and the local-companion tagline now lives inside the About card so
+  // we don't burn vertical space on a duplicate.
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4 pb-8 pt-2">
-      <header className="px-1 pb-2">
-        <h1 className="text-[22px] font-semibold tracking-tight text-foreground">Settings</h1>
-        <p className="mt-1 text-[13px] text-muted-foreground">
-          SuperWhisper Analytics is a local-only companion. Nothing leaves your machine.
-        </p>
-      </header>
       <RecordingsCard />
       <AppearanceCard />
       <IndexingCard />
@@ -310,27 +295,22 @@ function DemoModeCard(): React.JSX.Element {
 function TranscriptsCard(): React.JSX.Element {
   const mode = useUiPrefsStore((s) => s.transcriptViewMode)
   const setMode = useUiPrefsStore((s) => s.setTranscriptViewMode)
+  // 'block' = timestamps shown, 'inline' = timestamps hidden. Surface this
+  // as a Switch to match the Indexing / Demo data toggles — the dropdown
+  // it replaces felt out of place against the rest of Settings.
+  const showTimestamps = mode === 'block'
   return (
     <SettingsCard
       icon={AlignLeft}
       title="Transcripts"
       subtitle="How transcripts are laid out in the recording detail view."
     >
-      <Select value={mode} onValueChange={(v) => setMode(v as TranscriptViewMode)}>
-        <SelectTrigger
-          aria-label="Transcript view"
-          className="h-8 w-full justify-between text-[12.5px]"
-        >
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {TRANSCRIPT_VIEW_OPTIONS.map((opt) => (
-            <SelectItem key={opt.value} value={opt.value} className="text-[12.5px]">
-              {opt.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <ToggleRow
+        label="Show timestamps"
+        description="Render each segment with a clickable [m:ss] prefix; toggle off for a continuous inline transcript."
+        checked={showTimestamps}
+        onChange={(next) => setMode(next ? 'block' : 'inline')}
+      />
     </SettingsCard>
   )
 }
@@ -463,7 +443,13 @@ function AboutCard(): React.JSX.Element {
 
   return (
     <SettingsCard icon={Info} title="About" subtitle="Version, source and license.">
-      <dl className="divide-y divide-border text-[13px]">
+      {/* Local-companion tagline lives here now that the top Settings
+          header has been removed — it's the right home for it, alongside
+          version + license + the unaffiliated disclaimer. */}
+      <p className="text-[12.5px] text-muted-foreground">
+        SuperWhisper Analytics is a local companion. Nothing leaves your machine.
+      </p>
+      <dl className="mt-4 divide-y divide-border text-[13px]">
         <Row k="Version" v={`v${__APP_VERSION__}`} />
         <Row k="License" v="MIT" />
       </dl>

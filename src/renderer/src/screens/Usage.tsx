@@ -35,13 +35,14 @@ export function Usage(): React.JSX.Element {
     () => modeStats.map((m) => ({ name: m.modeName, value: m.count })),
     [modeStats]
   )
-  const dominantMode = modeStats[0]
-  const dominantPct = dominantMode
-    ? Math.round((dominantMode.count / overview.totalRecordings) * 100)
-    : 0
 
   return (
-    <div className="flex h-full flex-col gap-3">
+    // CSS grid for the page layout so the two chart rows always share the
+    // remaining height equally. Flex-col with flex-1 children let
+    // intrinsic content drive a taller row than 1fr — which caused the
+    // Duration mix / Streak row to push past the viewport and add a
+    // scrollbar. Explicit `auto_1fr_1fr` guarantees equal split.
+    <div className="grid h-full grid-rows-[auto_1fr_1fr] gap-3">
       <KpiRow
         items={[
           {
@@ -71,24 +72,20 @@ export function Usage(): React.JSX.Element {
       />
 
       {/* Top row — When you record (3/5) + Mode share (2/5). */}
-      <div className="grid min-h-0 flex-1 grid-cols-[3fr_2fr] gap-3">
+      <div className="grid min-h-0 grid-cols-[3fr_2fr] gap-3">
         <ChartCard title="When you record" slug="when-you-record">
-          <div className="flex h-full flex-col justify-center">
-            <Heatmap matrix={heatmap} cellHeight={24} />
-          </div>
+          {/* No fixed cell height — Heatmap stretches its 7 day rows to
+              fill the card so the grid grows with the window. */}
+          <Heatmap matrix={heatmap} />
         </ChartCard>
         <ChartCard title="Mode share" slug="mode-pie" className="min-w-[280px]">
-          <ModePie
-            data={modePieData}
-            centreLabel={dominantMode?.modeName}
-            centreSubLabel={dominantMode ? `${dominantPct}%` : undefined}
-          />
+          <ModePie data={modePieData} />
         </ChartCard>
       </div>
 
       {/* Bottom row — Duration mix (2/5, more square) + Streak calendar
           (3/5, wide GitHub-style year grid). */}
-      <div className="grid min-h-0 flex-1 grid-cols-[2fr_3fr] gap-3">
+      <div className="grid min-h-0 grid-cols-[2fr_3fr] gap-3">
         <ChartCard title="Duration mix" slug="duration-mix" className="min-w-[280px]">
           <DistBar data={durationDist} xKey="label" yKey="count" />
         </ChartCard>

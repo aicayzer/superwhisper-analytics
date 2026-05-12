@@ -29,7 +29,7 @@ export function VolumeOverTimeChart(): React.JSX.Element {
 
 export function WhenYouRecordChart(): React.JSX.Element {
   const { heatmap } = useFilteredAggregates()
-  return <Heatmap matrix={heatmap} cellHeight={36} />
+  return <Heatmap matrix={heatmap} />
 }
 
 export function RecordingStreakChart(): React.JSX.Element {
@@ -43,19 +43,12 @@ export function DurationMixChart(): React.JSX.Element {
 }
 
 export function ModePieChart(): React.JSX.Element {
-  const { modeStats, overview } = useFilteredAggregates()
+  const { modeStats } = useFilteredAggregates()
   const data = useMemo(
     () => modeStats.map((m) => ({ name: m.modeName, value: m.count })),
     [modeStats]
   )
-  const dom = modeStats[0]
-  const pct =
-    dom && overview.totalRecordings > 0
-      ? Math.round((dom.count / overview.totalRecordings) * 100)
-      : 0
-  return (
-    <ModePie data={data} centreLabel={dom?.modeName} centreSubLabel={dom ? `${pct}%` : undefined} />
-  )
+  return <ModePie data={data} />
 }
 
 export function TopWordsChart(): React.JSX.Element {

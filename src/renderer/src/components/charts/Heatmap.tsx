@@ -5,8 +5,14 @@ interface HeatmapProps {
   matrix: number[][]
   /** Day labels in the same order as rows. */
   dayLabels?: readonly string[]
-  /** Cell height in px. */
+  /** Cell height in px when `stretch === false`. Ignored when stretching
+   *  (rows distribute the container height instead). Default 14. */
   cellHeight?: number
+  /** When true (the default for full-card embeds), rows stretch to fill
+   *  the container's height via grid-template-rows = 1fr; the cellHeight
+   *  prop is ignored. When false, every row is fixed at `cellHeight` px
+   *  — handy for compact embeds where the grid shouldn't dominate. */
+  stretch?: boolean
   /** Hide left day-name column (for compact embeds). */
   compact?: boolean
 }
@@ -25,6 +31,7 @@ export function Heatmap({
   matrix,
   dayLabels = DEFAULT_DAYS,
   cellHeight = 14,
+  stretch = true,
   compact = false
 }: HeatmapProps): React.JSX.Element {
   const max = useMemo(() => {
@@ -35,11 +42,27 @@ export function Heatmap({
 
   const labelCol = compact ? '0' : '32px'
 
+  // When stretching, the 7 day-rows share the remaining height as 1fr
+  // each; the hour-axis row stays auto-sized. Otherwise rows are fixed
+  // to cellHeight (legacy fixed-cell mode used by compact embeds).
+  const gridStyle: React.CSSProperties = stretch
+    ? {
+        gridTemplateColumns: `${labelCol} repeat(24, minmax(0, 1fr))`,
+        gridTemplateRows: 'repeat(7, minmax(0, 1fr)) auto'
+      }
+    : { gridTemplateColumns: `${labelCol} repeat(24, minmax(0, 1fr))` }
+
   return (
-    <div className="min-h-[110px] w-full text-[10px] text-muted-foreground">
+    <div
+      className={
+        stretch
+          ? 'flex h-full min-h-[110px] w-full flex-col text-[10px] text-muted-foreground'
+          : 'min-h-[110px] w-full text-[10px] text-muted-foreground'
+      }
+    >
       <div
-        className="grid w-full gap-px"
-        style={{ gridTemplateColumns: `${labelCol} repeat(24, minmax(0, 1fr))` }}
+        className={stretch ? 'grid min-h-0 w-full flex-1 gap-px' : 'grid w-full gap-px'}
+        style={gridStyle}
       >
         {matrix.map((row, dayIdx) => (
           <RowFragment
@@ -47,7 +70,7 @@ export function Heatmap({
             day={compact ? '' : (dayLabels[dayIdx] ?? '')}
             row={row}
             max={max}
-            cellHeight={cellHeight}
+            cellHeight={stretch ? undefined : cellHeight}
             showLabel={!compact}
           />
         ))}
@@ -73,9 +96,19 @@ function RowFragment({
   day: string
   row: number[]
   max: number
-  cellHeight: number
+  cellHeight: number | undefined
   showLabel: boolean
 }): React.JSX.Element {
+  // When cellHeight is undefined the row stretches via the parent grid
+  // template (the stretch path); otherwise we pin each cell to a fixed
+  // pixel height (the legacy compact-embed path).
+  const cellStyle = (v: number): React.CSSProperties => ({
+    ...(cellHeight !== undefined ? { height: cellHeight } : null),
+    backgroundColor:
+      v === 0
+        ? 'var(--muted)'
+        : `color-mix(in oklab, var(--chart-1) ${Math.round((v / max) * 100)}%, var(--muted))`
+  })
   return (
     <>
       {showLabel && (
@@ -86,13 +119,7 @@ function RowFragment({
           key={h}
           title={`${day} ${h}:00 — ${v}`}
           className="rounded-[2px]"
-          style={{
-            height: cellHeight,
-            backgroundColor:
-              v === 0
-                ? 'var(--muted)'
-                : `color-mix(in oklab, var(--chart-1) ${Math.round((v / max) * 100)}%, var(--muted))`
-          }}
+          style={cellStyle(v)}
         />
       ))}
     </>
