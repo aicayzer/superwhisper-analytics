@@ -16,7 +16,9 @@ export const RANGE_PRESETS: ReadonlyArray<PresetOption> = [
 /** Either a preset id, or a custom range with explicit endpoints. */
 export type RangeValue = { id: string; from?: Date; to?: Date }
 
-export const DEFAULT_RANGE: RangeValue = { id: 'all' }
+/** 90d covers a full quarter of activity without exposing the cold start
+ *  of a fresh install. The user can widen via the navbar pill. */
+export const DEFAULT_RANGE: RangeValue = { id: '90' }
 
 const SHORT_DATE_FMT: Intl.DateTimeFormatOptions = {
   day: 'numeric',
