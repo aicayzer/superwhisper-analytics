@@ -37,6 +37,12 @@ updates:
       - dependency-name: vite
         update-types:
           - version-update:semver-major
+      # @vitejs/plugin-react 6.x imports `vite/internal` which only
+      # exists on Vite 8. We're pinned to Vite 7, so plugin-react majors
+      # break the build. Bump manually after Vite moves.
+      - dependency-name: '@vitejs/plugin-react'
+        update-types:
+          - version-update:semver-major
       # TypeScript majors change strict-typing semantics enough that a
       # green CI on an auto-merge isn't a safe signal — needs a manual
       # tsconfig audit. Bump manually when ready.
