@@ -10,8 +10,11 @@ interface SwitchProps {
 }
 
 /**
- * Small inline iOS-style switch. Blue track + white knob when on, muted
- * track + white knob when off, dimmed when disabled.
+ * Small inline iOS-style switch. Foreground track + white knob when on
+ * (black in light mode, near-white in dark), muted track + white knob
+ * when off, dimmed when disabled. The accent-blue was reserved for
+ * content selection elsewhere; controls keep a calmer surface so the eye
+ * reads the page rather than darting to the toggle.
  *
  * Hand-rolled rather than pulling in @radix-ui/react-switch — the surface
  * area we need is minimal and the visual treatment matches the rest of
@@ -37,7 +40,7 @@ export function Switch({
         'relative inline-flex h-[22px] w-9 shrink-0 items-center rounded-full transition-colors',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background',
         disabled && 'cursor-not-allowed opacity-50',
-        checked ? 'bg-accent-blue' : 'bg-foreground/[0.18]'
+        checked ? 'bg-foreground' : 'bg-foreground/[0.18]'
       )}
     >
       <span

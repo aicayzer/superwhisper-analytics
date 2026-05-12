@@ -28,8 +28,10 @@ const SEED = 0x9e3779b9
 const DAYS = 200
 const MS_PER_DAY = 86_400_000
 
-// Filler-injection target rate: roughly one filler every ~20 words.
-const FILLER_RATE = 0.05
+// Filler-injection target rate: roughly one filler every ~14 words. The
+// 0.05 baseline read flatly in screenshots — at 0.07 the Top Fillers
+// chart has visible bars without veering into caricature.
+const FILLER_RATE = 0.07
 
 interface ModeSpec {
   name: string
@@ -241,7 +243,10 @@ function pickN<T>(arr: readonly T[], n: number, rng: () => number): T[] {
  * picks the insertions up.
  */
 function injectFillers(text: string, rate: number, rng: () => number): string {
-  const fillers = DEFAULT_FILLER_PHRASES.filter((f) => f.length <= 20)
+  // Bias toward short hesitations and interjections — the visible "Top
+  // Fillers" chart leads with um/uh/err/like rather than the long
+  // discourse-marker phrases, which read more naturally in demo data.
+  const fillers = DEFAULT_FILLER_PHRASES.filter((f) => f.length <= 6)
   if (fillers.length === 0) return text
   const words = text.split(/(\s+)/) // keep whitespace tokens
   const out: string[] = []

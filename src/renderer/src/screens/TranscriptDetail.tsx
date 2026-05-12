@@ -191,8 +191,6 @@ function DetailView({ rec }: { rec: Recording }): React.JSX.Element {
             <AudioCard
               playing={playing}
               progress={progress}
-              currentSec={currentSec}
-              totalSec={totalSec}
               onTogglePlay={togglePlay}
               onSeek={(f) => seekTo(f * totalSec)}
             />
@@ -235,8 +233,6 @@ function KpiStrip({ rec }: { rec: Recording }): React.JSX.Element {
 interface AudioCardProps {
   playing: boolean
   progress: number
-  currentSec: number
-  totalSec: number
   onTogglePlay: () => void
   onSeek: (frac: number) => void
 }
@@ -251,14 +247,7 @@ interface AudioCardProps {
  * information without the visual disappointment, and stays useful even
  * for short or silent recordings.
  */
-function AudioCard({
-  playing,
-  progress,
-  currentSec,
-  totalSec,
-  onTogglePlay,
-  onSeek
-}: AudioCardProps): React.JSX.Element {
+function AudioCard({ playing, progress, onTogglePlay, onSeek }: AudioCardProps): React.JSX.Element {
   return (
     <Card className="p-3">
       <div className="flex items-center gap-2.5">
@@ -278,10 +267,8 @@ function AudioCard({
           <AudioProgressBar progress={progress} onSeek={onSeek} />
         </div>
       </div>
-      <div className="mt-2 flex items-center justify-between text-[10.5px] tabular-nums text-muted-foreground">
-        <span>{formatClock(currentSec)}</span>
-        <span>{formatClock(totalSec)}</span>
-      </div>
+      {/* No elapsed/total clock row — total duration is already in the KPI
+          strip above, and elapsed is implicit from the playhead position. */}
     </Card>
   )
 }

@@ -29,14 +29,18 @@ export function ChartTooltip({
       )}
       <div className="space-y-0.5">
         {payload.map((p, i) => (
-          <div key={i} className="flex items-center gap-2 tabular-nums">
-            <span
-              aria-hidden
-              className="h-1.5 w-1.5 shrink-0 rounded-full"
-              style={{ backgroundColor: p.color ?? 'var(--foreground)' }}
-            />
-            <span className="text-muted-foreground">{p.name ?? 'value'}</span>
-            <span className="ml-auto font-medium">{p.value}</span>
+          <div key={i} className="flex items-baseline gap-2 tabular-nums">
+            {/* Dot sits on the row baseline by wrapping it in a flex shim
+                of its own — items-baseline on the row would otherwise
+                bottom-align the round indicator with the text descenders. */}
+            <span aria-hidden className="flex shrink-0 items-center">
+              <span
+                className="h-1.5 w-1.5 rounded-full"
+                style={{ backgroundColor: p.color ?? 'var(--foreground)' }}
+              />
+            </span>
+            <span className="text-left text-muted-foreground">{p.name ?? 'value'}</span>
+            <span className="ml-auto text-right font-medium">{p.value}</span>
           </div>
         ))}
       </div>
