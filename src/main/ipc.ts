@@ -1,6 +1,14 @@
 import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import type { HydratePayload } from '@shared/types'
-import { defaultPath, getConfig, isPathInsideHome, isPathValid, setConfig } from './config'
+import {
+  defaultPath,
+  getConfig,
+  isPathInsideHome,
+  isPathValid,
+  resetConfig,
+  resolveRecordingsPath,
+  setConfig
+} from './config'
 import { hydrate, reindex, setFillerWords } from './cache'
 import { checkForUpdatesManually, getUpdaterStatus, type UpdaterStatus } from './updater'
 import { disableWatch, enableWatch } from './watcher'
@@ -46,7 +54,12 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('config:setPath', (_, path: unknown): ConfigStatus => {
     // Accept string or null; ignore anything else.
     if (path !== null && !validString(path)) return buildStatus()
-    setConfig({ superwhisperPath: path })
+    // Auto-promote a SuperWhisper parent-folder pick to its `recordings/`
+    // child if the parent itself isn't a valid recordings dir. Saves
+    // users having to re-navigate via the picker when they grabbed the
+    // SuperWhisper container by mistake.
+    const resolved = path === null ? null : resolveRecordingsPath(path)
+    setConfig({ superwhisperPath: resolved })
     syncWatcher()
     return buildStatus()
   })
@@ -79,6 +92,17 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('config:setAutoHideSidebar', (_, enabled: unknown): ConfigStatus => {
     if (!validBool(enabled)) return buildStatus()
     setConfig({ autoHideSidebar: enabled })
+    return buildStatus()
+  })
+
+  // Reset everything — wipes config.json back to defaults so the
+  // welcome flow shows again on next hydrate. Used by the "Reset app"
+  // affordance in Settings → About.
+  ipcMain.handle('config:reset', (): ConfigStatus => {
+    resetConfig()
+    // Watch is keyed off path, which is now null — kill any active
+    // watcher so we don't leak a handle pointing at the old folder.
+    disableWatch()
     return buildStatus()
   })
 

@@ -37,6 +37,13 @@ interface ConfigState {
   autoHideSidebar: boolean
   /** Has the initial round-trip completed? Gates the first-run modal. */
   hydrated: boolean
+  /** Transient flag — when true, force the welcome modal regardless
+   *  of whether a path is set. Set by `resetApp` so the user can
+   *  re-test the onboarding flow on a machine where SuperWhisper is
+   *  installed at the default location (which would otherwise be
+   *  auto-adopted on the next hydrate). Cleared when the user
+   *  completes the welcome flow. Not persisted. */
+  welcomeForceShow: boolean
 
   /** One-shot hydrate; safe to call more than once but only the first does work. */
   hydrate: () => Promise<void>
@@ -53,6 +60,12 @@ interface ConfigState {
   setDemoMode: (enabled: boolean) => Promise<void>
   /** Toggle the auto-hide sidebar behaviour. */
   setAutoHideSidebar: (enabled: boolean) => Promise<void>
+  /** Wipe the persisted config back to defaults and force the welcome
+   *  modal to re-appear. Used by Settings → About → Reset app. */
+  resetApp: () => Promise<void>
+  /** Clear `welcomeForceShow` — call this from the welcome modal
+   *  after the user has picked a path or opted into demo. */
+  dismissWelcomeForce: () => void
 }
 
 function applyStatus(status: ConfigStatus): Partial<ConfigState> {
@@ -81,6 +94,7 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
   demoMode: false,
   autoHideSidebar: true,
   hydrated: false,
+  welcomeForceShow: false,
 
   hydrate: async () => {
     if (get().hydrated) return
@@ -144,5 +158,20 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
     set({ autoHideSidebar: enabled })
     const updated = await window.api.config.setAutoHideSidebar(enabled)
     set(applyStatus(updated))
-  }
+  },
+
+  resetApp: async () => {
+    const status = await window.api.config.reset()
+    // Apply the cleared status AND flip the force-show flag so the
+    // welcome modal renders even when a SuperWhisper folder is
+    // detected at the default location (which the modal then surfaces
+    // as a Recommended option). Without the flag, the welcome would
+    // be skipped for users with SuperWhisper installed.
+    set({ ...applyStatus(status), welcomeForceShow: true })
+    // Refresh data so the renderer drops the previously-cached scan
+    // and falls back to the demo dataset behind the welcome modal.
+    await useDataStore.getState().hydrate()
+  },
+
+  dismissWelcomeForce: () => set({ welcomeForceShow: false })
 }))

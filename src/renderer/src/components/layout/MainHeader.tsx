@@ -1,8 +1,10 @@
 import { IconButton } from '@renderer/components/ui/IconButton'
+import { useConfigStore } from '@renderer/state/configStore'
 import { useLayoutStore } from '@renderer/state/layoutStore'
 import { useRangeStore } from '@renderer/state/rangeStore'
 import { PanelLeft } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { DemoModeBadge } from './DemoModeBadge'
 import { RangePill } from './RangePill'
 
 export interface Breadcrumb {
@@ -54,18 +56,28 @@ export function MainHeader({
   const peekActive = useLayoutStore((s) => s.peekActive)
   const toggleSidebar = useLayoutStore((s) => s.toggleSidebar)
   const setPeek = useLayoutStore((s) => s.setPeek)
+  const demoMode = useConfigStore((s) => s.demoMode)
   // Render the navbar's own toggle only when the sidebar is fully out of
   // the way. While peeking the sidebar covers the same area and provides
   // its own toggle, so a navbar copy would be redundant.
   const showToggle = !sidebarOpen && !peekActive
 
   return (
+    // Three-column grid: [1fr title][auto center][1fr right]. The two
+    // outer fr columns balance around the centre so the demo-mode badge
+    // sits truly centred between the sidebar's right edge and the
+    // window's right edge, regardless of how long the breadcrumb is.
+    // When the centre is empty (demo off) the layout still works — the
+    // auto column collapses, the title and right slot pull naturally.
     <div
       style={{ left: leftPad, right: rightPad }}
-      className="absolute top-2 z-30 flex h-9 items-center gap-2 [-webkit-app-region:drag]"
+      className="absolute top-2 z-30 grid h-9 grid-cols-[1fr_auto_1fr] items-center gap-2 [-webkit-app-region:drag]"
     >
-      {showToggle && (
-        <div className="flex shrink-0 items-center [-webkit-app-region:no-drag]">
+      {/* `no-drag` on the title so breadcrumb <Link> segments are clickable
+          (the parent header is a drag region, which otherwise eats clicks
+          and turns them into window drags). */}
+      <div className="flex min-w-0 items-center gap-2 [-webkit-app-region:no-drag]">
+        {showToggle && (
           <IconButton
             onClick={toggleSidebar}
             // Hovering the toggle peeks the sidebar — the user can use
@@ -77,23 +89,24 @@ export function MainHeader({
           >
             <PanelLeft className="h-3.5 w-3.5" strokeWidth={1.8} />
           </IconButton>
+        )}
+        <div className="min-w-0">
+          <TitleNode title={title} />
         </div>
-      )}
-      {/* `no-drag` on the title so breadcrumb <Link> segments are clickable
-          (the parent header is a drag region, which otherwise eats clicks
-          and turns them into window drags). */}
-      <div className="min-w-0 flex-1 [-webkit-app-region:no-drag]">
-        <TitleNode title={title} />
       </div>
-      {showRange ? (
-        <div className="flex shrink-0 items-center gap-1 [-webkit-app-region:no-drag]">
+      {/* Centre slot — only the DemoModeBadge claims it today. Wrapped
+          in a div so the empty case still occupies the grid track and
+          the right slot doesn't shift when demo flips. */}
+      <div className="flex items-center justify-center [-webkit-app-region:no-drag]">
+        {demoMode && <DemoModeBadge />}
+      </div>
+      <div className="flex items-center justify-end gap-1 [-webkit-app-region:no-drag]">
+        {showRange ? (
           <RangePill value={range} onChange={setRange} />
-        </div>
-      ) : rightAction ? (
-        <div className="flex shrink-0 items-center gap-1 [-webkit-app-region:no-drag]">
-          {rightAction}
-        </div>
-      ) : null}
+        ) : rightAction ? (
+          rightAction
+        ) : null}
+      </div>
     </div>
   )
 }

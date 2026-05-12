@@ -69,6 +69,23 @@ export function truncate(s: string, max: number): string {
   return s.slice(0, Math.max(0, max - 1)).trimEnd() + '…'
 }
 
+/**
+ * Middle-ellipsis truncation. Keeps the head AND tail visible so a long
+ * filesystem path collapses in its middle rather than losing the
+ * filename. Used by the welcome modal's folder picker to fit a default
+ * SuperWhisper path into one row without losing "/recordings" at the end.
+ */
+export function middleTruncate(s: string, max: number): string {
+  if (s.length <= max) return s
+  // Reserve one slot for the ellipsis; split the rest of the budget
+  // slightly weighted toward the tail so paths still surface their
+  // final segment (the filename / leaf folder).
+  const budget = max - 1
+  const headLen = Math.max(1, Math.floor(budget / 2))
+  const tailLen = Math.max(1, budget - headLen)
+  return `${s.slice(0, headLen)}…${s.slice(s.length - tailLen)}`
+}
+
 /** Format X-axis date ticks for activity charts. */
 export function formatActivityTick(raw: unknown): string {
   const d = new Date(String(raw))

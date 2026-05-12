@@ -1,4 +1,4 @@
-import { FirstRunModal } from '@renderer/components/FirstRunModal'
+import { WelcomeModal } from '@renderer/components/WelcomeModal'
 import { useGlobalShortcut } from '@renderer/hooks/useGlobalShortcut'
 import { formatTimestamp } from '@renderer/lib/format'
 import { useConfigStore } from '@renderer/state/configStore'
@@ -76,6 +76,8 @@ export function RootLayout(): React.JSX.Element {
   const setPeek = useLayoutStore((s) => s.setPeek)
   const configHydrated = useConfigStore((s) => s.hydrated)
   const configValid = useConfigStore((s) => s.isValid)
+  const demoMode = useConfigStore((s) => s.demoMode)
+  const welcomeForceShow = useConfigStore((s) => s.welcomeForceShow)
   const autoHideSidebar = useConfigStore((s) => s.autoHideSidebar)
   const recordings = useDataStore((s) => s.recordings)
   const location = useLocation()
@@ -197,11 +199,14 @@ export function RootLayout(): React.JSX.Element {
         title={title}
         leftPad={leftPad}
         rightPad={rightPad}
-        // Hide the date-range pill on the single-transcript page — the
-        // window only ever shows one recording, so a filter pill would
-        // be meaningless. Every other route (including the maximised
-        // chart view) keeps the pill.
-        showRange={!transcriptRec}
+        // Hide the date-range pill on routes where it'd be noise:
+        //   • single-transcript page — only one recording in view, the
+        //     filter has nothing to act on
+        //   • settings — has its own segmented tab strip and there's no
+        //     time-windowed content to filter
+        // Every other route (including the maximised chart view) keeps
+        // the pill.
+        showRange={!transcriptRec && location.pathname !== '/settings'}
         // Single-transcript page swaps the range pill for a "Copy
         // transcript" action pill in the same slot. The action used to
         // live as an IconButton in the DetailsCard header; moving it
@@ -233,7 +238,13 @@ export function RootLayout(): React.JSX.Element {
         <Outlet />
       </main>
       <CommandPalette />
-      {configHydrated && !configValid && <FirstRunModal />}
+      {/* Welcome appears when:
+           • the user has no valid recordings folder AND demo isn't on
+             (the natural "fresh install" trigger), OR
+           • the user just hit Reset app in Settings (welcomeForceShow)
+             — guarantees the flow is re-entered even when the default
+             SuperWhisper path is detected on disk. */}
+      {configHydrated && ((!configValid && !demoMode) || welcomeForceShow) && <WelcomeModal />}
     </Window>
   )
 }
