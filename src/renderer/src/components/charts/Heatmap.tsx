@@ -36,8 +36,11 @@ export function Heatmap({
   const labelCol = compact ? '0' : '32px'
 
   return (
-    <div className="text-[10px] text-muted-foreground">
-      <div className="grid gap-px" style={{ gridTemplateColumns: `${labelCol} repeat(24, 1fr)` }}>
+    <div className="min-h-[110px] w-full text-[10px] text-muted-foreground">
+      <div
+        className="grid w-full gap-px"
+        style={{ gridTemplateColumns: `${labelCol} repeat(24, minmax(0, 1fr))` }}
+      >
         {matrix.map((row, dayIdx) => (
           <RowFragment
             key={dayIdx}

@@ -31,12 +31,16 @@ export function Language(): React.JSX.Element {
 
   // Derived chart inputs — memoised so the BarList memo wrappers can
   // short-circuit on unchanged references.
+  // Two-column BarList variants want more entries so each column has rows
+  // to render. The Language preview cards use columns=2, so widen the slice.
   const topWords = useMemo(
-    () => wordFrequency.slice(0, TOP_LIST_LIMIT).map((w) => ({ label: w.word, count: w.count })),
+    () =>
+      wordFrequency.slice(0, TOP_LIST_LIMIT * 2).map((w) => ({ label: w.word, count: w.count })),
     [wordFrequency]
   )
   const topFillers = useMemo(
-    () => fillerSummary.slice(0, TOP_LIST_LIMIT).map((f) => ({ label: f.phrase, count: f.count })),
+    () =>
+      fillerSummary.slice(0, TOP_LIST_LIMIT * 2).map((f) => ({ label: f.phrase, count: f.count })),
     [fillerSummary]
   )
   // Sample wpmDots so PaceTrend renders ≤1000 scatter points. On 11k
@@ -77,11 +81,11 @@ export function Language(): React.JSX.Element {
       />
 
       <div className="grid min-h-0 flex-1 grid-cols-2 gap-3">
-        <ChartCard title="Top words" slug="top-words">
-          <BarList data={topWords} />
+        <ChartCard title="Top words" slug="top-words" className="min-w-[220px]">
+          <BarList data={topWords} columns={2} />
         </ChartCard>
-        <ChartCard title="Filler words" slug="filler-words">
-          <BarList data={topFillers} />
+        <ChartCard title="Filler words" slug="filler-words" className="min-w-[220px]">
+          <BarList data={topFillers} columns={2} />
         </ChartCard>
       </div>
 

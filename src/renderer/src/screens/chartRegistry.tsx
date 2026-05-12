@@ -59,7 +59,7 @@ export const CHART_REGISTRY: Record<string, ChartSpec> = {
     section: 'Usage',
     sectionPath: '/usage',
     title: 'Recording streak',
-    description: 'Daily activity for the last twelve months.',
+    description: 'Daily activity across the selected range.',
     render: () => <RecordingStreakChart />
   },
   'duration-mix': {
@@ -91,14 +91,14 @@ export const CHART_REGISTRY: Record<string, ChartSpec> = {
   'speaking-pace': {
     section: 'Language',
     sectionPath: '/language',
-    title: 'Speaking pace',
-    description: 'Words per minute, monthly average over per-recording dots.',
+    title: 'Words per minute',
+    description: 'Average over the selected range, plotted over per-recording dots.',
     render: () => <SpeakingPaceChart />
   },
   'filler-rate': {
     section: 'Language',
     sectionPath: '/language',
-    title: 'Filler rate over time',
+    title: 'Filler rate',
     render: () => <FillerRateChart />
   },
   'sentence-length': {

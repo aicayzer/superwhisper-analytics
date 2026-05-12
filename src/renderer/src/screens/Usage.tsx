@@ -77,7 +77,7 @@ export function Usage(): React.JSX.Element {
             <Heatmap matrix={heatmap} cellHeight={24} />
           </div>
         </ChartCard>
-        <ChartCard title="Mode share" slug="mode-pie">
+        <ChartCard title="Mode share" slug="mode-pie" className="min-w-[280px]">
           <ModePie
             data={modePieData}
             centreLabel={dominantMode?.modeName}
@@ -89,7 +89,7 @@ export function Usage(): React.JSX.Element {
       {/* Bottom row — Duration mix (2/5, more square) + Streak calendar
           (3/5, wide GitHub-style year grid). */}
       <div className="grid min-h-0 flex-1 grid-cols-[2fr_3fr] gap-3">
-        <ChartCard title="Duration mix" slug="duration-mix">
+        <ChartCard title="Duration mix" slug="duration-mix" className="min-w-[280px]">
           <DistBar data={durationDist} xKey="label" yKey="count" />
         </ChartCard>
         <ChartCard title="Recording streak" slug="recording-streak">

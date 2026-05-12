@@ -72,8 +72,11 @@ export function StreakCalendar({ data, cellGap = 2 }: StreakCalendarProps): Reac
     return { columns: cols, monthMarkers: markers, max: m || 1 }
   }, [data])
 
-  // Pick the largest cellSize that lets the grid fit both dimensions of
-  // the container at this exact data length.
+  // Pick the natural cellSize that fits both dimensions of the container
+  // at this exact data length, then clamp to [MIN_CELL, MAX_CELL]. When the
+  // container is too narrow to hold even MIN_CELL × cols, the SVG's
+  // preserveAspectRatio downscales the natural viewBox to fit — preferred
+  // over overflowing into the neighbouring chart.
   const wrapRef = useRef<HTMLDivElement>(null)
   const [cellSize, setCellSize] = useState<number>(11)
   useEffect(() => {
@@ -84,9 +87,10 @@ export function StreakCalendar({ data, cellGap = 2 }: StreakCalendarProps): Reac
       const h = el.clientHeight
       if (w <= 0 || h <= 0 || columns.length === 0) return
       const colCount = columns.length
-      const byW = Math.floor((w - LABEL_GUTTER) / colCount) - cellGap
-      const byH = Math.floor((h - MONTH_ROW_H) / 7) - cellGap
-      const next = Math.max(MIN_CELL, Math.min(MAX_CELL, Math.min(byW, byH)))
+      const byW = (w - LABEL_GUTTER) / colCount - cellGap
+      const byH = (h - MONTH_ROW_H) / 7 - cellGap
+      const natural = Math.floor(Math.min(byW, byH))
+      const next = Math.max(MIN_CELL, Math.min(MAX_CELL, natural))
       setCellSize(next)
     }
     compute()
@@ -100,12 +104,12 @@ export function StreakCalendar({ data, cellGap = 2 }: StreakCalendarProps): Reac
   const height = MONTH_ROW_H + 7 * stride
 
   return (
-    <div ref={wrapRef} className="flex h-full w-full items-center justify-center">
+    <div ref={wrapRef} className="h-full min-h-[110px] w-full">
       <svg
         role="img"
         aria-label="Recording streak calendar"
-        width={width}
-        height={height}
+        width="100%"
+        height="100%"
         viewBox={`0 0 ${width} ${height}`}
         preserveAspectRatio="xMidYMid meet"
       >
