@@ -125,13 +125,19 @@ export function ModePie({
     const cos = Math.cos(-midAngle * RAD)
     const sx = cx + outerRadius * cos
     const sy = cy + outerRadius * sin
-    const mx = cx + (outerRadius + 8) * cos
-    const my = cy + (outerRadius + 8) * sin
+    // Leader elbow + horizontal stub trimmed from 8/16 to 6/10. The old
+    // distances were generous enough that a right-side narrow slice
+    // (e.g. "Meeting" at 10% on a 440px card) ended up with the label
+    // anchor past the card's right edge — text was getting clipped. The
+    // tighter leader keeps every label inside the chart's right margin
+    // (still 44px in the PieChart `margin` prop) while staying readable.
+    const mx = cx + (outerRadius + 6) * cos
+    const my = cy + (outerRadius + 6) * sin
     const isRightSide = cos >= 0
-    const ex = mx + (isRightSide ? 16 : -16)
+    const ex = mx + (isRightSide ? 10 : -10)
     const ey = my
     const textAnchor = isRightSide ? 'start' : 'end'
-    const labelX = ex + (isRightSide ? 4 : -4)
+    const labelX = ex + (isRightSide ? 3 : -3)
     // Reference innerRadius to silence unused-destructure warnings; the
     // value is only consulted in the dominant-slice branch above.
     void innerRadius
@@ -168,13 +174,12 @@ export function ModePie({
 
   return (
     <ResponsiveContainer width="100%" height="100%">
-      {/* Margin balance: just enough horizontal room for the outside
-          labels + their short leader lines, but tight enough that the
-          donut itself fills the card. Previous 56/56 left the donut
-          looking dwarfed by the empty label gutters; 44/44 pulls the
-          donut closer to its natural size while still keeping labels
-          legible. */}
-      <PieChart margin={{ top: 8, right: 44, bottom: 8, left: 44 }}>
+      {/* Margin balance: enough horizontal room for outside labels +
+          their short leader lines without the donut feeling dwarfed.
+          Bumped from 44 → 52 alongside a tighter leader geometry (see
+          renderSliceLabel) so a narrow right-side slice's label can't
+          clip against the card edge on smaller cards. */}
+      <PieChart margin={{ top: 8, right: 52, bottom: 8, left: 52 }}>
         <Pie
           data={data}
           dataKey="value"
