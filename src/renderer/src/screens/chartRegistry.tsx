@@ -44,87 +44,92 @@ export const CHART_REGISTRY: Record<string, ChartSpec> = {
   'volume-over-time': {
     section: 'Usage',
     sectionPath: '/usage',
-    title: 'Volume over time',
-    description: 'Recordings per day across the active range.',
+    title: 'Recordings over time',
+    description: 'How many recordings you made each day, across the selected range.',
     render: () => <VolumeOverTimeChart />
   },
   'when-you-record': {
     section: 'Usage',
     sectionPath: '/usage',
-    title: 'When you record',
-    description: 'Day of week × hour of day. Brighter cells are busier.',
+    title: 'Recordings by hour',
+    description: 'When you tend to record, broken down by day of week and hour of day.',
     render: () => <WhenYouRecordChart />
   },
   'recording-streak': {
     section: 'Usage',
     sectionPath: '/usage',
-    title: 'Recording streak',
-    description: 'Daily activity for the last twelve months.',
+    title: 'Daily activity',
+    description: 'A calendar view of your recording activity over the past few months.',
     render: () => <RecordingStreakChart />
   },
   'duration-mix': {
     section: 'Usage',
     sectionPath: '/usage',
-    title: 'Duration mix',
-    description: 'How long recordings tend to run.',
+    title: 'Recordings by duration',
+    description: 'How your recording lengths are distributed across the selected range.',
     render: () => <DurationMixChart />
   },
   'mode-pie': {
     section: 'Usage',
     sectionPath: '/usage',
-    title: 'Mode share',
-    description: 'Share of recordings by mode.',
+    title: 'Recordings by mode',
+    description: 'Which SuperWhisper modes you use the most.',
     render: () => <ModePieChart />
   },
   'top-words': {
     section: 'Language',
     sectionPath: '/language',
     title: 'Top words',
+    description: 'Your most frequently spoken words across the selected range.',
     render: () => <TopWordsChart />
   },
   'filler-words': {
     section: 'Language',
     sectionPath: '/language',
-    title: 'Filler words',
+    title: 'Top fillers',
+    description: 'Your most-used filler words and hesitations across the selected range.',
     render: () => <FillerWordsChart />
   },
   'speaking-pace': {
     section: 'Language',
     sectionPath: '/language',
-    title: 'Speaking pace',
-    description: 'Words per minute, monthly average over per-recording dots.',
+    title: 'Words per minute',
+    description: 'Your speaking pace over time, with one dot per recording.',
     render: () => <SpeakingPaceChart />
   },
   'filler-rate': {
     section: 'Language',
     sectionPath: '/language',
-    title: 'Filler rate over time',
+    title: 'Filler rate',
+    description: 'The share of your spoken words that are fillers, over time.',
     render: () => <FillerRateChart />
   },
   'sentence-length': {
     section: 'Language',
     sectionPath: '/language',
     title: 'Sentence length',
+    description: 'How long your sentences tend to be, in words.',
     render: () => <SentenceLengthChart />
   },
   'vocabulary-growth': {
     section: 'Language',
     sectionPath: '/language',
     title: 'Vocabulary growth',
-    description: 'Cumulative unique words used.',
+    description: 'The total number of unique words you have used, growing over time.',
     render: () => <VocabularyGrowthChart />
   },
   activity: {
     section: 'Overview',
     sectionPath: '/',
-    title: 'Activity',
-    description: 'Recordings per day.',
+    title: 'Recordings over time',
+    description: 'How many recordings you made each day, across the selected range.',
     render: () => <ActivityChart />
   },
   'by-day-of-week': {
     section: 'Overview',
     sectionPath: '/',
-    title: 'By day of week',
+    title: 'Recordings by day of week',
+    description: 'Which days of the week you record on most.',
     render: () => <ByDayOfWeekChart />
   }
 }

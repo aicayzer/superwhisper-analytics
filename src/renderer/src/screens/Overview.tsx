@@ -64,7 +64,7 @@ export function Overview(): React.JSX.Element {
     <div className="flex h-full flex-col gap-3">
       <ComparisonKpiGrid items={items} />
 
-      <ChartCard title="Activity" slug="activity" className="min-h-0 flex-1">
+      <ChartCard title="Recordings over time" slug="activity" className="min-h-0 flex-1">
         <ActivityArea
           data={current.daily}
           xKey="date"

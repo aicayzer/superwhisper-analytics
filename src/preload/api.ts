@@ -35,6 +35,11 @@ export interface Config {
    *  dataset instead of scanning the real recordings folder. Used for
    *  demos and screenshots. */
   demoMode: boolean
+  /** When true, the sidebar auto-collapses on narrow windows
+   *  (≤900px wide). The user can still open it manually via Cmd-B or the
+   *  navbar PanelLeft icon; widening the window again does NOT auto-
+   *  expand, so user intent always wins. Default true. */
+  autoHideSidebar: boolean
 }
 
 /**
@@ -59,6 +64,7 @@ export interface ConfigStatus {
   watchFolder: boolean
   transcriptsOnly: boolean
   demoMode: boolean
+  autoHideSidebar: boolean
 }
 
 /** Wire callback type for main → renderer push when the indexed dataset
@@ -80,7 +86,12 @@ export const api = {
     /** Toggle demo mode. Triggers a fresh hydrate so the renderer's
      *  dataset swaps in/out without a reload. */
     setDemoMode: (enabled: boolean): Promise<ConfigStatus> =>
-      ipcRenderer.invoke('config:setDemoMode', enabled)
+      ipcRenderer.invoke('config:setDemoMode', enabled),
+    /** Toggle the auto-hide sidebar behaviour. When on, narrow windows
+     *  (≤900px) hide the sidebar automatically; when off the user controls
+     *  it entirely via Cmd-B / the navbar icon. */
+    setAutoHideSidebar: (enabled: boolean): Promise<ConfigStatus> =>
+      ipcRenderer.invoke('config:setAutoHideSidebar', enabled)
   },
   data: {
     hydrate: (): Promise<HydratePayload> => ipcRenderer.invoke('data:hydrate'),

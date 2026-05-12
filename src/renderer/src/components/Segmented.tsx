@@ -28,8 +28,8 @@ const TRACK_BY_SIZE = {
   sm: 'h-6 gap-0 p-0.5'
 }
 const BUTTON_BY_SIZE = {
-  md: 'h-7 rounded-[5px] px-3 text-[12.5px]',
-  sm: 'h-5 rounded-[4px] px-2 text-[11px]'
+  md: 'h-7 rounded-[6px] px-3 text-[12.5px]',
+  sm: 'h-5 rounded-[5px] px-2 text-[11px]'
 }
 
 export function Segmented<T extends string>({
@@ -45,7 +45,7 @@ export function Segmented<T extends string>({
       role="radiogroup"
       aria-label={ariaLabel}
       className={cn(
-        'inline-flex items-center rounded-md border border-border bg-foreground/[0.03]',
+        'inline-flex items-center rounded-[8px] border border-border bg-foreground/[0.03]',
         TRACK_BY_SIZE[size],
         className
       )}
@@ -72,7 +72,7 @@ export function Segmented<T extends string>({
                 className={cn(
                   'absolute inset-x-0 top-px bottom-px bg-background shadow-[0_0_0_1px_var(--border)]',
                   // Match the button's own corner radius so the highlight tracks it.
-                  size === 'sm' ? 'rounded-[4px]' : 'rounded-[5px]'
+                  size === 'sm' ? 'rounded-[5px]' : 'rounded-[6px]'
                 )}
               />
             )}

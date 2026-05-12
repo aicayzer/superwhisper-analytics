@@ -7,6 +7,7 @@ import { SIDEBAR_MAX_WIDTH, SIDEBAR_MIN_WIDTH, useLayoutStore } from '@renderer/
 import { usePaletteStore } from '@renderer/state/paletteStore'
 import {
   AudioLines,
+  Command,
   House,
   Languages,
   PanelLeft,
@@ -65,6 +66,9 @@ export function Sidebar(): React.JSX.Element {
   const sidebarWidth = useLayoutStore((s) => s.sidebarWidth)
   const setSidebarWidth = useLayoutStore((s) => s.setSidebarWidth)
   const toggleSidebar = useLayoutStore((s) => s.toggleSidebar)
+  const setSidebarOpen = useLayoutStore((s) => s.setSidebarOpen)
+  const peekActive = useLayoutStore((s) => s.peekActive)
+  const setPeek = useLayoutStore((s) => s.setPeek)
   const openPalette = usePaletteStore((s) => s.openWith)
   const indexedAt = useDataStore((s) => s.indexedAt)
   const loading = useDataStore((s) => s.loading)
@@ -93,27 +97,53 @@ export function Sidebar(): React.JSX.Element {
     return configValid ? 'Not yet indexed' : 'No folder configured'
   })()
 
+  // "visible" covers both the locked-open state and the transient peek
+  // state — visually identical, but peek doesn't persist on click-outside.
+  const visible = sidebarOpen || peekActive
   return (
     <aside
       style={{ width: sidebarWidth }}
-      aria-hidden={!sidebarOpen}
+      aria-hidden={!visible}
+      onPointerLeave={() => {
+        if (!sidebarOpen && peekActive) setPeek(false)
+      }}
+      onClick={() => {
+        // Promote a peek into a locked-open sidebar on any click inside.
+        // The user has signalled intent, so keep it on screen until they
+        // explicitly close it with Cmd-B or the toggle.
+        if (!sidebarOpen && peekActive) setSidebarOpen(true)
+      }}
       className={cn(
-        'absolute bottom-2 left-2 top-2 z-20',
+        // z-40 so the sidebar always sits ABOVE the MainHeader (z-30).
+        // Otherwise the page title bleeds through the sidebar's header
+        // strip during a peek, and clicks meant for PanelLeft / Search /
+        // Command land on the navbar instead — leaving the user unable
+        // to re-open a collapsed sidebar from inside a peek.
+        'absolute bottom-2 left-2 top-2 z-40',
         'flex flex-col rounded-xl border border-border bg-floating shadow-[var(--shadow-float)] [-webkit-app-region:drag]',
         !isResizing && 'transition-[transform,opacity] duration-200 ease-out',
-        !sidebarOpen && '-translate-x-[calc(100%+0.5rem)] opacity-0 pointer-events-none'
+        !visible && '-translate-x-[calc(100%+0.5rem)] opacity-0 pointer-events-none'
       )}
     >
       {/* Header band — traffic lights live in the left third (Electron-native,
-          x=18 y=18). Hide-toggle and Search sit on the right, in that order. */}
+          x=18 y=18). Hide-toggle, Command palette and Search sit on the
+          right, in that order (Command before Search so the visual rhythm
+          goes "structural action → text input"). */}
       <div className="flex h-9 items-center justify-end gap-0.5 pl-[68px] pr-1.5">
-        <IconButton onClick={toggleSidebar} aria-label="Hide sidebar" title="Hide sidebar">
+        <IconButton onClick={toggleSidebar} aria-label="Hide sidebar" title="Hide sidebar (Cmd-B)">
           <PanelLeft className="h-3.5 w-3.5" strokeWidth={1.8} />
+        </IconButton>
+        <IconButton
+          onClick={() => openPalette('command')}
+          aria-label="Open command palette"
+          title="Command palette (Cmd-K)"
+        >
+          <Command className="h-3.5 w-3.5" strokeWidth={1.8} />
         </IconButton>
         <IconButton
           onClick={() => openPalette('search')}
           aria-label="Search transcripts"
-          title="Search transcripts"
+          title="Search transcripts (Cmd-P)"
         >
           <Search className="h-3.5 w-3.5" strokeWidth={1.8} />
         </IconButton>

@@ -1,4 +1,7 @@
+import { IconButton } from '@renderer/components/ui/IconButton'
+import { useLayoutStore } from '@renderer/state/layoutStore'
 import { useRangeStore } from '@renderer/state/rangeStore'
+import { PanelLeft } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { RangePill } from './RangePill'
 
@@ -16,39 +19,72 @@ interface MainHeaderProps {
   /** Distance from window right to header content, in px — matches the
    *  content area's paddingRight. */
   rightPad: number
+  /** Show the date-range pill on the right side of the header. False on
+   *  routes where the pill would be meaningless (e.g. an individual
+   *  transcript). Default true. */
+  showRange?: boolean
 }
 
 /**
- * Header strip for the main pane. Only renders the page title (or breadcrumb
+ * Header strip for the main pane. Renders the page title (or breadcrumb
  * trail) on the left and the global RangePill on the right.
  *
- * Previously this hosted a sidebar toggle, back arrow, and a per-screen
- * actions slot. Those were removed in PR #15:
- *   • Sidebar toggle  → Cmd-B (registered in RootLayout). The sidebar's own
- *                       internal close button handles the open→closed flip.
- *   • Back arrow      → redundant with the breadcrumb's <Link> segments.
- *   • Header actions  → screens now own their action chrome (Copy lives in
- *                       the DetailsCard header, ColumnsMenu lives in the
- *                       transcripts-table toolbar, view-mode is in Settings).
+ * When the sidebar is hidden, a single PanelLeft IconButton appears
+ * before the title to flip the sidebar back open. Hovering that button
+ * peeks the sidebar in without committing to opening it — moving the
+ * pointer away retracts it; clicking inside the peeked sidebar promotes
+ * the peek into the locked-open state. Search + Command icons are kept
+ * inside the sidebar itself (visible when it's open or peeked), so we
+ * don't duplicate them here.
  */
-export function MainHeader({ title, leftPad, rightPad }: MainHeaderProps): React.JSX.Element {
+export function MainHeader({
+  title,
+  leftPad,
+  rightPad,
+  showRange = true
+}: MainHeaderProps): React.JSX.Element {
   const range = useRangeStore((s) => s.range)
   const setRange = useRangeStore((s) => s.setRange)
+  const sidebarOpen = useLayoutStore((s) => s.sidebarOpen)
+  const peekActive = useLayoutStore((s) => s.peekActive)
+  const toggleSidebar = useLayoutStore((s) => s.toggleSidebar)
+  const setPeek = useLayoutStore((s) => s.setPeek)
+  // Render the navbar's own toggle only when the sidebar is fully out of
+  // the way. While peeking the sidebar covers the same area and provides
+  // its own toggle, so a navbar copy would be redundant.
+  const showToggle = !sidebarOpen && !peekActive
 
   return (
     <div
       style={{ left: leftPad, right: rightPad }}
       className="absolute top-2 z-30 flex h-9 items-center gap-2 [-webkit-app-region:drag]"
     >
+      {showToggle && (
+        <div className="flex shrink-0 items-center [-webkit-app-region:no-drag]">
+          <IconButton
+            onClick={toggleSidebar}
+            // Hovering the toggle peeks the sidebar — the user can use
+            // the sidebar's nav without committing to opening it. Move
+            // away to retract; click inside the sidebar to lock it open.
+            onPointerEnter={() => setPeek(true)}
+            aria-label="Show sidebar"
+            title="Show sidebar (Cmd-B)"
+          >
+            <PanelLeft className="h-3.5 w-3.5" strokeWidth={1.8} />
+          </IconButton>
+        </div>
+      )}
       {/* `no-drag` on the title so breadcrumb <Link> segments are clickable
           (the parent header is a drag region, which otherwise eats clicks
           and turns them into window drags). */}
       <div className="min-w-0 flex-1 [-webkit-app-region:no-drag]">
         <TitleNode title={title} />
       </div>
-      <div className="flex shrink-0 items-center gap-1 [-webkit-app-region:no-drag]">
-        <RangePill value={range} onChange={setRange} />
-      </div>
+      {showRange && (
+        <div className="flex shrink-0 items-center gap-1 [-webkit-app-region:no-drag]">
+          <RangePill value={range} onChange={setRange} />
+        </div>
+      )}
     </div>
   )
 }

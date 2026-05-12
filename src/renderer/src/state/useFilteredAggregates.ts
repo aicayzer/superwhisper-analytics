@@ -1,9 +1,36 @@
-import { computeAll } from '@shared/aggregates'
+import { computeAll, type BucketBy } from '@shared/aggregates'
 import { filterByRange } from '@shared/range'
-import type { Aggregates } from '@shared/types'
+import type { Aggregates, Recording } from '@shared/types'
 import { useMemo } from 'react'
 import { useDataStore } from './dataStore'
 import { useRangeStore, windowFor } from './rangeStore'
+
+const DAY_MS = 24 * 3600 * 1000
+
+/**
+ * Pick a trend-bucket granularity from a window-in-days. Daily reads well
+ * up to ~30 buckets; weekly up to ~13 (a quarter); beyond that monthly.
+ */
+function pickBucketBy(days: number): BucketBy {
+  if (days <= 29) return 'day'
+  if (days <= 90) return 'week'
+  return 'month'
+}
+
+/** Total span (days) covered by the recording dataset, used when range="all". */
+function datasetSpanDays(recordings: ReadonlyArray<Recording>): number {
+  if (recordings.length === 0) return 0
+  let min = Infinity
+  let max = -Infinity
+  for (const r of recordings) {
+    const t = new Date(r.datetime).getTime()
+    if (isNaN(t)) continue
+    if (t < min) min = t
+    if (t > max) max = t
+  }
+  if (!isFinite(min) || !isFinite(max)) return 0
+  return Math.max(1, Math.round((max - min) / DAY_MS))
+}
 
 /**
  * Range-aware aggregates. Screens that should respect the navbar's date
@@ -29,15 +56,42 @@ export function useFilteredAggregates(): Aggregates {
 
   return useMemo(() => {
     const window = windowFor(range)
-    if (!window.from && !window.to) return fullAggregates
+    // "All time" (no window) — bucket the trends by the dataset's natural
+    // span and use the legacy 365-day streak window so the full-year grid
+    // stays available.
+    if (!window.from && !window.to) {
+      const spanDays = datasetSpanDays(recordings)
+      const bucketBy = pickBucketBy(spanDays)
+      // If the prebuilt fullAggregates was computed with the default (week)
+      // bucketing we need to recompute trends here for monthly when the
+      // dataset is multi-year. We keep streakCells from the prebuilt to
+      // avoid recomputing the calendar.
+      if (bucketBy === 'month') {
+        const reb = computeAll(recordings, new Date(), {
+          bucketBy,
+          streakWindowDays: 365
+        })
+        return {
+          ...reb,
+          sparklines: fullAggregates.sparklines,
+          streakCells: fullAggregates.streakCells
+        }
+      }
+      return fullAggregates
+    }
+    const windowDays = Math.max(
+      1,
+      Math.round(((window.to ?? new Date()).getTime() - (window.from?.getTime() ?? 0)) / DAY_MS)
+    )
+    const bucketBy = pickBucketBy(windowDays)
     const slice = filterByRange(recordings, window)
-    const filtered = computeAll(slice)
+    const filtered = computeAll(slice, new Date(), { bucketBy })
     // Sparklines + streak cells stay tied to the full unfiltered dataset.
-    // They give recent-trend context behind the big KPI number; tying them
-    // to the range would shrink "Last 7 days" sparklines into 7 data points
-    // padded with 23 days of zeros, which reads as a flat line. Keeping the
-    // full-set series means the sparkline always shows the trailing 30
-    // days, regardless of what the pill is filtered to.
+    // Sparklines: shrinking to 7 points padded with zeros reads as a flat
+    // line. Streak cells: the calendar always shows full calendar months
+    // and shades cells inside the range darker than the ones outside — so
+    // it needs the full last-365-days dataset to compute against, with
+    // the active range used only for shading.
     return {
       ...filtered,
       sparklines: fullAggregates.sparklines,

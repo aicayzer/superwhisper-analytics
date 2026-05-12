@@ -1,180 +1,287 @@
 import type { StreakCell } from '@renderer/lib/types'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 
 interface StreakCalendarProps {
   /** One entry per day, ordered oldest → newest. */
   data: StreakCell[]
-  /** Gap between cells. */
-  cellGap?: number
+  /** Optional active-range window. Cells whose date is inside this
+   *  window render with full intensity; cells outside render in a
+   *  dimmer "out-of-range" shade so the calendar's shape (full months)
+   *  stays constant across range changes. */
+  rangeFrom?: Date
+  rangeTo?: Date
 }
 
-const DAY_LABELS = ['Mon', '', 'Wed', '', 'Fri', '', ''] as const
-const MONTH_LABELS = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec'
-] as const
-const LABEL_GUTTER = 22
-const MONTH_ROW_H = 12
-const MIN_CELL = 5
-const MAX_CELL = 16
+const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const
+
+/** Minimum span (in calendar months) shown by the grid. Even at 7d the
+ *  user sees roughly the last six months edge-to-edge so the calendar
+ *  reads as a substantial picture of recording history rather than a
+ *  short strip. Out-of-range cells render at the dimmer shade defined
+ *  below so the active window still pops visually. */
+const MIN_VISIBLE_MONTHS = 6
+
+interface GridCell {
+  /** ISO date string yyyy-MM-dd. */
+  date: string
+  /** Recording count for that day, or 0 if no entry. */
+  count: number
+  /** True iff this date falls inside the active range window. */
+  inRange: boolean
+  /** True iff this date is a "padding" day outside the visible months
+   *  used to round the grid up to whole weeks (rendered as empty cells). */
+  padding: boolean
+}
+
+function ymd(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function mondayIndex(d: Date): number {
+  return (d.getDay() + 6) % 7
+}
+
+function addMonths(d: Date, months: number): Date {
+  return new Date(d.getFullYear(), d.getMonth() + months, 1)
+}
+
+function startOfMonth(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), 1)
+}
+
+function endOfMonth(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth() + 1, 0)
+}
+
+/** Format a yyyy-MM-dd into a long-form "Mon, 5 Mar 2026" for tooltips. */
+function formatTooltipDate(iso: string): string {
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return iso
+  return d.toLocaleDateString('en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  })
+}
 
 /**
- * GitHub-style streak grid — up to 53 weeks × 7 days, Mon-start.
+ * Recording streak grid — full calendar months rendered as an HTML/CSS
+ * grid (matching the When You Record heatmap). Each column = one ISO
+ * week (Mon-start), each row = one day of week.
  *
- * Cell size adapts to the container via ResizeObserver — the grid stays
- * proportional to whatever cell it's dropped into. A narrow card gives
- * small cells; a wide card gives chunky ones. Capped at [MIN_CELL,
- * MAX_CELL] so cells never disappear or look comical.
+ * The grid always shows full calendar months regardless of the active
+ * range. Cells inside the range carry the normal muted → chart-1
+ * intensity ramp; cells outside render at a dimmer shade so the shape
+ * stays constant but the in-range stretch is the one that dominates.
+ *
+ * Hovering a cell surfaces a tooltip with the long-form date and the
+ * recording count. The month-label strip sits BELOW the grid (matching
+ * the Recordings-by-hour heatmap's x-axis convention).
  */
-export function StreakCalendar({ data, cellGap = 2 }: StreakCalendarProps): React.JSX.Element {
-  // Compute layout once per data change. Columns + month markers stay
-  // stable across resize ticks — only the visual cellSize changes.
+export function StreakCalendar({
+  data,
+  rangeFrom,
+  rangeTo
+}: StreakCalendarProps): React.JSX.Element {
   const { columns, monthMarkers, max } = useMemo(() => {
-    const cols: Array<Array<StreakCell | null>> = []
+    if (data.length === 0) return { columns: [] as GridCell[][], monthMarkers: [], max: 1 }
+
+    const dataMap = new Map<string, number>(data.map((d) => [d.date, d.count]))
     let m = 0
-    if (data.length === 0) return { columns: cols, monthMarkers: [], max: 1 }
+    for (const v of dataMap.values()) if (v > m) m = v
 
-    const firstDate = new Date(data[0]!.date)
-    const firstDayIdx = (firstDate.getDay() + 6) % 7 // 0=Mon
-    let week: Array<StreakCell | null> = Array(firstDayIdx).fill(null)
+    const lastDate = new Date(data[data.length - 1]!.date)
+    const today = new Date()
+    const anchor = today.getTime() > lastDate.getTime() ? today : lastDate
+    const lastMonth = endOfMonth(anchor)
+    const requestedFrom = rangeFrom ?? new Date(data[0]!.date)
+    const monthsByRange =
+      (lastMonth.getFullYear() - requestedFrom.getFullYear()) * 12 +
+      (lastMonth.getMonth() - requestedFrom.getMonth()) +
+      1
+    const monthCount = Math.max(MIN_VISIBLE_MONTHS, Math.min(12, monthsByRange))
+    const firstMonth = addMonths(lastMonth, -(monthCount - 1))
+    const firstDay = startOfMonth(firstMonth)
 
-    let lastMonth = -1
-    const markers: Array<{ col: number; label: string }> = []
-
-    for (const cell of data) {
-      const d = new Date(cell.date)
-      const month = d.getMonth()
-      if (month !== lastMonth && week.length === 0) {
-        markers.push({ col: cols.length, label: MONTH_LABELS[month]! })
-        lastMonth = month
-      }
-      week.push(cell)
-      if (cell.count > m) m = cell.count
+    const cols: GridCell[][] = []
+    let week: GridCell[] = []
+    const firstDayIdx = mondayIndex(firstDay)
+    for (let i = 0; i < firstDayIdx; i++) {
+      week.push({ date: '', count: 0, inRange: false, padding: true })
+    }
+    const lastDay = endOfMonth(anchor)
+    const cur = new Date(firstDay)
+    while (cur.getTime() <= lastDay.getTime()) {
+      const key = ymd(cur)
+      const inRange =
+        (!rangeFrom || cur.getTime() >= rangeFrom.getTime()) &&
+        (!rangeTo || cur.getTime() <= rangeTo.getTime())
+      week.push({
+        date: key,
+        count: dataMap.get(key) ?? 0,
+        inRange,
+        padding: false
+      })
       if (week.length === 7) {
         cols.push(week)
         week = []
       }
+      cur.setDate(cur.getDate() + 1)
     }
     if (week.length > 0) {
-      while (week.length < 7) week.push(null)
+      while (week.length < 7) {
+        week.push({ date: '', count: 0, inRange: false, padding: true })
+      }
       cols.push(week)
     }
+
+    const markers: Array<{ col: number; label: string }> = []
+    let lastSeen = -1
+    cols.forEach((wk, col) => {
+      for (const cell of wk) {
+        if (cell.padding) continue
+        const d = new Date(cell.date)
+        const monthKey = d.getFullYear() * 12 + d.getMonth()
+        if (monthKey !== lastSeen) {
+          markers.push({
+            col,
+            label: `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getFullYear() % 100).padStart(2, '0')}`
+          })
+          lastSeen = monthKey
+          break
+        }
+      }
+    })
+
     return { columns: cols, monthMarkers: markers, max: m || 1 }
-  }, [data])
+  }, [data, rangeFrom, rangeTo])
 
-  // Pick the largest cellSize that lets the grid fit both dimensions of
-  // the container at this exact data length.
-  const wrapRef = useRef<HTMLDivElement>(null)
-  const [cellSize, setCellSize] = useState<number>(11)
-  useEffect(() => {
-    const el = wrapRef.current
-    if (!el) return undefined
-    const compute = (): void => {
-      const w = el.clientWidth
-      const h = el.clientHeight
-      if (w <= 0 || h <= 0 || columns.length === 0) return
-      const colCount = columns.length
-      const byW = Math.floor((w - LABEL_GUTTER) / colCount) - cellGap
-      const byH = Math.floor((h - MONTH_ROW_H) / 7) - cellGap
-      const next = Math.max(MIN_CELL, Math.min(MAX_CELL, Math.min(byW, byH)))
-      setCellSize(next)
-    }
-    compute()
-    const ro = new ResizeObserver(compute)
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [columns.length, cellGap])
+  // Tooltip state — { date, count } of the cell currently under the
+  // pointer, plus the pointer-relative anchor so the floating panel
+  // tracks the cursor.
+  const [tip, setTip] = useState<{ x: number; y: number; date: string; count: number } | null>(null)
 
-  const stride = cellSize + cellGap
-  const width = LABEL_GUTTER + columns.length * stride
-  const height = MONTH_ROW_H + 7 * stride
+  if (columns.length === 0) {
+    return (
+      <div className="flex h-full items-center justify-center text-[10px] text-muted-foreground">
+        No data.
+      </div>
+    )
+  }
 
   return (
-    <div ref={wrapRef} className="flex h-full w-full items-center justify-center">
-      <svg
-        role="img"
-        aria-label="Recording streak calendar"
-        width={width}
-        height={height}
-        viewBox={`0 0 ${width} ${height}`}
-        preserveAspectRatio="xMidYMid meet"
+    <div
+      // py-2 leaves a small inset above the grid and below the axis so
+      // the chart isn't flush against the card's title and bottom edge —
+      // matches the Heatmap's inset for visual consistency.
+      className="relative flex h-full min-h-[110px] w-full flex-col gap-1 py-2 text-[10px] text-muted-foreground"
+      onPointerLeave={() => setTip(null)}
+    >
+      {/* Main grid: day-of-week label column + N week columns. */}
+      <div
+        className="grid min-h-0 flex-1 gap-px"
+        style={{
+          gridTemplateColumns: `22px repeat(${columns.length}, minmax(0, 1fr))`,
+          gridTemplateRows: 'repeat(7, minmax(0, 1fr))'
+        }}
       >
-        {/* Day labels (left column) */}
-        {DAY_LABELS.map((label, i) =>
-          label ? (
-            <text
-              key={i}
-              x={0}
-              y={MONTH_ROW_H + i * stride + cellSize - 1}
-              fontSize={9}
-              fill="var(--muted-foreground)"
-            >
-              {label}
-            </text>
-          ) : null
-        )}
-        {/* Month labels (top row) */}
-        {monthMarkers.map((mm, i) => (
-          <text
-            key={i}
-            x={LABEL_GUTTER + mm.col * stride}
-            y={9}
-            fontSize={9}
-            fill="var(--muted-foreground)"
+        {DAY_LABELS.map((label, row) => (
+          <div
+            key={`label-${row}`}
+            className="pr-1 text-right text-[10px] leading-none"
+            style={{ gridColumn: 1, gridRow: row + 1 }}
           >
-            {mm.label}
-          </text>
+            {label}
+          </div>
         ))}
-        {/* Cells */}
-        {columns.map((week, c) =>
-          week.map((cell, r) => {
-            const x = LABEL_GUTTER + c * stride
-            const y = MONTH_ROW_H + r * stride
-            if (!cell) {
-              return (
-                <rect
-                  key={`${c}-${r}`}
-                  x={x}
-                  y={y}
-                  width={cellSize}
-                  height={cellSize}
-                  fill="transparent"
-                />
-              )
+        {columns.map((week, col) =>
+          week.map((cell, row) => {
+            const key = `${col}-${row}`
+            if (cell.padding) {
+              return <div key={key} style={{ gridColumn: col + 2, gridRow: row + 1 }} aria-hidden />
             }
-            const intensity =
-              cell.count === 0 ? 0 : Math.max(8, Math.round((cell.count / max) * 100))
-            const fill =
-              cell.count === 0
-                ? 'var(--muted)'
-                : `color-mix(in oklab, var(--chart-1) ${intensity}%, var(--muted))`
             return (
-              <rect
-                key={`${c}-${r}`}
-                x={x}
-                y={y}
-                width={cellSize}
-                height={cellSize}
-                rx={2}
-                ry={2}
-                fill={fill}
-              >
-                <title>{`${cell.date} — ${cell.count}`}</title>
-              </rect>
+              <div
+                key={key}
+                className="rounded-[2px]"
+                style={{
+                  gridColumn: col + 2,
+                  gridRow: row + 1,
+                  backgroundColor: backgroundFor(cell, max)
+                }}
+                onPointerMove={(e) => {
+                  const target = e.currentTarget.parentElement?.parentElement
+                  const rect = target?.getBoundingClientRect()
+                  if (!rect) return
+                  setTip({
+                    x: e.clientX - rect.left,
+                    y: e.clientY - rect.top,
+                    date: cell.date,
+                    count: cell.count
+                  })
+                }}
+                onPointerLeave={() => setTip(null)}
+              />
             )
           })
         )}
-      </svg>
+      </div>
+      {/* Month label strip — sits BELOW the grid (x-axis convention),
+          indexed by column. The 22px gutter mirrors the day-label column. */}
+      <div
+        className="grid gap-px pt-0.5"
+        style={{
+          gridTemplateColumns: `22px repeat(${columns.length}, minmax(0, 1fr))`,
+          height: 12
+        }}
+      >
+        <div />
+        {columns.map((_, col) => {
+          const marker = monthMarkers.find((m) => m.col === col)
+          return (
+            <div key={col} className="text-[10px] leading-none tabular-nums">
+              {marker ? marker.label : ''}
+            </div>
+          )
+        })}
+      </div>
+      {tip && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full rounded-md border border-border bg-card px-2.5 py-1.5 text-[11px] text-foreground shadow-[var(--shadow-float)]"
+          style={{ left: tip.x, top: tip.y - 6 }}
+        >
+          <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            {formatTooltipDate(tip.date)}
+          </div>
+          <div className="mt-0.5 tabular-nums">
+            {tip.count} recording{tip.count === 1 ? '' : 's'}
+          </div>
+        </div>
+      )}
     </div>
   )
+}
+
+/**
+ * Pick a cell's background colour.
+ *
+ *   • In-range, count > 0 → mix chart-1 with muted by intensity.
+ *   • In-range, count = 0 → solid muted.
+ *   • Out of range, count > 0 → faint chart-1 tint (much lower mix %)
+ *     so the user sees there WAS activity there but the eye still
+ *     resolves to the in-range stretch first.
+ *   • Out of range, count = 0 → the lightest neutral shade we have
+ *     (mostly transparent over the card background).
+ */
+function backgroundFor(cell: GridCell, max: number): string {
+  if (cell.inRange) {
+    if (cell.count === 0) return 'var(--muted)'
+    const intensity = Math.max(8, Math.round((cell.count / max) * 100))
+    return `color-mix(in oklab, var(--chart-1) ${intensity}%, var(--muted))`
+  }
+  if (cell.count === 0) return 'color-mix(in oklab, var(--muted) 35%, transparent)'
+  const dim = Math.max(8, Math.round((cell.count / max) * 30))
+  return `color-mix(in oklab, var(--chart-1) ${dim}%, color-mix(in oklab, var(--muted) 35%, transparent))`
 }

@@ -55,6 +55,30 @@ function isoWeek(dt: Date): string {
   return `${d.getUTCFullYear()}-W${pad2(weekNum)}`
 }
 
+/** YYYY-MM-DD (calendar day in local time). */
+function dayKey(dt: Date): string {
+  return dateKey(dt)
+}
+
+/** YYYY-MM (calendar month). */
+function monthKey(dt: Date): string {
+  return `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}`
+}
+
+export type BucketBy = 'day' | 'week' | 'month'
+
+/** Map a date into a period key based on the chosen granularity. */
+function bucketKey(dt: Date, bucketBy: BucketBy): string {
+  switch (bucketBy) {
+    case 'day':
+      return dayKey(dt)
+    case 'week':
+      return isoWeek(dt)
+    case 'month':
+      return monthKey(dt)
+  }
+}
+
 /** Walk every day in [start, end] inclusive, calling fn(date) for each. */
 function eachDay(start: Date, end: Date, fn: (d: Date) => void): void {
   const cur = new Date(start.getFullYear(), start.getMonth(), start.getDate())
@@ -289,11 +313,12 @@ function computeUsage(
   }
 }
 
-function computeWpmTrend(recordings: Recording[]): TrendPoint[] {
+function computeWpmTrend(recordings: Recording[], bucketBy: BucketBy): TrendPoint[] {
   const buckets = new Map<string, { sumWords: number; sumSec: number }>()
   for (const r of recordings) {
-    const period = r.datetime.slice(0, 7) // YYYY-MM
-    if (!period) continue
+    const d = new Date(r.datetime)
+    if (isNaN(d.getTime())) continue
+    const period = bucketKey(d, bucketBy)
     const cur = buckets.get(period) ?? { sumWords: 0, sumSec: 0 }
     cur.sumWords += r.wordCount
     cur.sumSec += r.duration / 1000
@@ -307,12 +332,12 @@ function computeWpmTrend(recordings: Recording[]): TrendPoint[] {
     }))
 }
 
-function computeFillerTrend(recordings: Recording[]): TrendPoint[] {
+function computeFillerTrend(recordings: Recording[], bucketBy: BucketBy): TrendPoint[] {
   const buckets = new Map<string, { fillers: number; words: number }>()
   for (const r of recordings) {
     const d = new Date(r.datetime)
     if (isNaN(d.getTime())) continue
-    const period = isoWeek(d)
+    const period = bucketKey(d, bucketBy)
     const cur = buckets.get(period) ?? { fillers: 0, words: 0 }
     cur.fillers += r.fillerCount
     cur.words += r.wordCount
@@ -326,14 +351,14 @@ function computeFillerTrend(recordings: Recording[]): TrendPoint[] {
     }))
 }
 
-function computeVocabGrowth(recordings: Recording[]): TrendPoint[] {
+function computeVocabGrowth(recordings: Recording[], bucketBy: BucketBy): TrendPoint[] {
   const sorted = [...recordings].sort((a, b) => a.datetime.localeCompare(b.datetime))
   const seen = new Set<string>()
   const buckets = new Map<string, number>()
   for (const r of sorted) {
     const d = new Date(r.datetime)
     if (isNaN(d.getTime())) continue
-    const period = isoWeek(d)
+    const period = bucketKey(d, bucketBy)
     if (r.result) for (const w of tokenise(r.result)) seen.add(w)
     buckets.set(period, seen.size)
   }
@@ -386,9 +411,9 @@ function computeSparklines(
   }
 }
 
-function computeStreakCells(daily: DailySummary[], now: Date): StreakCell[] {
-  const STREAK_DAYS = 365
-  const start = new Date(now.getTime() - (STREAK_DAYS - 1) * 24 * 3600 * 1000)
+function computeStreakCells(daily: DailySummary[], now: Date, windowDays = 365): StreakCell[] {
+  const days = Math.max(1, Math.min(365, Math.floor(windowDays)))
+  const start = new Date(now.getTime() - (days - 1) * 24 * 3600 * 1000)
   const dayMap = new Map(daily.map((d) => [d.date, d]))
   const cells: StreakCell[] = []
   eachDay(start, now, (d) => {
@@ -452,15 +477,42 @@ function computeModeByDay(
   return { byDay, byWeek, weekFlat, keys }
 }
 
-function computeWpmDots(recordings: Recording[]): Array<{ period: string; value: number }> {
+function computeWpmDots(
+  recordings: Recording[],
+  bucketBy: BucketBy
+): Array<{ period: string; value: number }> {
+  // Each dot is one recording placed on the trend's X axis. The bucket
+  // key has to match the trend's bucketing — otherwise the dots stack
+  // monthly even when the trend is daily/weekly, which used to render
+  // as a vertical "histogram bar" at the start of every calendar month.
   return [...recordings]
-    .map((r) => ({ period: r.datetime.slice(0, 7), value: r.wordsPerMinute }))
+    .map((r) => {
+      const d = new Date(r.datetime)
+      const period = isNaN(d.getTime()) ? r.datetime.slice(0, 7) : bucketKey(d, bucketBy)
+      return { period, value: r.wordsPerMinute }
+    })
     .sort((a, b) => a.period.localeCompare(b.period))
 }
 
 // ---------- Top-level entry point ---------------------------------------
 
-export function computeAll(recordings: Recording[], now: Date = new Date()): Aggregates {
+export interface ComputeAllOptions {
+  /** Trend bucketing for wpm/filler/vocab — caller chooses based on the
+   *  active range window. Defaults to 'week' which matches the legacy
+   *  behaviour for filler / vocab. */
+  bucketBy?: BucketBy
+  /** Days of streak-calendar history to emit. Defaults to 365 to match
+   *  the legacy "full year" cell grid. */
+  streakWindowDays?: number
+}
+
+export function computeAll(
+  recordings: Recording[],
+  now: Date = new Date(),
+  opts: ComputeAllOptions = {}
+): Aggregates {
+  const bucketBy: BucketBy = opts.bucketBy ?? 'week'
+  const streakWindowDays = opts.streakWindowDays ?? 365
   const totalDurationSec = recordings.reduce((s, r) => s + r.duration, 0) / 1000
   const totalWords = recordings.reduce((s, r) => s + r.wordCount, 0)
 
@@ -474,15 +526,15 @@ export function computeAll(recordings: Recording[], now: Date = new Date()): Agg
   const durationDist = computeDurationDist(recordings)
   const sentenceDist = computeSentenceDist(recordings)
   const usage = computeUsage(recordings, totalDurationSec, daily, overview.activeDays)
-  const wpmTrend = computeWpmTrend(recordings)
-  const fillerTrend = computeFillerTrend(recordings)
-  const vocabGrowth = computeVocabGrowth(recordings)
+  const wpmTrend = computeWpmTrend(recordings, bucketBy)
+  const fillerTrend = computeFillerTrend(recordings, bucketBy)
+  const vocabGrowth = computeVocabGrowth(recordings, bucketBy)
   const language = computeLanguage(recordings, totalWords, uniqueCount, totalDurationSec)
   const sparklines = computeSparklines(daily, overview.avgWPM, now)
-  const streakCells = computeStreakCells(daily, now)
+  const streakCells = computeStreakCells(daily, now, streakWindowDays)
   const topModes = modeStats.slice(0, 5).map((m) => m.modeName)
   const { byDay, byWeek, weekFlat, keys } = computeModeByDay(recordings, daily, topModes)
-  const wpmDots = computeWpmDots(recordings)
+  const wpmDots = computeWpmDots(recordings, bucketBy)
 
   return {
     overview,

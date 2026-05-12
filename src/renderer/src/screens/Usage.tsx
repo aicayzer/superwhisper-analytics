@@ -5,6 +5,7 @@ import { ModePie } from '@renderer/components/charts/ModePie'
 import { StreakCalendar } from '@renderer/components/charts/StreakCalendar'
 import { KpiRow } from '@renderer/components/KpiRow'
 import { formatDurationSec } from '@renderer/lib/format'
+import { useRangeStore, windowFor } from '@renderer/state/rangeStore'
 import { useFilteredAggregates } from '@renderer/state/useFilteredAggregates'
 import { useMemo } from 'react'
 
@@ -15,85 +16,80 @@ import { useMemo } from 'react'
  * aspect that fits it best:
  *
  *   ┌──────────────────────────┬──────────────────┐
- *   │  When you record (3/5)   │  Mode share (2/5)│
- *   │  (hour × day heatmap)    │  (pie)           │
- *   ├──────────────────┬───────┴──────────────────┤
- *   │  Duration mix    │  Streak calendar (3/5)   │
- *   │  (2/5, square)   │  (year of days, github)  │
- *   └──────────────────┴──────────────────────────┘
+ *   │  Recordings by hour 3fr  │  by duration 2fr │
+ *   │  (hour × day heatmap)    │  (distribution)  │
+ *   ├──────────────────────────┴──────────────────┤
+ *   │  Daily activity 2fr      │  by mode 1fr     │
+ *   │  (year of days, calendar)│  (donut)         │
+ *   └─────────────────────────────────────────────┘
  *
- * Top row is "rectangular left, square right". Bottom flips that —
- * a more square duration chart sits beside the wide streak calendar.
+ * The bottom row is two-thirds / one-third so the year-grid calendar
+ * (which reads best wide) gets the real estate while the donut keeps
+ * just enough room for its outside labels + leader lines.
+ *
  * Every aggregate flows through `useFilteredAggregates`, so the cards
  * update with the navbar range pill.
  */
 export function Usage(): React.JSX.Element {
-  const { overview, usage, daily, heatmap, durationDist, modeStats, sparklines, streakCells } =
+  const { overview, usage, heatmap, durationDist, modeStats, sparklines, streakCells } =
     useFilteredAggregates()
+  const range = useRangeStore((s) => s.range)
+  // The streak calendar wants to know which days are inside the active
+  // range so it can shade them. Range = "All time" returns {} — pass
+  // undefined to the calendar in that case and every cell renders at
+  // full intensity.
+  const { from: rangeFrom, to: rangeTo } = useMemo(() => windowFor(range), [range])
 
   const modePieData = useMemo(
     () => modeStats.map((m) => ({ name: m.modeName, value: m.count })),
     [modeStats]
   )
-  const dominantMode = modeStats[0]
-  const dominantPct = dominantMode
-    ? Math.round((dominantMode.count / overview.totalRecordings) * 100)
-    : 0
 
   return (
-    <div className="flex h-full flex-col gap-3">
+    <div className="grid h-full grid-rows-[auto_1fr_1fr] gap-3">
       <KpiRow
         items={[
           {
             label: 'Active days',
             value: String(overview.activeDays),
-            sub: `of ${daily.length} in window`,
             spark: sparklines.recordings.values
           },
           {
             label: 'Current streak',
-            value: `${usage.currentStreak}d`,
-            sub: `longest ${usage.longestStreak}d`
+            value: `${usage.currentStreak}d`
           },
           {
-            label: 'Avg per active day',
+            label: 'Recordings per day',
             value: String(Math.round(usage.avgPerActiveDay)),
-            sub: 'recordings',
             spark: sparklines.recordings.values
           },
           {
             label: 'Time per day',
             value: formatDurationSec(usage.timePerActiveDaySec),
-            sub: 'active days',
             spark: sparklines.duration.values
           }
         ]}
       />
 
-      {/* Top row — When you record (3/5) + Mode share (2/5). */}
-      <div className="grid min-h-0 flex-1 grid-cols-[3fr_2fr] gap-3">
-        <ChartCard title="When you record" slug="when-you-record">
-          <div className="flex h-full flex-col justify-center">
-            <Heatmap matrix={heatmap} cellHeight={24} />
-          </div>
+      {/* Top row — Recordings by hour (3fr) + Recordings by duration (2fr). */}
+      <div className="grid min-h-0 grid-cols-[3fr_2fr] gap-3">
+        <ChartCard title="Recordings by hour" slug="when-you-record">
+          <Heatmap matrix={heatmap} />
         </ChartCard>
-        <ChartCard title="Mode share" slug="mode-pie">
-          <ModePie
-            data={modePieData}
-            centreLabel={dominantMode?.modeName}
-            centreSubLabel={dominantMode ? `${dominantPct}%` : undefined}
-          />
+        <ChartCard title="Recordings by duration" slug="duration-mix" className="min-w-[260px]">
+          <DistBar data={durationDist} xKey="label" yKey="count" />
         </ChartCard>
       </div>
 
-      {/* Bottom row — Duration mix (2/5, more square) + Streak calendar
-          (3/5, wide GitHub-style year grid). */}
-      <div className="grid min-h-0 flex-1 grid-cols-[2fr_3fr] gap-3">
-        <ChartCard title="Duration mix" slug="duration-mix">
-          <DistBar data={durationDist} xKey="label" yKey="count" />
+      {/* Bottom row — Recordings by mode (1fr) on the left, Daily activity
+          (2fr) on the right. Donut takes the smaller slot so the calendar
+          gets the horizontal real estate that suits it. */}
+      <div className="grid min-h-0 grid-cols-[1fr_2fr] gap-3">
+        <ChartCard title="Recordings by mode" slug="mode-pie" className="min-w-[240px]">
+          <ModePie data={modePieData} />
         </ChartCard>
-        <ChartCard title="Recording streak" slug="recording-streak">
-          <StreakCalendar data={streakCells} />
+        <ChartCard title="Daily activity" slug="recording-streak">
+          <StreakCalendar data={streakCells} rangeFrom={rangeFrom} rangeTo={rangeTo} />
         </ChartCard>
       </div>
     </div>

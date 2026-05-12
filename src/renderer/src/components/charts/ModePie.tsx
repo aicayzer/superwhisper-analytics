@@ -6,15 +6,12 @@ interface ModePieProps {
   data: Array<{ name: string; value: number }>
   /** When true, renders a donut. Default. */
   donut?: boolean
-  /** Sub-label drawn inside the donut hole. */
-  centreLabel?: string
-  /** Sub-sub-label drawn underneath the centre label. */
-  centreSubLabel?: string
+  /** Slices that account for less than this fraction (0-1) of the total
+   *  are left unlabelled — they're surfaced via hover instead. Default
+   *  0.04 (4%). */
+  minLabelFraction?: number
 }
 
-/** Subset of Recharts tooltip render-prop args we care about. The
- *  payload list arrives readonly from Recharts; matching that lets us
- *  pass the function straight to `<Tooltip content={...}>`. */
 interface PieTooltipEntry {
   name?: string | number
   value?: string | number | ReadonlyArray<string | number>
@@ -25,26 +22,39 @@ interface PieTooltipProps {
   payload?: ReadonlyArray<PieTooltipEntry>
 }
 
+interface SliceLabelArgs {
+  cx?: number
+  cy?: number
+  innerRadius?: number
+  outerRadius?: number
+  midAngle?: number
+  percent?: number
+  name?: string | number
+  fill?: string
+}
+
 /**
- * Pie / donut chart for mode share. Slice colours come from the standard
+ * Donut chart for mode share. Slice colours come from the standard
  * `--chart-1..5` ramp, cycling for slices beyond five.
  *
- * Donut variant exposes a centre label slot — handy for surfacing the
- * dominant mode and its percentage. Inner radius is sized as a fraction
- * of the smaller container dimension so the proportions stay sensible
- * regardless of the parent's aspect ratio.
+ * Labels render OUTSIDE the donut with short leader lines pointing to
+ * each slice. Outside labels are more readable than inside labels for a
+ * compact donut and survive thin slices much better — a slice carrying
+ * 4% of the total still has a tiny coloured strip on the donut, and
+ * the leader line + outside label make it identifiable. Slices below
+ * `minLabelFraction` skip the label and stay hoverable-only so the
+ * leader lines don't cluster.
+ *
+ * Donut radii are set so the outside labels + leader lines have room
+ * inside the chart's bounding box without overlapping the slices.
  */
 export function ModePie({
   data,
   donut = true,
-  centreLabel,
-  centreSubLabel
+  minLabelFraction = 0.04
 }: ModePieProps): React.JSX.Element {
-  // Total is used by the tooltip to show percentages alongside raw counts.
   const total = useMemo(() => data.reduce((s, d) => s + d.value, 0), [data])
-  // The render-prop is hoisted because react/prop-types rule treats inline
-  // `content={(p) => ...}` as a nameless component; a named wrapper with an
-  // explicit type sidesteps it without disabling the rule.
+
   const renderTooltip = (props: PieTooltipProps): React.JSX.Element => {
     const augmented = (props.payload ?? []).map((entry) => {
       const value = typeof entry.value === 'number' ? entry.value : 0
@@ -57,46 +67,94 @@ export function ModePie({
     })
     return <ChartTooltip active={props.active} payload={augmented} />
   }
+
+  // Outside leader-line label renderer. We compute three points:
+  //   • s — the point on the slice (at the outer radius)
+  //   • m — an elbow point pulled outward
+  //   • e — the label anchor (a touch further out, on the side of the donut)
+  // Recharts' d3-arc convention has angle increasing counter-clockwise
+  // and 0° on the right, so we flip the sine to match screen-y.
+  const renderSliceLabel = (args: SliceLabelArgs): React.JSX.Element | null => {
+    const {
+      cx = 0,
+      cy = 0,
+      outerRadius = 0,
+      midAngle = 0,
+      percent = 0,
+      name = '',
+      fill = 'var(--foreground)'
+    } = args
+    if (percent < minLabelFraction) return null
+    const RAD = Math.PI / 180
+    const sin = Math.sin(-midAngle * RAD)
+    const cos = Math.cos(-midAngle * RAD)
+    const sx = cx + outerRadius * cos
+    const sy = cy + outerRadius * sin
+    const mx = cx + (outerRadius + 8) * cos
+    const my = cy + (outerRadius + 8) * sin
+    const isRightSide = cos >= 0
+    const ex = mx + (isRightSide ? 16 : -16)
+    const ey = my
+    const textAnchor = isRightSide ? 'start' : 'end'
+    const labelX = ex + (isRightSide ? 4 : -4)
+    return (
+      <g pointerEvents="none">
+        <path
+          d={`M${sx},${sy}L${mx},${my}L${ex},${ey}`}
+          stroke={fill}
+          strokeOpacity={0.55}
+          fill="none"
+        />
+        <circle cx={ex} cy={ey} r={1.5} fill={fill} fillOpacity={0.7} />
+        <text
+          x={labelX}
+          y={ey - 4}
+          textAnchor={textAnchor}
+          fill="var(--foreground)"
+          style={{ fontSize: 11, fontWeight: 600 }}
+        >
+          {String(name)}
+        </text>
+        <text
+          x={labelX}
+          y={ey + 8}
+          textAnchor={textAnchor}
+          fill="var(--muted-foreground)"
+          style={{ fontSize: 10 }}
+        >
+          {Math.round(percent * 100)}%
+        </text>
+      </g>
+    )
+  }
+
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+      {/* Margin balance: just enough horizontal room for the outside
+          labels + their short leader lines, but tight enough that the
+          donut itself fills the card. Previous 56/56 left the donut
+          looking dwarfed by the empty label gutters; 44/44 pulls the
+          donut closer to its natural size while still keeping labels
+          legible. */}
+      <PieChart margin={{ top: 8, right: 44, bottom: 8, left: 44 }}>
         <Pie
           data={data}
           dataKey="value"
           nameKey="name"
-          innerRadius={donut ? '55%' : 0}
-          outerRadius="85%"
+          innerRadius={donut ? '45%' : 0}
+          outerRadius="82%"
           stroke="var(--card)"
           strokeWidth={1.5}
           isAnimationActive={false}
           paddingAngle={donut ? 1 : 0}
+          label={renderSliceLabel}
+          labelLine={false}
         >
           {data.map((_, i) => (
             <Cell key={i} fill={`var(--chart-${(i % 5) + 1})`} />
           ))}
         </Pie>
         <Tooltip content={renderTooltip} />
-        {donut && (centreLabel || centreSubLabel) && (
-          <text
-            x="50%"
-            y="50%"
-            textAnchor="middle"
-            dominantBaseline="middle"
-            className="select-none"
-            fill="var(--foreground)"
-          >
-            {centreLabel && (
-              <tspan x="50%" dy="-0.2em" style={{ fontSize: 13, fontWeight: 600 }}>
-                {centreLabel}
-              </tspan>
-            )}
-            {centreSubLabel && (
-              <tspan x="50%" dy="1.4em" style={{ fontSize: 11, fill: 'var(--muted-foreground)' }}>
-                {centreSubLabel}
-              </tspan>
-            )}
-          </text>
-        )}
       </PieChart>
     </ResponsiveContainer>
   )

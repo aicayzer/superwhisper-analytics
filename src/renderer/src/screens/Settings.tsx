@@ -1,19 +1,12 @@
 import { AppearancePicker } from '@renderer/components/settings/AppearancePicker'
 import { SettingsCard } from '@renderer/components/settings/SettingsCard'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '@renderer/components/ui/select'
 import { Switch } from '@renderer/components/ui/Switch'
 import { cn } from '@renderer/lib/cn'
 import { formatCompact, formatDurationSec } from '@renderer/lib/format'
 import { DEFAULT_FILLER_PHRASES, normalisePhrases } from '@shared/text-metrics'
 import { useConfigStore } from '@renderer/state/configStore'
 import { useDataStore } from '@renderer/state/dataStore'
-import { useUiPrefsStore, type TranscriptViewMode } from '@renderer/state/uiPrefsStore'
+import { useUiPrefsStore } from '@renderer/state/uiPrefsStore'
 import {
   AlignLeft,
   BookOpen,
@@ -32,11 +25,6 @@ const GITHUB_URL = 'https://github.com/aicayzer/superwhisper-analytics'
 const DISCLAIMER =
   'Personal project, not affiliated with SuperWhisper. Shared in case it’s useful to anyone else.'
 
-const TRANSCRIPT_VIEW_OPTIONS: ReadonlyArray<{ value: TranscriptViewMode; label: string }> = [
-  { value: 'block', label: 'Segments' },
-  { value: 'inline', label: 'Inline' }
-]
-
 /**
  * Card-based Settings page. Each section is a `<SettingsCard>` with an
  * icon header + body content. Sections, in order:
@@ -50,20 +38,21 @@ const TRANSCRIPT_VIEW_OPTIONS: ReadonlyArray<{ value: TranscriptViewMode; label:
  *              and an "unaffiliated" disclaimer.
  */
 export function Settings(): React.JSX.Element {
+  // No top header: the navbar already shows "Settings" in the title row,
+  // and the local-companion tagline now lives inside the About card so
+  // we don't burn vertical space on a duplicate.
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4 pb-8 pt-2">
-      <header className="px-1 pb-2">
-        <h1 className="text-[22px] font-semibold tracking-tight text-foreground">Settings</h1>
-        <p className="mt-1 text-[13px] text-muted-foreground">
-          SuperWhisper Analytics is a local-only companion. Nothing leaves your machine.
-        </p>
-      </header>
       <RecordingsCard />
       <AppearanceCard />
       <IndexingCard />
-      <DemoModeCard />
       <TranscriptsCard />
       <DictionaryCard />
+      {/* Demo data sits second-to-last — it's a toggle for showcasing
+          the app rather than a primary preference, so it shouldn't
+          compete for attention with Indexing / Transcripts / Dictionary
+          higher up in the list. */}
+      <DemoModeCard />
       <AboutCard />
     </div>
   )
@@ -108,40 +97,67 @@ function RecordingsCard(): React.JSX.Element {
           ? { label: 'All recordings indexed', tone: 'ok' }
           : { label: 'Not yet indexed', tone: 'busy' }
 
+  // Top-right of the card header now mirrors the sidebar footer pattern:
+  // a small status line + a refresh icon button. Folder picking lives
+  // inline at the right edge of the path bar. The previous "Choose folder
+  // / Reindex now" button row is gone — both actions are now reachable
+  // from the header / path bar.
+  const headerExtra = (
+    <div className="flex items-center gap-1.5">
+      <StatusLine
+        label={status.label}
+        tone={status.tone}
+        indexedAt={indexedAt}
+        busy={busy}
+        reindexing={reindexing}
+      />
+      <button
+        type="button"
+        onClick={() => void reindex()}
+        disabled={!isValid || busy}
+        title={isValid ? 'Reindex recordings' : 'Pick a valid folder first'}
+        aria-label="Reindex recordings"
+        className={cn(
+          'inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors',
+          'hover:bg-foreground/5 hover:text-foreground',
+          'disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground'
+        )}
+      >
+        <RefreshCw className={cn('h-3.5 w-3.5', reindexing && 'animate-spin')} strokeWidth={1.8} />
+      </button>
+    </div>
+  )
+
   return (
     <SettingsCard
       icon={Folder}
       title="Recordings folder"
       subtitle="Where SuperWhisper saves your transcripts."
-      headerExtra={<StatusPill label={status.label} tone={status.tone} />}
+      headerExtra={headerExtra}
     >
       <div className="space-y-4">
-        <p
-          className="break-all rounded-md bg-foreground/[0.04] px-3 py-2 font-mono text-[12px] leading-relaxed text-muted-foreground"
+        {/* Path + inline "Choose…" affordance. The path stretches; the
+            button sits on the right inside the same surface so the row
+            reads as one editable field. */}
+        <div
+          className="flex items-center gap-2 rounded-md bg-foreground/[0.04] py-1.5 pl-3 pr-1.5"
           title={path ?? 'No folder selected'}
         >
-          {path ?? 'No folder selected'}
-        </p>
+          <span className="min-w-0 flex-1 truncate font-mono text-[12px] leading-relaxed text-muted-foreground">
+            {path ?? 'No folder selected'}
+          </span>
+          <button
+            type="button"
+            onClick={choose}
+            className="inline-flex h-6 shrink-0 items-center rounded-[5px] border border-border bg-floating px-2 text-[11.5px] text-foreground transition-colors hover:bg-foreground/5"
+          >
+            Choose…
+          </button>
+        </div>
         <div className="grid grid-cols-3 gap-3 border-t border-border pt-4">
           <Stat label="recordings" value={formatCompact(count)} />
           <Stat label="audio" value={formatDurationSec(totalDurationSec)} />
           <Stat label="last indexed" value={indexedAt ? relativeTime(indexedAt) : '—'} />
-        </div>
-        <div className="flex items-center gap-2 border-t border-border pt-4">
-          <button type="button" onClick={choose} className={CHROME_BUTTON}>
-            <Folder className="h-3 w-3" strokeWidth={1.8} />
-            Choose folder…
-          </button>
-          <button
-            type="button"
-            onClick={() => void reindex()}
-            disabled={!isValid || busy}
-            title={isValid ? 'Rescan the recordings folder' : 'Pick a valid folder first'}
-            className={CHROME_BUTTON}
-          >
-            <RefreshCw className={cn('h-3 w-3', reindexing && 'animate-spin')} strokeWidth={1.8} />
-            {reindexing ? 'Reindexing…' : 'Reindex now'}
-          </button>
         </div>
         {error && (
           <p className="text-[12px] text-red-500" role="alert">
@@ -174,25 +190,31 @@ function Stat({ label, value }: { label: string; value: string }): React.JSX.Ele
   )
 }
 
-function StatusPill({
+/** Status line shown in the Recordings card header. "Indexed Xm ago" /
+ *  "Scanning…" string only — no status dot. The healthy state is the
+ *  default and doesn't need a coloured indicator; the unhealthy states
+ *  (error / not-found) surface via the inline status text and the
+ *  warning rows in the body below. */
+function StatusLine({
   label,
-  tone
+  tone,
+  indexedAt,
+  busy,
+  reindexing
 }: {
   label: string
   tone: 'ok' | 'busy' | 'error'
+  indexedAt: string | null
+  busy: boolean
+  reindexing: boolean
 }): React.JSX.Element {
-  const dot =
-    tone === 'ok'
-      ? 'bg-emerald-500'
-      : tone === 'error'
-        ? 'bg-red-500'
-        : 'bg-amber-500 animate-pulse'
-  return (
-    <span className="inline-flex items-center gap-1.5 text-[12px] text-muted-foreground">
-      <span className={cn('h-1.5 w-1.5 rounded-full', dot)} aria-hidden />
-      {label}
-    </span>
-  )
+  const text = (() => {
+    if (reindexing) return 'Reindexing…'
+    if (busy) return label
+    if (tone === 'ok' && indexedAt) return `Indexed ${relativeTime(indexedAt)}`
+    return label
+  })()
+  return <span className="text-[12px] text-muted-foreground">{text}</span>
 }
 
 function relativeTime(iso: string): string {
@@ -233,6 +255,8 @@ function IndexingCard(): React.JSX.Element {
   const setWatchFolder = useConfigStore((s) => s.setWatchFolder)
   const transcriptsOnly = useConfigStore((s) => s.transcriptsOnly)
   const setTranscriptsOnly = useConfigStore((s) => s.setTranscriptsOnly)
+  const autoHideSidebar = useConfigStore((s) => s.autoHideSidebar)
+  const setAutoHideSidebar = useConfigStore((s) => s.setAutoHideSidebar)
   return (
     <SettingsCard
       icon={SettingsIcon}
@@ -251,6 +275,12 @@ function IndexingCard(): React.JSX.Element {
           description="Skip audio playback and waveform — transcripts only."
           checked={transcriptsOnly}
           onChange={(next) => void setTranscriptsOnly(next)}
+        />
+        <ToggleRow
+          label="Auto-hide sidebar on narrow windows"
+          description="Collapse the sidebar when the window is under 900px wide. Reopen with Cmd-B or the navbar icon."
+          checked={autoHideSidebar}
+          onChange={(next) => void setAutoHideSidebar(next)}
         />
       </div>
     </SettingsCard>
@@ -302,27 +332,22 @@ function DemoModeCard(): React.JSX.Element {
 function TranscriptsCard(): React.JSX.Element {
   const mode = useUiPrefsStore((s) => s.transcriptViewMode)
   const setMode = useUiPrefsStore((s) => s.setTranscriptViewMode)
+  // 'block' = timestamps shown, 'inline' = timestamps hidden. Surface this
+  // as a Switch to match the Indexing / Demo data toggles — the dropdown
+  // it replaces felt out of place against the rest of Settings.
+  const showTimestamps = mode === 'block'
   return (
     <SettingsCard
       icon={AlignLeft}
       title="Transcripts"
       subtitle="How transcripts are laid out in the recording detail view."
     >
-      <Select value={mode} onValueChange={(v) => setMode(v as TranscriptViewMode)}>
-        <SelectTrigger
-          aria-label="Transcript view"
-          className="h-8 w-full justify-between text-[12.5px]"
-        >
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {TRANSCRIPT_VIEW_OPTIONS.map((opt) => (
-            <SelectItem key={opt.value} value={opt.value} className="text-[12.5px]">
-              {opt.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <ToggleRow
+        label="Show timestamps"
+        description="Render each segment with a clickable [m:ss] prefix; toggle off for a continuous inline transcript."
+        checked={showTimestamps}
+        onChange={(next) => setMode(next ? 'block' : 'inline')}
+      />
     </SettingsCard>
   )
 }
@@ -453,21 +478,37 @@ function AboutCard(): React.JSX.Element {
     void window.api.openExternal(GITHUB_URL)
   }
 
+  // Layout:
+  //   1. Tagline — what the app is in one sentence.
+  //   2. Version / License metadata in a small label-value table.
+  //   3. Source link as its own subtle action row.
+  //   4. Disclaimer footnote at the bottom, separated by a divider so
+  //      the legal-style copy isn't mixed with the rest of the card.
   return (
     <SettingsCard icon={Info} title="About" subtitle="Version, source and license.">
-      <dl className="divide-y divide-border text-[13px]">
+      <p className="text-[12.5px] leading-relaxed text-foreground">
+        SuperWhisper Analytics is a local companion. Nothing leaves your machine.
+      </p>
+      <dl className="mt-4 divide-y divide-border text-[13px]">
         <Row k="Version" v={`v${__APP_VERSION__}`} />
         <Row k="License" v="MIT" />
+        <div className="flex items-center justify-between py-2">
+          <dt className="text-muted-foreground">Source</dt>
+          <dd>
+            <button
+              type="button"
+              onClick={openGithub}
+              className="inline-flex items-center gap-1.5 text-accent-blue hover:underline"
+            >
+              View on GitHub
+              <ExternalLink className="h-3 w-3" strokeWidth={1.8} />
+            </button>
+          </dd>
+        </div>
       </dl>
-      <p className="mt-4 text-[12.5px] text-muted-foreground">{DISCLAIMER}</p>
-      <button
-        type="button"
-        onClick={openGithub}
-        className="mt-3 inline-flex items-center gap-1.5 text-[12.5px] text-accent-blue hover:underline"
-      >
-        View on GitHub
-        <ExternalLink className="h-3 w-3" strokeWidth={1.8} />
-      </button>
+      <p className="mt-4 border-t border-border pt-3 text-[11.5px] leading-relaxed text-muted-foreground">
+        {DISCLAIMER}
+      </p>
     </SettingsCard>
   )
 }

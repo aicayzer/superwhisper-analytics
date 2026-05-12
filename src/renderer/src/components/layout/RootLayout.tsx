@@ -3,7 +3,7 @@ import { useGlobalShortcut } from '@renderer/hooks/useGlobalShortcut'
 import { formatTimestamp } from '@renderer/lib/format'
 import { useConfigStore } from '@renderer/state/configStore'
 import { useDataStore } from '@renderer/state/dataStore'
-import { useLayoutStore } from '@renderer/state/layoutStore'
+import { SIDEBAR_AUTO_HIDE_BELOW, useLayoutStore } from '@renderer/state/layoutStore'
 import { chartBreadcrumb } from '@renderer/screens/chartRegistry'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
@@ -50,15 +50,35 @@ export function RootLayout(): React.JSX.Element {
   const sidebarOpen = useLayoutStore((s) => s.sidebarOpen)
   const sidebarWidth = useLayoutStore((s) => s.sidebarWidth)
   const toggleSidebar = useLayoutStore((s) => s.toggleSidebar)
+  const setSidebarOpen = useLayoutStore((s) => s.setSidebarOpen)
+  const setPeek = useLayoutStore((s) => s.setPeek)
   const configHydrated = useConfigStore((s) => s.hydrated)
   const configValid = useConfigStore((s) => s.isValid)
+  const autoHideSidebar = useConfigStore((s) => s.autoHideSidebar)
   const recordings = useDataStore((s) => s.recordings)
   const location = useLocation()
 
-  // Cmd-B is the only way to reopen the sidebar once it's collapsed (the
-  // header used to host a toggle button; it doesn't any more). Mounted at
-  // layout level so the shortcut is live on every screen.
+  // Auto-collapse the sidebar when the window narrows past the threshold.
+  // Re-expand on widen is intentionally NOT wired — that'd cause flicker
+  // for users who hand-resized to ~900px and toggled the sidebar manually.
+  useEffect(() => {
+    if (!autoHideSidebar) return undefined
+    const apply = (): void => {
+      if (window.innerWidth < SIDEBAR_AUTO_HIDE_BELOW) {
+        if (useLayoutStore.getState().sidebarOpen) setSidebarOpen(false)
+      }
+    }
+    apply()
+    window.addEventListener('resize', apply)
+    return () => window.removeEventListener('resize', apply)
+  }, [autoHideSidebar, setSidebarOpen])
+
+  // Two shortcuts for the same toggle: Cmd-B (familiar to ex-Notion / VS
+  // Code users) and Cmd-Option-Left (matches the macOS pattern of
+  // "modifier + arrow" for panel collapse). Both mounted at layout level
+  // so they're live on every screen.
   useGlobalShortcut({ key: 'b', mod: true }, toggleSidebar)
+  useGlobalShortcut({ key: 'ArrowLeft', mod: true, alt: true }, toggleSidebar)
 
   // Cmd-, matches the macOS convention for opening app preferences.
   // Pushes a /settings navigation regardless of the current route.
@@ -74,6 +94,12 @@ export function RootLayout(): React.JSX.Element {
   const leftPad = sidebarOpen
     ? sidebarWidth + SIDEBAR_GAP /* sidebar's own left-2 */ + SIDEBAR_GAP + CONTENT_GUTTER
     : Math.max(CONTENT_GUTTER, TRAFFIC_LIGHT_RESERVE)
+  // Symmetric content gutter when the sidebar is collapsed — pad the right
+  // edge the same amount as the left so the content area is visually
+  // centred in the window, not pushed right by the traffic-light reserve.
+  // When the sidebar is open we keep the smaller CONTENT_GUTTER on the
+  // right so the content stretches naturally toward it.
+  const rightPad = sidebarOpen ? CONTENT_GUTTER : leftPad
   // /chart/:slug renders a breadcrumb instead of a plain title; the
   // breadcrumb's <Link> segments are how the user navigates back.
   const chartMatch = location.pathname.match(/^\/chart\/([^/]+)/)
@@ -120,20 +146,41 @@ export function RootLayout(): React.JSX.Element {
   const maskHeight = HEADER_TOP + HEADER_H + FRAME_GAP + 16
   return (
     <Window>
+      {/* Peek hit-zone — invisible 12px column on the window's left edge.
+          When the sidebar is collapsed, hovering this strip flips peek
+          on, which renders the sidebar at its open transform without
+          flipping the persisted open flag. Pointerleave on the sidebar
+          bounds clears it. */}
+      {!sidebarOpen && (
+        <div
+          aria-hidden
+          onPointerEnter={() => setPeek(true)}
+          className="absolute bottom-0 left-0 top-0 z-30 w-3"
+        />
+      )}
       <Sidebar />
       <div
         aria-hidden
         className="pointer-events-none absolute top-0 z-20 transition-[left,opacity] duration-200 ease-out"
         style={{
           left: leftPad - CONTENT_GUTTER / 2,
-          right: 0,
+          right: rightPad - CONTENT_GUTTER / 2,
           height: maskHeight,
           opacity: scrolled ? 1 : 0,
           background:
             'linear-gradient(to bottom, var(--background) 0%, var(--background) 55%, color-mix(in srgb, var(--background) 60%, transparent) 80%, transparent 100%)'
         }}
       />
-      <MainHeader title={title} leftPad={leftPad} rightPad={CONTENT_GUTTER} />
+      <MainHeader
+        title={title}
+        leftPad={leftPad}
+        rightPad={rightPad}
+        // Hide the date-range pill on the single-transcript page — the
+        // window only ever shows one recording, so a filter pill would
+        // be meaningless. Every other route (including the maximised
+        // chart view) keeps the pill.
+        showRange={!transcriptRec}
+      />
       <main
         ref={mainRef}
         className="absolute inset-0 overflow-y-auto bg-background transition-[padding] duration-200 ease-out"
@@ -142,7 +189,7 @@ export function RootLayout(): React.JSX.Element {
           // 8px gap to content above; same 8px gap to window bottom.
           paddingTop: HEADER_TOP + HEADER_H + FRAME_GAP,
           paddingLeft: leftPad,
-          paddingRight: CONTENT_GUTTER,
+          paddingRight: rightPad,
           paddingBottom: FRAME_GAP
         }}
       >
