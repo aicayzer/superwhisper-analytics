@@ -1,0 +1,36 @@
+name: Feature request
+description: Suggest an idea or improvement
+title: '[Feature]: '
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What's the problem or itch?
+      description: |
+        What are you trying to do, and where does the current app fall short?
+        It's fine if the answer is "I just want to see X" — please say so explicitly though.
+      placeholder: Today I have to … and I'd rather …
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would the solution look like?
+      description: |
+        A rough sketch is enough. Screenshots / mockups welcome but not required.
+      placeholder: e.g. "Add a toggle in Settings that …"
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you've considered (optional)
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Additional context (optional)

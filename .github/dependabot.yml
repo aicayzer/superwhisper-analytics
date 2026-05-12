@@ -1,0 +1,45 @@
+# Dependabot keeps npm + GitHub Actions dependencies fresh and surfaces
+# security advisories as PRs. Weekly cadence is enough for a personal
+# project — daily PRs would just be noise. Groups patch-level updates
+# together so the bulk of PRs are batched.
+
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: '/'
+    schedule:
+      interval: weekly
+      day: monday
+      time: '08:00'
+      timezone: Europe/London
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+    groups:
+      patches:
+        applies-to: version-updates
+        update-types:
+          - patch
+      minor:
+        applies-to: version-updates
+        update-types:
+          - minor
+    ignore:
+      # Electron majors get manual bumps — too much risk of subtle
+      # behaviour changes (Chromium / V8 / Node updates) to land via an
+      # unreviewed auto-merge.
+      - dependency-name: electron
+        update-types:
+          - version-update:semver-major
+
+  - package-ecosystem: github-actions
+    directory: '/'
+    schedule:
+      interval: weekly
+      day: monday
+      time: '08:00'
+      timezone: Europe/London
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+      - github-actions

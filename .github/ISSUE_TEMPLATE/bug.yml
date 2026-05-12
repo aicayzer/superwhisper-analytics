@@ -1,0 +1,85 @@
+name: Bug report
+description: Something isn't working as expected
+title: '[Bug]: '
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. The more detail you can give the easier it is to reproduce.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: A short description of the bug and what you expected to happen.
+      placeholder: When I do X, Y happens. I expected Z.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open the app
+        2. Click on …
+        3. See the error
+    validations:
+      required: true
+
+  - type: input
+    id: app-version
+    attributes:
+      label: App version
+      description: Settings → About → Version
+      placeholder: e.g. 0.2.0
+    validations:
+      required: true
+
+  - type: input
+    id: macos-version
+    attributes:
+      label: macOS version
+      placeholder: e.g. 15.1 (Sequoia)
+    validations:
+      required: true
+
+  - type: input
+    id: superwhisper-version
+    attributes:
+      label: SuperWhisper version (if relevant)
+      placeholder: e.g. 1.18.0
+
+  - type: input
+    id: recording-count
+    attributes:
+      label: Approximate number of recordings in your dataset
+      description: Helpful for performance-related issues. Shown in Settings → Recordings folder.
+      placeholder: e.g. 11,000
+
+  - type: dropdown
+    id: install-source
+    attributes:
+      label: How did you install the app?
+      options:
+        - Packaged .dmg from GitHub Releases
+        - Built from source (pnpm build:mac)
+        - Other (please describe in additional context)
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Console output / logs (optional)
+      description: |
+        Anything from the macOS Console.app filtered by "SuperWhisper Analytics" can help. Strip anything sensitive first.
+      render: shell
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Additional context (optional)
+      description: Screenshots, notes, anything else.
