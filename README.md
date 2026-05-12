@@ -14,7 +14,13 @@ If you just want simple local transcription without the broader feature set, [Ai
 
 ## Install
 
-There's no signed release yet, so install from source.
+The app is unsigned (no Apple Developer cert yet), so macOS will flag it on first launch — see [Gatekeeper](#gatekeeper) below.
+
+### Download a packaged `.dmg`
+
+Grab the latest `.dmg` from the [GitHub Releases page](https://github.com/aicayzer/superwhisper-analytics/releases/latest), open it, and drag `SuperWhisper Analytics.app` into `/Applications`.
+
+### Or build from source
 
 ```bash
 pnpm install
