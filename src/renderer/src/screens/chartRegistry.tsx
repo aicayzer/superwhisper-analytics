@@ -44,35 +44,35 @@ export const CHART_REGISTRY: Record<string, ChartSpec> = {
   'volume-over-time': {
     section: 'Usage',
     sectionPath: '/usage',
-    title: 'Volume over time',
+    title: 'Recordings over time',
     description: 'Recordings per day across the active range.',
     render: () => <VolumeOverTimeChart />
   },
   'when-you-record': {
     section: 'Usage',
     sectionPath: '/usage',
-    title: 'When you record',
+    title: 'Recordings by hour',
     description: 'Day of week × hour of day. Brighter cells are busier.',
     render: () => <WhenYouRecordChart />
   },
   'recording-streak': {
     section: 'Usage',
     sectionPath: '/usage',
-    title: 'Recording streak',
-    description: 'Daily activity across the selected range.',
+    title: 'Daily activity',
+    description: 'Recording activity per day across the selected range.',
     render: () => <RecordingStreakChart />
   },
   'duration-mix': {
     section: 'Usage',
     sectionPath: '/usage',
-    title: 'Duration mix',
+    title: 'Recordings by duration',
     description: 'How long recordings tend to run.',
     render: () => <DurationMixChart />
   },
   'mode-pie': {
     section: 'Usage',
     sectionPath: '/usage',
-    title: 'Mode share',
+    title: 'Recordings by mode',
     description: 'Share of recordings by mode.',
     render: () => <ModePieChart />
   },
@@ -85,7 +85,7 @@ export const CHART_REGISTRY: Record<string, ChartSpec> = {
   'filler-words': {
     section: 'Language',
     sectionPath: '/language',
-    title: 'Filler words',
+    title: 'Top fillers',
     render: () => <FillerWordsChart />
   },
   'speaking-pace': {
@@ -117,14 +117,14 @@ export const CHART_REGISTRY: Record<string, ChartSpec> = {
   activity: {
     section: 'Overview',
     sectionPath: '/',
-    title: 'Activity',
+    title: 'Recordings over time',
     description: 'Recordings per day.',
     render: () => <ActivityChart />
   },
   'by-day-of-week': {
     section: 'Overview',
     sectionPath: '/',
-    title: 'By day of week',
+    title: 'Recordings by day of week',
     render: () => <ByDayOfWeekChart />
   }
 }

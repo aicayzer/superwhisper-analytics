@@ -61,9 +61,9 @@ const COLS: ColSpec[] = [
   },
   {
     key: 'wordsPerMinute',
-    label: 'WPM',
+    label: 'Words per minute',
     align: 'right',
-    width: '80px',
+    width: '120px',
     sortKey: 'wordsPerMinute',
     defaultVisible: true
   },
@@ -257,9 +257,11 @@ function RowCell({ col, rec }: { col: ColSpec; rec: Recording }): React.JSX.Elem
       )
     case 'snippet':
       // max-w-0 lets the column flex naturally while still letting truncate
-      // kick in for ellipsis overflow.
+      // kick in for ellipsis overflow. Snippet text uses the foreground
+      // colour (not muted) so the actual transcript content reads as the
+      // main row payload, not a secondary caption.
       return (
-        <td className="max-w-0 px-4 py-2 align-middle text-muted-foreground">
+        <td className="max-w-0 px-4 py-2 align-middle text-foreground">
           <span className="block truncate">{truncate(rec.excerpt, 140)}</span>
         </td>
       )
@@ -303,9 +305,12 @@ function SortHeader({
         ))}
     </button>
   ) : (
+    // Non-sortable header (e.g. Snippet): same foreground colour as the
+    // sortable headers so the row reads as a single typographic unit
+    // rather than mixing tones.
     <span
       className={cn(
-        'inline-flex items-center gap-1 text-muted-foreground',
+        'inline-flex items-center gap-1 text-foreground',
         col.align === 'right' && 'flex-row-reverse'
       )}
     >

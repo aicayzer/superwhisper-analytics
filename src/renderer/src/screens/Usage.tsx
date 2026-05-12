@@ -28,7 +28,7 @@ import { useMemo } from 'react'
  * update with the navbar range pill.
  */
 export function Usage(): React.JSX.Element {
-  const { overview, usage, daily, heatmap, durationDist, modeStats, sparklines, streakCells } =
+  const { overview, usage, heatmap, durationDist, modeStats, sparklines, streakCells } =
     useFilteredAggregates()
 
   const modePieData = useMemo(
@@ -48,48 +48,44 @@ export function Usage(): React.JSX.Element {
           {
             label: 'Active days',
             value: String(overview.activeDays),
-            sub: `of ${daily.length} in window`,
             spark: sparklines.recordings.values
           },
           {
             label: 'Current streak',
-            value: `${usage.currentStreak}d`,
-            sub: `longest ${usage.longestStreak}d`
+            value: `${usage.currentStreak}d`
           },
           {
-            label: 'Avg per active day',
+            label: 'Recordings per day',
             value: String(Math.round(usage.avgPerActiveDay)),
-            sub: 'recordings',
             spark: sparklines.recordings.values
           },
           {
             label: 'Time per day',
             value: formatDurationSec(usage.timePerActiveDaySec),
-            sub: 'active days',
             spark: sparklines.duration.values
           }
         ]}
       />
 
-      {/* Top row — When you record (3/5) + Mode share (2/5). */}
+      {/* Top row — Recordings by hour (3/5) + Recordings by mode (2/5). */}
       <div className="grid min-h-0 grid-cols-[3fr_2fr] gap-3">
-        <ChartCard title="When you record" slug="when-you-record">
+        <ChartCard title="Recordings by hour" slug="when-you-record">
           {/* No fixed cell height — Heatmap stretches its 7 day rows to
               fill the card so the grid grows with the window. */}
           <Heatmap matrix={heatmap} />
         </ChartCard>
-        <ChartCard title="Mode share" slug="mode-pie" className="min-w-[280px]">
+        <ChartCard title="Recordings by mode" slug="mode-pie" className="min-w-[280px]">
           <ModePie data={modePieData} />
         </ChartCard>
       </div>
 
-      {/* Bottom row — Duration mix (2/5, more square) + Streak calendar
-          (3/5, wide GitHub-style year grid). */}
+      {/* Bottom row — Recordings by duration (2/5) + Daily activity grid
+          (3/5, GitHub-style). */}
       <div className="grid min-h-0 grid-cols-[2fr_3fr] gap-3">
-        <ChartCard title="Duration mix" slug="duration-mix" className="min-w-[280px]">
+        <ChartCard title="Recordings by duration" slug="duration-mix" className="min-w-[280px]">
           <DistBar data={durationDist} xKey="label" yKey="count" />
         </ChartCard>
-        <ChartCard title="Recording streak" slug="recording-streak">
+        <ChartCard title="Daily activity" slug="recording-streak">
           <StreakCalendar data={streakCells} />
         </ChartCard>
       </div>

@@ -33,7 +33,7 @@ export function WordsCard({ rec, hoveredWord, onHover }: WordsCardProps): React.
   }, [rec.result])
 
   return (
-    <Card className="flex min-h-[180px] flex-1 flex-col p-4 text-[12px]">
+    <Card className="flex min-h-[180px] flex-1 flex-col px-4 py-3 text-[12px]">
       <div className="mb-2 text-[12px] font-semibold tracking-tight text-foreground">
         Most common words
       </div>

@@ -114,25 +114,24 @@ export function Sidebar(): React.JSX.Element {
         if (!sidebarOpen && peekActive) setSidebarOpen(true)
       }}
       className={cn(
-        'absolute bottom-2 left-2 top-2 z-20',
+        // z-40 so the sidebar always sits ABOVE the MainHeader (z-30).
+        // Otherwise the page title bleeds through the sidebar's header
+        // strip during a peek, and clicks meant for PanelLeft / Search /
+        // Command land on the navbar instead — leaving the user unable
+        // to re-open a collapsed sidebar from inside a peek.
+        'absolute bottom-2 left-2 top-2 z-40',
         'flex flex-col rounded-xl border border-border bg-floating shadow-[var(--shadow-float)] [-webkit-app-region:drag]',
         !isResizing && 'transition-[transform,opacity] duration-200 ease-out',
         !visible && '-translate-x-[calc(100%+0.5rem)] opacity-0 pointer-events-none'
       )}
     >
       {/* Header band — traffic lights live in the left third (Electron-native,
-          x=18 y=18). Hide-toggle, Search and Command palette sit on the
-          right, in that order. */}
+          x=18 y=18). Hide-toggle, Command palette and Search sit on the
+          right, in that order (Command before Search so the visual rhythm
+          goes "structural action → text input"). */}
       <div className="flex h-9 items-center justify-end gap-0.5 pl-[68px] pr-1.5">
         <IconButton onClick={toggleSidebar} aria-label="Hide sidebar" title="Hide sidebar (Cmd-B)">
           <PanelLeft className="h-3.5 w-3.5" strokeWidth={1.8} />
-        </IconButton>
-        <IconButton
-          onClick={() => openPalette('search')}
-          aria-label="Search transcripts"
-          title="Search transcripts (Cmd-P)"
-        >
-          <Search className="h-3.5 w-3.5" strokeWidth={1.8} />
         </IconButton>
         <IconButton
           onClick={() => openPalette('command')}
@@ -140,6 +139,13 @@ export function Sidebar(): React.JSX.Element {
           title="Command palette (Cmd-K)"
         >
           <Command className="h-3.5 w-3.5" strokeWidth={1.8} />
+        </IconButton>
+        <IconButton
+          onClick={() => openPalette('search')}
+          aria-label="Search transcripts"
+          title="Search transcripts (Cmd-P)"
+        >
+          <Search className="h-3.5 w-3.5" strokeWidth={1.8} />
         </IconButton>
       </div>
 

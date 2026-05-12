@@ -465,7 +465,7 @@ function DetailsCard({ rec, fillerPct }: { rec: Recording; fillerPct: number }):
     void navigator.clipboard.writeText(rec.result)
   }
   return (
-    <Card className="p-4 text-[12px]">
+    <Card className="px-4 py-3 text-[12px]">
       <div className="mb-2 flex items-center justify-between text-[12px] font-semibold tracking-tight text-foreground">
         <span>Details</span>
         <IconButton onClick={copy} aria-label="Copy transcript" title="Copy transcript">

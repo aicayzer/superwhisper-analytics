@@ -5,8 +5,6 @@ import { useEffect, useRef, useState } from 'react'
 export interface KpiSpec {
   label: string
   value: string
-  /** Optional secondary line (e.g. "11 active days"). */
-  sub?: string
   /** Optional trailing trend series. Renders a sparkline next to the value. */
   spark?: number[]
 }
@@ -17,10 +15,16 @@ interface KpiRowProps {
 }
 
 /**
- * Unified KPI strip. Bordered rounded-xl container with vertical dividers,
- * tight typography. Used by Overview, Usage and Language so the headline
- * row is consistent across screens. Each KPI optionally carries a 30-day
- * sparkline for a quiet trend cue.
+ * Unified KPI strip. Bordered rounded-xl container, tight typography.
+ * Used by Overview, Usage and Language so the headline row is consistent
+ * across screens. Each KPI optionally carries a 30-day sparkline for a
+ * quiet trend cue.
+ *
+ * The previous design carried a `sub` caption per cell (e.g. "of 91 in
+ * window", "longest 11d") — that was dropped because the captions
+ * doubled the visual weight of the strip and the labels carry enough
+ * meaning on their own. If a metric needs disambiguation it should
+ * change its label, not append a grey footnote.
  */
 export function KpiRow({ items, className }: KpiRowProps): React.JSX.Element {
   return (
@@ -41,7 +45,7 @@ export function KpiRow({ items, className }: KpiRowProps): React.JSX.Element {
  *  this threshold. Four KPIs sit around 180px+, so the trend cue stays. */
 const SPARK_HIDE_BELOW = 160
 
-function Cell({ label, value, sub, spark }: KpiSpec): React.JSX.Element {
+function Cell({ label, value, spark }: KpiSpec): React.JSX.Element {
   const ref = useRef<HTMLDivElement>(null)
   const [showSpark, setShowSpark] = useState(true)
   useEffect(() => {
@@ -56,7 +60,7 @@ function Cell({ label, value, sub, spark }: KpiSpec): React.JSX.Element {
   return (
     <div ref={ref} className="rounded-xl border border-border bg-card px-4 py-3">
       <div className="text-[12px] font-medium text-foreground">{label}</div>
-      <div className="mt-1 flex items-end justify-between gap-3">
+      <div className="mt-2 flex items-end justify-between gap-3">
         <div className="text-[22px] font-semibold leading-none tracking-tight tabular-nums text-foreground">
           {value}
         </div>
@@ -66,7 +70,6 @@ function Cell({ label, value, sub, spark }: KpiSpec): React.JSX.Element {
           </div>
         )}
       </div>
-      {sub && <div className="mt-1.5 text-[11.5px] text-muted-foreground">{sub}</div>}
     </div>
   )
 }

@@ -62,25 +62,21 @@ export function Language(): React.JSX.Element {
       <KpiRow
         items={[
           {
-            label: 'Words / minute',
+            label: 'Words per minute',
             value: String(language.avgWPM),
-            sub: 'rolling average',
             spark: sparklines.wpm.values
           },
           {
             label: 'Filler rate',
-            value: `${language.fillerRatePct}%`,
-            sub: 'of total words'
+            value: `${language.fillerRatePct}%`
           },
           {
-            label: 'Vocabulary',
-            value: formatNumber(language.vocabularyCount),
-            sub: 'unique words'
+            label: 'Unique words',
+            value: formatNumber(language.vocabularyCount)
           },
           {
-            label: 'Avg sentence',
-            value: `${language.avgSentenceLength}`,
-            sub: 'words / sentence'
+            label: 'Sentence length',
+            value: `${language.avgSentenceLength}`
           }
         ]}
       />
@@ -89,7 +85,7 @@ export function Language(): React.JSX.Element {
         <ChartCard title="Top words" slug="top-words" className="min-w-[220px]">
           <BarList data={topWords} columns={2} />
         </ChartCard>
-        <ChartCard title="Filler words" slug="filler-words" className="min-w-[220px]">
+        <ChartCard title="Top fillers" slug="filler-words" className="min-w-[220px]">
           <BarList data={topFillers} columns={2} />
         </ChartCard>
       </div>

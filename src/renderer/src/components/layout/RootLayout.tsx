@@ -73,10 +73,12 @@ export function RootLayout(): React.JSX.Element {
     return () => window.removeEventListener('resize', apply)
   }, [autoHideSidebar, setSidebarOpen])
 
-  // Cmd-B is the only way to reopen the sidebar once it's collapsed (the
-  // header used to host a toggle button; it doesn't any more). Mounted at
-  // layout level so the shortcut is live on every screen.
+  // Two shortcuts for the same toggle: Cmd-B (familiar to ex-Notion / VS
+  // Code users) and Cmd-Option-Left (matches the macOS pattern of
+  // "modifier + arrow" for panel collapse). Both mounted at layout level
+  // so they're live on every screen.
   useGlobalShortcut({ key: 'b', mod: true }, toggleSidebar)
+  useGlobalShortcut({ key: 'ArrowLeft', mod: true, alt: true }, toggleSidebar)
 
   // Cmd-, matches the macOS convention for opening app preferences.
   // Pushes a /settings navigation regardless of the current route.
