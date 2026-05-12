@@ -103,7 +103,12 @@ export const api = {
      *  (≤900px) hide the sidebar automatically; when off the user controls
      *  it entirely via Cmd-B / the navbar icon. */
     setAutoHideSidebar: (enabled: boolean): Promise<ConfigStatus> =>
-      ipcRenderer.invoke('config:setAutoHideSidebar', enabled)
+      ipcRenderer.invoke('config:setAutoHideSidebar', enabled),
+    /** Wipe the persisted config back to defaults — clears the saved
+     *  folder, demo flag, custom filler dictionary, etc. The renderer
+     *  follows up by triggering a fresh hydrate so the dataStore picks
+     *  up the cleared state. Used by Settings → About → Reset app. */
+    reset: (): Promise<ConfigStatus> => ipcRenderer.invoke('config:reset')
   },
   data: {
     hydrate: (): Promise<HydratePayload> => ipcRenderer.invoke('data:hydrate'),

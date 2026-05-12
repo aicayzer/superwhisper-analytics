@@ -89,6 +89,22 @@ export function setConfig(patch: Partial<Config>): Config {
 }
 
 /**
+ * Wipe the persisted config back to defaults. Used by the "Reset app"
+ * affordance in Settings so the welcome flow can be re-tested without
+ * hand-editing `~/Library/Application Support/me.cyzr.superwhisper-
+ * analytics/config.json`. Writes the defaults explicitly so the
+ * file's mtime updates and the renderer's next `config:status` call
+ * sees the cleared state.
+ */
+export function resetConfig(): Config {
+  const fresh = defaultConfig()
+  const file = configFilePath()
+  mkdirSync(dirname(file), { recursive: true })
+  writeFileSync(file, JSON.stringify(fresh, null, 2), 'utf-8')
+  return fresh
+}
+
+/**
  * Probe known SuperWhisper recordings paths. Returns the first that
  * exists, or `null` if neither does (user must pick manually).
  */
@@ -97,6 +113,21 @@ export function defaultPath(): string | null {
     if (existsSync(candidate)) return candidate
   }
   return null
+}
+
+/**
+ * Resolve a picked path to the actual recordings directory. The user
+ * might select the SuperWhisper parent folder (e.g. `.../com.super
+ * duper.superwhisper`) rather than its `recordings/` subdirectory.
+ * If the picked path isn't itself a valid recordings folder but has a
+ * `recordings/` child that is, promote to the child — saves the user
+ * having to re-navigate through the picker.
+ */
+export function resolveRecordingsPath(picked: string): string {
+  if (isPathValid(picked)) return picked
+  const sub = join(picked, 'recordings')
+  if (isPathValid(sub)) return sub
+  return picked
 }
 
 /**

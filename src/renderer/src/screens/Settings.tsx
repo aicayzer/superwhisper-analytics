@@ -1,5 +1,6 @@
 import { AppearancePicker } from '@renderer/components/settings/AppearancePicker'
 import { SettingsCard } from '@renderer/components/settings/SettingsCard'
+import { SegmentedTabs } from '@renderer/components/ui/SegmentedTabs'
 import { Switch } from '@renderer/components/ui/Switch'
 import { cn } from '@renderer/lib/cn'
 import { formatCompact, formatDurationSec } from '@renderer/lib/format'
@@ -14,6 +15,7 @@ import {
   Folder,
   Info,
   RefreshCw,
+  RotateCcw,
   Settings as SettingsIcon,
   Sparkles,
   Sun,
@@ -22,39 +24,62 @@ import {
 import { useEffect, useMemo, useState } from 'react'
 import type { UpdaterStatus } from '../../../preload/api'
 
+type SettingsTab = 'general' | 'data' | 'about'
+
+const SETTINGS_TABS: ReadonlyArray<{ id: SettingsTab; label: string }> = [
+  { id: 'general', label: 'General' },
+  { id: 'data', label: 'Data' },
+  { id: 'about', label: 'About' }
+]
+
 const GITHUB_URL = 'https://github.com/aicayzer/superwhisper-analytics'
 const DISCLAIMER =
   'Personal project, not affiliated with SuperWhisper. Shared in case it’s useful to anyone else.'
 
 /**
- * Card-based Settings page. Each section is a `<SettingsCard>` with an
- * icon header + body content. Sections, in order:
+ * Settings page, organised into three tabs:
  *
- *   1. Recordings folder — path, indexed stats, Choose/Reindex.
- *   2. Appearance — preview cards (Light / System / Dark).
- *   3. Indexing — Watch folder + Index transcripts only toggles.
- *   4. Transcripts — segment / inline view-mode preference.
- *   5. Dictionary — searchable, scrollable filler-phrase list.
- *   6. About — version (live from package.json), GitHub link, MIT,
- *              and an "unaffiliated" disclaimer.
+ *   • General — Recordings folder, Appearance, Transcript view-mode,
+ *               Demo data toggle. The everyday user preferences.
+ *   • Data    — Indexing toggles + Filler-phrase dictionary. Editorial
+ *               control over what gets counted and how.
+ *   • About   — Version, License, Source, Updates.
+ *
+ * The tab strip lives at the top using the same lifted-pill segmented
+ * visual as the navbar RangePill — keeps the chrome consistent. The
+ * navbar's range pill hides on this route (set in RootLayout) so the
+ * date-window control doesn't compete with the tab strip.
  */
 export function Settings(): React.JSX.Element {
-  // No top header: the navbar already shows "Settings" in the title row,
-  // and the local-companion tagline now lives inside the About card so
-  // we don't burn vertical space on a duplicate.
+  const [tab, setTab] = useState<SettingsTab>('general')
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4 pb-8 pt-2">
-      <RecordingsCard />
-      <AppearanceCard />
-      <IndexingCard />
-      <TranscriptsCard />
-      <DictionaryCard />
-      {/* Demo data sits second-to-last — it's a toggle for showcasing
-          the app rather than a primary preference, so it shouldn't
-          compete for attention with Indexing / Transcripts / Dictionary
-          higher up in the list. */}
-      <DemoModeCard />
-      <AboutCard />
+      <SegmentedTabs<SettingsTab>
+        value={tab}
+        onChange={setTab}
+        options={SETTINGS_TABS}
+        ariaLabel="Settings sections"
+      />
+      {tab === 'general' && (
+        <>
+          <RecordingsCard />
+          <AppearanceCard />
+          <TranscriptsCard />
+          <DemoModeCard />
+        </>
+      )}
+      {tab === 'data' && (
+        <>
+          <IndexingCard />
+          <DictionaryCard />
+        </>
+      )}
+      {tab === 'about' && (
+        <>
+          <AboutCard />
+          <ResetAppCard />
+        </>
+      )}
     </div>
   )
 }
@@ -66,6 +91,8 @@ function RecordingsCard(): React.JSX.Element {
   const isValid = useConfigStore((s) => s.isValid)
   const isInsideHome = useConfigStore((s) => s.isInsideHome)
   const setPath = useConfigStore((s) => s.setPath)
+  const demoMode = useConfigStore((s) => s.demoMode)
+  const setDemoMode = useConfigStore((s) => s.setDemoMode)
   const count = useDataStore((s) => s.count)
   const indexedAt = useDataStore((s) => s.indexedAt)
   const loading = useDataStore((s) => s.loading)
@@ -84,7 +111,14 @@ function RecordingsCard(): React.JSX.Element {
 
   async function choose(): Promise<void> {
     const chosen = await window.api.dialog.pickFolder()
-    if (chosen) await setPath(chosen)
+    if (!chosen) return
+    // Order matters: persist the path first, THEN flip demo off. The
+    // reverse order briefly leaves the renderer in (!demoMode && !path)
+    // which fires the welcome-modal trigger and causes a flash before
+    // setPath resolves. Path-first means the in-between state is
+    // (demoMode && path-set) which the trigger ignores.
+    await setPath(chosen)
+    if (demoMode) await setDemoMode(false)
   }
 
   const busy = loading || reindexing
@@ -256,8 +290,6 @@ function IndexingCard(): React.JSX.Element {
   const setWatchFolder = useConfigStore((s) => s.setWatchFolder)
   const transcriptsOnly = useConfigStore((s) => s.transcriptsOnly)
   const setTranscriptsOnly = useConfigStore((s) => s.setTranscriptsOnly)
-  const autoHideSidebar = useConfigStore((s) => s.autoHideSidebar)
-  const setAutoHideSidebar = useConfigStore((s) => s.setAutoHideSidebar)
   return (
     <SettingsCard
       icon={SettingsIcon}
@@ -276,12 +308,6 @@ function IndexingCard(): React.JSX.Element {
           description="Skip audio playback and waveform — transcripts only."
           checked={transcriptsOnly}
           onChange={(next) => void setTranscriptsOnly(next)}
-        />
-        <ToggleRow
-          label="Auto-hide sidebar on narrow windows"
-          description="Collapse the sidebar when the window is under 900px wide. Reopen with Cmd-B or the navbar icon."
-          checked={autoHideSidebar}
-          onChange={(next) => void setAutoHideSidebar(next)}
         />
       </div>
     </SettingsCard>
@@ -495,16 +521,17 @@ function AboutCard(): React.JSX.Element {
   }
 
   // Layout:
-  //   1. Tagline — what the app is in one sentence.
+  //   1. Tagline + disclaimer combined into one paragraph at the top —
+  //      saves a trailing legal-style footer and keeps the card tidy.
   //   2. Version / License / Source / Updates in a single label-value
   //      table. The Updates row carries the current updater state +
   //      a manual "Check now" trigger.
-  //   3. Disclaimer footnote at the bottom, separated by a divider so
-  //      the legal-style copy isn't mixed with the rest of the card.
+  // Reset lives in its own card below — see ResetAppCard.
   return (
     <SettingsCard icon={Info} title="About" subtitle="Version, source, license and updates.">
       <p className="text-[12.5px] leading-relaxed text-foreground">
-        SuperWhisper Analytics is a local companion. Nothing leaves your machine.
+        SuperWhisper Analytics is a local companion. Nothing leaves your machine.{' '}
+        <span className="text-muted-foreground">{DISCLAIMER}</span>
       </p>
       <dl className="mt-4 divide-y divide-border text-[13px]">
         <Row k="Version" v={`v${__APP_VERSION__}`} />
@@ -533,9 +560,71 @@ function AboutCard(): React.JSX.Element {
           </dd>
         </div>
       </dl>
-      <p className="mt-4 border-t border-border pt-3 text-[11.5px] leading-relaxed text-muted-foreground">
-        {DISCLAIMER}
-      </p>
+    </SettingsCard>
+  )
+}
+
+// ---------- Reset app ---------------------------------------------------
+
+/**
+ * Standalone card for the "Reset app" affordance. Lived inside AboutCard
+ * previously but the row was crowding the version table and breaking
+ * the visual rhythm of the rest of Settings — separating it gives the
+ * action room to breathe and signals that it's a heavier operation than
+ * the other About metadata.
+ */
+function ResetAppCard(): React.JSX.Element {
+  const resetApp = useConfigStore((s) => s.resetApp)
+  const [confirmReset, setConfirmReset] = useState(false)
+  const [resetting, setResetting] = useState(false)
+
+  async function doReset(): Promise<void> {
+    setResetting(true)
+    try {
+      await resetApp()
+    } finally {
+      setResetting(false)
+      setConfirmReset(false)
+    }
+  }
+
+  return (
+    <SettingsCard
+      icon={RotateCcw}
+      title="Reset app"
+      subtitle="Clears your folder and preferences. Recordings on disk are not affected."
+    >
+      <div className="flex justify-end">
+        {confirmReset ? (
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setConfirmReset(false)}
+              disabled={resetting}
+              className={CHROME_BUTTON}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => void doReset()}
+              disabled={resetting}
+              className={cn(
+                // Accent-orange warning palette — same as the demo-mode
+                // pill. Reset is reversible (recordings on disk are
+                // untouched) so destructive-red would overstate things.
+                'inline-flex h-7 items-center rounded-md border border-accent-orange/40 bg-accent-orange/10 px-3 text-[12px] font-medium text-accent-orange transition-colors hover:bg-accent-orange/15 disabled:opacity-50'
+              )}
+            >
+              {resetting ? 'Resetting…' : 'Confirm reset'}
+            </button>
+          </div>
+        ) : (
+          <button type="button" onClick={() => setConfirmReset(true)} className={CHROME_BUTTON}>
+            Reset…
+          </button>
+        )}
+      </div>
     </SettingsCard>
   )
 }

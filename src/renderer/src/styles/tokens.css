@@ -63,6 +63,12 @@
   --accent-blue: #0166cc;
   --accent-blue-bg: #edf3fb;
 
+  /* Accent orange — used by the demo-data navbar pill so the "this is
+     mock data" indicator reads at a glance without competing for
+     attention with the rest of the app. */
+  --accent-orange: #c2410c;
+  --accent-orange-bg: #fef3e7;
+
   /* Elevation — used only by floating overlays (sidebar, palette). Cards
      get their lift from a brighter --card colour, not shadow. */
   --shadow-float: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px -4px rgba(0, 0, 0, 0.08);
@@ -103,6 +109,9 @@
   --accent-blue: #0099ff;
   --accent-blue-bg: #212b35;
 
+  --accent-orange: #fb923c;
+  --accent-orange-bg: #2a1f12;
+
   /* Pulled right back in dark mode — the brighter --card and --floating
      colours carry the elevation cue. Just enough to avoid a hard outline. */
   --shadow-float: 0 1px 2px rgba(0, 0, 0, 0.4);
@@ -138,6 +147,8 @@
 
   --color-accent-blue: var(--accent-blue);
   --color-accent-blue-bg: var(--accent-blue-bg);
+  --color-accent-orange: var(--accent-orange);
+  --color-accent-orange-bg: var(--accent-orange-bg);
 
   /* Foundation aliases (kept so layout primitives still compile) */
   --color-window: var(--window);

@@ -43,18 +43,21 @@ function App(): React.JSX.Element {
     void hydrateConfig()
   }, [hydrateConfig])
 
-  // Once config is hydrated, drive the data store off the path's
-  // validity. Valid path → hydrate (cache rescans transparently if the
-  // path has changed). Invalid path → clear data (so stale aggregates
-  // from a previous folder don't linger after the user breaks the
-  // path).
+  // Once config is hydrated, ask main for data. Main decides what to
+  // serve:
+  //   • configured + valid path → real recordings
+  //   • demo mode on → synthetic dataset
+  //   • no folder configured → demo fallback (so screens look
+  //     populated behind the welcome modal on a fresh install)
+  // clearData() is intentionally not called for the "no folder" path
+  // any more — the demo fallback covers that case and avoids a brief
+  // empty-screen flash before the modal animates in.
   useEffect(() => {
     if (!configHydrated) return
-    if (configValid) {
-      void hydrateData()
-    } else {
-      clearData()
-    }
+    void hydrateData()
+    // `clearData` is referenced here purely so React's lint rule for
+    // exhaustive deps stays happy when other branches re-introduce it.
+    void clearData
   }, [configHydrated, configValid, hydrateData, clearData])
 
   // Subscribe to fs.watch invalidation pushes from main — when the user
@@ -77,7 +80,11 @@ function App(): React.JSX.Element {
   return (
     <>
       <RouterProvider router={router} />
-      {dataLoading && <LoadingOverlay />}
+      {/* LoadingOverlay only covers the screen for real-data scans
+          (configured + valid path). On a fresh install we serve demo
+          data behind the welcome modal — no need for a loading curtain
+          there too. */}
+      {configValid && dataLoading && <LoadingOverlay />}
     </>
   )
 }

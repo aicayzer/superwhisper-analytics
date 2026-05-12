@@ -51,27 +51,39 @@ function clear(): void {
 function rescan(): HydratePayload {
   const config = getConfig()
 
-  // Demo mode short-circuits the disk read. The synthetic dataset is
-  // reproducible, so callers can toggle it on and off safely without
-  // losing or mixing real-data state.
-  if (config.demoMode) {
+  // Demo data is served in two cases:
+  //   1. `config.demoMode` is on (user opted in via Settings).
+  //   2. No folder is configured yet (first-launch fallback so the
+  //      welcome modal renders against a populated app, not a blank
+  //      shell — picking a folder swaps in real data).
+  // Either case short-circuits the disk read. The synthetic dataset is
+  // deterministic, so callers can toggle it on and off without losing
+  // or mixing real-data state. We track the *persisted* demoMode flag
+  // in `lastDemoMode` (not the fact we're rendering demo) so the
+  // hydrate() change-detection stays correct: when the user later
+  // picks a folder OR toggles demo on, the path/flag mismatch triggers
+  // a fresh rescan.
+  const usingDemoFallback = !config.superwhisperPath
+  if (config.demoMode || usingDemoFallback) {
     const t0 = Date.now()
     recordings = buildDemoRecordings(new Date(), config.fillerWords)
     aggregates = computeAll(recordings, new Date())
     indexedAt = new Date().toISOString()
-    lastScannedPath = null
-    lastDemoMode = true
+    lastScannedPath = config.superwhisperPath
+    lastDemoMode = config.demoMode
     scanErrors = 0
     scanSkipped = 0
-    console.log(`[cache] generated ${recordings.length} demo recordings in ${Date.now() - t0}ms`)
+    const reason = config.demoMode ? 'demo mode' : 'no folder configured'
+    console.log(
+      `[cache] generated ${recordings.length} demo recordings in ${Date.now() - t0}ms (${reason})`
+    )
     return buildPayload(null)
   }
 
-  const path = config.superwhisperPath
-  if (!path) {
-    clear()
-    return buildPayload('No recordings folder configured.')
-  }
+  // `superwhisperPath` is guaranteed non-null here: the demo fallback
+  // branch above catches the null case. Narrow via assertion so the
+  // `scan(path, …)` call below doesn't trip the type checker.
+  const path = config.superwhisperPath as string
   if (!isPathValid(path)) {
     clear()
     return buildPayload(`Path not found: ${path}`)
