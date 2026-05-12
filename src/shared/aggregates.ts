@@ -89,6 +89,42 @@ function eachDay(start: Date, end: Date, fn: (d: Date) => void): void {
   }
 }
 
+/**
+ * Walk every period key in [start, end] inclusive at the chosen
+ * granularity. Used by trend aggregators to seed empty buckets so the
+ * resulting array is continuous on the X axis (a missing week between
+ * W18 and W20 would otherwise vanish from the chart entirely).
+ */
+function eachPeriod(start: Date, end: Date, bucketBy: BucketBy, fn: (key: string) => void): void {
+  if (end.getTime() < start.getTime()) return
+  // Walk one day at a time and emit distinct bucket keys. Cheap on the
+  // small datasets a chart range covers, and avoids fiddly per-bucket
+  // arithmetic for week/month.
+  const seen = new Set<string>()
+  eachDay(start, end, (d) => {
+    const key = bucketKey(d, bucketBy)
+    if (!seen.has(key)) {
+      seen.add(key)
+      fn(key)
+    }
+  })
+}
+
+/** Min/max datetime across a recording slice, parsed once. */
+function dateBounds(recordings: Recording[]): { start: Date; end: Date } | null {
+  if (recordings.length === 0) return null
+  let min = Infinity
+  let max = -Infinity
+  for (const r of recordings) {
+    const t = new Date(r.datetime).getTime()
+    if (isNaN(t)) continue
+    if (t < min) min = t
+    if (t > max) max = t
+  }
+  if (!isFinite(min) || !isFinite(max)) return null
+  return { start: new Date(min), end: new Date(max) }
+}
+
 const EMPTY_OVERVIEW: OverviewStats = {
   totalRecordings: 0,
   totalWords: 0,
@@ -324,12 +360,21 @@ function computeWpmTrend(recordings: Recording[], bucketBy: BucketBy): TrendPoin
     cur.sumSec += r.duration / 1000
     buckets.set(period, cur)
   }
-  return Array.from(buckets.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([period, v]) => ({
-      period,
-      value: v.sumSec > 0 ? Math.round((v.sumWords / v.sumSec) * 60) : 0
-    }))
+  // Seed every period inside [first recording, last recording] so the
+  // X axis stays continuous when a bucket has no data. `value: null`
+  // tells the line chart to break across the gap rather than dive to 0.
+  const points: TrendPoint[] = []
+  const bounds = dateBounds(recordings)
+  if (bounds) {
+    eachPeriod(bounds.start, bounds.end, bucketBy, (key) => {
+      const v = buckets.get(key)
+      points.push({
+        period: key,
+        value: v && v.sumSec > 0 ? Math.round((v.sumWords / v.sumSec) * 60) : null
+      })
+    })
+  }
+  return points
 }
 
 function computeFillerTrend(recordings: Recording[], bucketBy: BucketBy): TrendPoint[] {
@@ -343,28 +388,46 @@ function computeFillerTrend(recordings: Recording[], bucketBy: BucketBy): TrendP
     cur.words += r.wordCount
     buckets.set(period, cur)
   }
-  return Array.from(buckets.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([period, v]) => ({
-      period,
-      value: v.words > 0 ? +((v.fillers / v.words) * 100).toFixed(2) : 0
-    }))
+  const points: TrendPoint[] = []
+  const bounds = dateBounds(recordings)
+  if (bounds) {
+    eachPeriod(bounds.start, bounds.end, bucketBy, (key) => {
+      const v = buckets.get(key)
+      points.push({
+        period: key,
+        value: v && v.words > 0 ? +((v.fillers / v.words) * 100).toFixed(2) : null
+      })
+    })
+  }
+  return points
 }
 
 function computeVocabGrowth(recordings: Recording[], bucketBy: BucketBy): TrendPoint[] {
   const sorted = [...recordings].sort((a, b) => a.datetime.localeCompare(b.datetime))
-  const seen = new Set<string>()
-  const buckets = new Map<string, number>()
+  // Group new words per period — we accumulate vocab size across periods
+  // even when a given bucket has no recordings (vocab is monotonic, so
+  // the natural carry-forward is the previous period's value).
+  const newWordsPerPeriod = new Map<string, Set<string>>()
   for (const r of sorted) {
     const d = new Date(r.datetime)
     if (isNaN(d.getTime())) continue
     const period = bucketKey(d, bucketBy)
-    if (r.result) for (const w of tokenise(r.result)) seen.add(w)
-    buckets.set(period, seen.size)
+    if (!r.result) continue
+    const bucket = newWordsPerPeriod.get(period) ?? new Set<string>()
+    for (const w of tokenise(r.result)) bucket.add(w)
+    newWordsPerPeriod.set(period, bucket)
   }
-  return Array.from(buckets.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([period, value]) => ({ period, value }))
+  const points: TrendPoint[] = []
+  const bounds = dateBounds(recordings)
+  if (bounds) {
+    const seen = new Set<string>()
+    eachPeriod(bounds.start, bounds.end, bucketBy, (key) => {
+      const added = newWordsPerPeriod.get(key)
+      if (added) for (const w of added) seen.add(w)
+      points.push({ period: key, value: seen.size })
+    })
+  }
+  return points
 }
 
 function computeLanguage(

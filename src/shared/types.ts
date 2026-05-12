@@ -96,8 +96,12 @@ export interface SentenceBucket {
 }
 
 export interface TrendPoint {
-  period: string // YYYY-MM or YYYY-Www
-  value: number
+  period: string // YYYY-MM-DD, YYYY-Www, or YYYY-MM (depending on bucket)
+  /** `null` indicates a period inside the data's span where no recordings
+   *  exist — the chart line breaks at that point so a gap reads as
+   *  "no data" instead of "value dropped to 0". Vocab growth carries
+   *  the previous value forward and so never emits `null`. */
+  value: number | null
 }
 
 export interface UsageStats {
