@@ -1,13 +1,12 @@
 import { WordsCard } from '@renderer/components/transcripts/WordsCard'
 import { Card } from '@renderer/components/ui/card'
-import { IconButton } from '@renderer/components/ui/IconButton'
 import { cn } from '@renderer/lib/cn'
 import { formatClock, formatDurationSec, formatTimestamp } from '@renderer/lib/format'
 import type { Recording } from '@renderer/lib/types'
 import { useConfigStore } from '@renderer/state/configStore'
 import { useDataStore } from '@renderer/state/dataStore'
 import { useUiPrefsStore } from '@renderer/state/uiPrefsStore'
-import { Copy, Pause, Play } from 'lucide-react'
+import { Pause, Play } from 'lucide-react'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
@@ -461,17 +460,12 @@ function highlightWord(text: string, word: string | null): React.ReactNode {
 // ---------- Details + Row -----------------------------------------------
 
 function DetailsCard({ rec, fillerPct }: { rec: Recording; fillerPct: number }): React.JSX.Element {
-  const copy = (): void => {
-    void navigator.clipboard.writeText(rec.result)
-  }
+  // Copy action lives in the navbar's top-right slot now (see RootLayout
+  // — it renders a NavActionPill when the route is a single transcript).
+  // The Details card just shows the heading + the metadata rows.
   return (
     <Card className="px-4 py-3 text-[12px]">
-      <div className="mb-2 flex items-center justify-between text-[12px] font-semibold tracking-tight text-foreground">
-        <span>Details</span>
-        <IconButton onClick={copy} aria-label="Copy transcript" title="Copy transcript">
-          <Copy className="h-3.5 w-3.5" strokeWidth={1.8} />
-        </IconButton>
-      </div>
+      <div className="mb-2 text-[12px] font-semibold tracking-tight text-foreground">Details</div>
       {/* Mode / Duration / Words / WPM now live in the top KPI strip -- the
           remaining rows are the per-recording metadata that doesn't earn a
           tile of its own. */}
