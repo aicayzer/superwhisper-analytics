@@ -1,8 +1,7 @@
 import { IconButton } from '@renderer/components/ui/IconButton'
 import { useLayoutStore } from '@renderer/state/layoutStore'
-import { usePaletteStore } from '@renderer/state/paletteStore'
 import { useRangeStore } from '@renderer/state/rangeStore'
-import { Command, PanelLeft, Search } from 'lucide-react'
+import { PanelLeft } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { RangePill } from './RangePill'
 
@@ -26,12 +25,13 @@ interface MainHeaderProps {
  * Header strip for the main pane. Renders the page title (or breadcrumb
  * trail) on the left and the global RangePill on the right.
  *
- * When the sidebar is hidden, three IconButtons appear before the title:
- *   • PanelLeft — toggles the sidebar back open
- *   • Search    — opens the command palette in search mode
- *   • Command   — opens the command palette in command mode
- * These mirror what the sidebar's own header band exposes, so a user who
- * has hidden the sidebar still has the same actions one click away.
+ * When the sidebar is hidden, a single PanelLeft IconButton appears
+ * before the title to flip the sidebar back open. Hovering that button
+ * peeks the sidebar in without committing to opening it — moving the
+ * pointer away retracts it; clicking inside the peeked sidebar promotes
+ * the peek into the locked-open state. Search + Command icons are kept
+ * inside the sidebar itself (visible when it's open or peeked), so we
+ * don't duplicate them here.
  */
 export function MainHeader({ title, leftPad, rightPad }: MainHeaderProps): React.JSX.Element {
   const range = useRangeStore((s) => s.range)
@@ -39,39 +39,29 @@ export function MainHeader({ title, leftPad, rightPad }: MainHeaderProps): React
   const sidebarOpen = useLayoutStore((s) => s.sidebarOpen)
   const peekActive = useLayoutStore((s) => s.peekActive)
   const toggleSidebar = useLayoutStore((s) => s.toggleSidebar)
-  const openPalette = usePaletteStore((s) => s.openWith)
-  // Only render the icon trio when the sidebar is fully out of the way
-  // (not even peeking). During a peek the sidebar already exposes these
-  // same actions, so the trio would be redundant.
-  const showIcons = !sidebarOpen && !peekActive
+  const setPeek = useLayoutStore((s) => s.setPeek)
+  // Render the navbar's own toggle only when the sidebar is fully out of
+  // the way. While peeking the sidebar covers the same area and provides
+  // its own toggle, so a navbar copy would be redundant.
+  const showToggle = !sidebarOpen && !peekActive
 
   return (
     <div
       style={{ left: leftPad, right: rightPad }}
       className="absolute top-2 z-30 flex h-9 items-center gap-2 [-webkit-app-region:drag]"
     >
-      {showIcons && (
-        <div className="flex shrink-0 items-center gap-0.5 [-webkit-app-region:no-drag]">
+      {showToggle && (
+        <div className="flex shrink-0 items-center [-webkit-app-region:no-drag]">
           <IconButton
             onClick={toggleSidebar}
+            // Hovering the toggle peeks the sidebar — the user can use
+            // the sidebar's nav without committing to opening it. Move
+            // away to retract; click inside the sidebar to lock it open.
+            onPointerEnter={() => setPeek(true)}
             aria-label="Show sidebar"
             title="Show sidebar (Cmd-B)"
           >
             <PanelLeft className="h-3.5 w-3.5" strokeWidth={1.8} />
-          </IconButton>
-          <IconButton
-            onClick={() => openPalette('search')}
-            aria-label="Search transcripts"
-            title="Search transcripts (Cmd-P)"
-          >
-            <Search className="h-3.5 w-3.5" strokeWidth={1.8} />
-          </IconButton>
-          <IconButton
-            onClick={() => openPalette('command')}
-            aria-label="Open command palette"
-            title="Command palette (Cmd-K)"
-          >
-            <Command className="h-3.5 w-3.5" strokeWidth={1.8} />
           </IconButton>
         </div>
       )}

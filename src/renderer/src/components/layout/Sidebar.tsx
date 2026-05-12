@@ -7,6 +7,7 @@ import { SIDEBAR_MAX_WIDTH, SIDEBAR_MIN_WIDTH, useLayoutStore } from '@renderer/
 import { usePaletteStore } from '@renderer/state/paletteStore'
 import {
   AudioLines,
+  Command,
   House,
   Languages,
   PanelLeft,
@@ -120,17 +121,25 @@ export function Sidebar(): React.JSX.Element {
       )}
     >
       {/* Header band — traffic lights live in the left third (Electron-native,
-          x=18 y=18). Hide-toggle and Search sit on the right, in that order. */}
+          x=18 y=18). Hide-toggle, Search and Command palette sit on the
+          right, in that order. */}
       <div className="flex h-9 items-center justify-end gap-0.5 pl-[68px] pr-1.5">
-        <IconButton onClick={toggleSidebar} aria-label="Hide sidebar" title="Hide sidebar">
+        <IconButton onClick={toggleSidebar} aria-label="Hide sidebar" title="Hide sidebar (Cmd-B)">
           <PanelLeft className="h-3.5 w-3.5" strokeWidth={1.8} />
         </IconButton>
         <IconButton
           onClick={() => openPalette('search')}
           aria-label="Search transcripts"
-          title="Search transcripts"
+          title="Search transcripts (Cmd-P)"
         >
           <Search className="h-3.5 w-3.5" strokeWidth={1.8} />
+        </IconButton>
+        <IconButton
+          onClick={() => openPalette('command')}
+          aria-label="Open command palette"
+          title="Command palette (Cmd-K)"
+        >
+          <Command className="h-3.5 w-3.5" strokeWidth={1.8} />
         </IconButton>
       </div>
 
