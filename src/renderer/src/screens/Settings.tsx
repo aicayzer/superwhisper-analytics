@@ -186,14 +186,11 @@ function Stat({ label, value }: { label: string; value: string }): React.JSX.Ele
   )
 }
 
-/** Status line shown in the Recordings card header. Mirrors the sidebar
- *  footer: a status dot, an "Indexed Xm ago" / "Scanning…" string, and
- *  a refresh button rendered alongside (handled by the caller).
- *
- *  When valid + idle, the text is `Indexed Xm ago` so the user gets the
- *  same affordance the sidebar provides without scanning to a separate
- *  Stat below. Other states (scanning, reindexing, error, not-found)
- *  surface their own dedicated copy. */
+/** Status line shown in the Recordings card header. "Indexed Xm ago" /
+ *  "Scanning…" string only — no status dot. The healthy state is the
+ *  default and doesn't need a coloured indicator; the unhealthy states
+ *  (error / not-found) surface via the inline status text and the
+ *  warning rows in the body below. */
 function StatusLine({
   label,
   tone,
@@ -207,24 +204,13 @@ function StatusLine({
   busy: boolean
   reindexing: boolean
 }): React.JSX.Element {
-  const dot =
-    tone === 'ok'
-      ? 'bg-emerald-500'
-      : tone === 'error'
-        ? 'bg-red-500'
-        : 'bg-amber-500 animate-pulse'
   const text = (() => {
     if (reindexing) return 'Reindexing…'
     if (busy) return label
     if (tone === 'ok' && indexedAt) return `Indexed ${relativeTime(indexedAt)}`
     return label
   })()
-  return (
-    <span className="inline-flex items-center gap-1.5 text-[12px] text-muted-foreground">
-      <span className={cn('h-1.5 w-1.5 rounded-full', dot)} aria-hidden />
-      {text}
-    </span>
-  )
+  return <span className="text-[12px] text-muted-foreground">{text}</span>
 }
 
 function relativeTime(iso: string): string {
@@ -488,27 +474,37 @@ function AboutCard(): React.JSX.Element {
     void window.api.openExternal(GITHUB_URL)
   }
 
+  // Layout:
+  //   1. Tagline — what the app is in one sentence.
+  //   2. Version / License metadata in a small label-value table.
+  //   3. Source link as its own subtle action row.
+  //   4. Disclaimer footnote at the bottom, separated by a divider so
+  //      the legal-style copy isn't mixed with the rest of the card.
   return (
     <SettingsCard icon={Info} title="About" subtitle="Version, source and license.">
-      {/* Local-companion tagline lives here now that the top Settings
-          header has been removed — it's the right home for it, alongside
-          version + license + the unaffiliated disclaimer. */}
-      <p className="text-[12.5px] text-muted-foreground">
+      <p className="text-[12.5px] leading-relaxed text-foreground">
         SuperWhisper Analytics is a local companion. Nothing leaves your machine.
       </p>
       <dl className="mt-4 divide-y divide-border text-[13px]">
         <Row k="Version" v={`v${__APP_VERSION__}`} />
         <Row k="License" v="MIT" />
+        <div className="flex items-center justify-between py-2">
+          <dt className="text-muted-foreground">Source</dt>
+          <dd>
+            <button
+              type="button"
+              onClick={openGithub}
+              className="inline-flex items-center gap-1.5 text-accent-blue hover:underline"
+            >
+              View on GitHub
+              <ExternalLink className="h-3 w-3" strokeWidth={1.8} />
+            </button>
+          </dd>
+        </div>
       </dl>
-      <p className="mt-4 text-[12.5px] text-muted-foreground">{DISCLAIMER}</p>
-      <button
-        type="button"
-        onClick={openGithub}
-        className="mt-3 inline-flex items-center gap-1.5 text-[12.5px] text-accent-blue hover:underline"
-      >
-        View on GitHub
-        <ExternalLink className="h-3 w-3" strokeWidth={1.8} />
-      </button>
+      <p className="mt-4 border-t border-border pt-3 text-[11.5px] leading-relaxed text-muted-foreground">
+        {DISCLAIMER}
+      </p>
     </SettingsCard>
   )
 }
