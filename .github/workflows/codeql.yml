@@ -1,19 +1,26 @@
-# CodeQL static analysis for JS/TS. Free for public repos, runs on
-# every PR + weekly to catch new advisories landing against existing
-# code. Findings appear in the repo's Security tab.
+# CodeQL static analysis for JS/TS. Free for public repos, surfaces
+# findings in the repo's Security tab.
 #
-# No untrusted-input usage in this workflow; only static literal
-# values and built-in actions, so no command-injection surface.
+# No untrusted-input usage in this workflow; only static literal values
+# and built-in actions, so no command-injection surface.
+#
+# Currently invokable only via Actions → CodeQL → "Run workflow". The
+# auto-triggers (push / pull_request / schedule) below are commented
+# out because code-scanning result uploads aren't available on private
+# repos without GitHub Advanced Security — every PR check would fail
+# at the SARIF-upload step. When the repo goes public, uncomment the
+# trigger block and delete the `workflow_dispatch` line to turn it on.
 
 name: CodeQL
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-  schedule:
-    - cron: '0 7 * * 1'
+  workflow_dispatch:
+  # push:
+  #   branches: [main]
+  # pull_request:
+  #   branches: [main]
+  # schedule:
+  #   - cron: '0 7 * * 1'
 
 jobs:
   analyze:
