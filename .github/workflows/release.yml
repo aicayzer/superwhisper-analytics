@@ -34,3 +34,30 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      # electron-builder uploads five assets: the .dmg, a .zip, two
+      # .blockmap files and `latest-mac.yml`. The .dmg is the only one
+      # a human downloads — the rest are auto-update plumbing. Pin a
+      # short "Install" note to the bottom of the release body so anyone
+      # landing on the Releases page knows what to grab.
+      - name: Append install note to release body
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          VERSION="${TAG#v}"
+          DMG="superwhisper-analytics-${VERSION}.dmg"
+          NOTE=$(cat <<EOF
+
+          ---
+
+          ## Install
+
+          Download **\`${DMG}\`** below. Open it and drag \`SuperWhisper Analytics.app\` into \`/Applications\`. Signed + notarised — opens without the Gatekeeper warning.
+
+          The other assets (\`.zip\`, \`.blockmap\`, \`latest-mac.yml\`) are auto-update plumbing; you don't need them.
+          EOF
+          )
+          EXISTING=$(gh release view "$TAG" --json body --jq .body)
+          printf '%s%s' "$EXISTING" "$NOTE" | gh release edit "$TAG" --notes-file -
