@@ -11,6 +11,36 @@ import {
 } from 'recharts'
 import { ChartTooltip } from './ChartTooltip'
 
+const DAY_MS = 24 * 3600 * 1000
+/** Window-day threshold past which the X-axis switches from "5 Mar"
+ *  day-and-month labels to month-only labels anchored at month starts.
+ *  At 90 days of daily data the previous behaviour produced a row of
+ *  arbitrary-looking dates like "5 Mar / 19 Mar / 4 Apr / 18 Apr…"; one
+ *  tick per calendar month reads cleaner. */
+const MONTH_TICK_THRESHOLD_DAYS = 60
+
+function pad(n: number): string {
+  return n < 10 ? `0${n}` : String(n)
+}
+
+/** YYYY-MM-01 string for the first day of each calendar month inside
+ *  (from, to]. Skips the partial month at the leading edge so the chart
+ *  doesn't show a tick on day 1 of a window that starts on day 14. */
+function monthBoundaries(from: Date, to: Date): string[] {
+  const out: string[] = []
+  const cursor = new Date(from.getFullYear(), from.getMonth() + 1, 1)
+  while (cursor.getTime() <= to.getTime()) {
+    out.push(`${cursor.getFullYear()}-${pad(cursor.getMonth() + 1)}-01`)
+    cursor.setMonth(cursor.getMonth() + 1)
+  }
+  return out
+}
+
+function monthLabel(raw: unknown): string {
+  const d = new Date(String(raw))
+  return isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-GB', { month: 'short' })
+}
+
 interface ActivityAreaProps<T extends object> {
   data: readonly T[]
   xKey: string
@@ -59,6 +89,20 @@ function ActivityAreaInner<T extends object>({
     })
   }, [data, xKey, from, to])
 
+  // Switch to month-anchored ticks when the window is long enough that
+  // daily labels would crowd. Only kicks in when the chart has a real
+  // `from`/`to` (Overview's "Recordings over time"); the Language screen
+  // calls ActivityArea with period strings ("2026-W12") so we leave its
+  // formatter alone.
+  const monthTicks = useMemo<string[] | undefined>(() => {
+    if (!from || !to) return undefined
+    const spanDays = (to.getTime() - from.getTime()) / DAY_MS
+    if (spanDays <= MONTH_TICK_THRESHOLD_DAYS) return undefined
+    return monthBoundaries(from, to)
+  }, [from, to])
+
+  const effectiveTickFormatter = monthTicks ? monthLabel : formatTick
+
   return (
     <ResponsiveContainer width="100%" height="100%">
       <AreaChart
@@ -77,9 +121,10 @@ function ActivityAreaInner<T extends object>({
           tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }}
           tickLine={false}
           axisLine={false}
-          interval="preserveStartEnd"
+          interval={monthTicks ? 0 : 'preserveStartEnd'}
+          ticks={monthTicks}
           tickCount={tickCount}
-          tickFormatter={formatTick}
+          tickFormatter={effectiveTickFormatter}
         />
         <YAxis
           tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }}
