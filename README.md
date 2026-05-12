@@ -93,7 +93,6 @@ Briefly:
 - **Scanner** reads each `meta.json`, derives metrics, sorts newest-first. ~200ms for 11k recordings, so synchronous.
 - **Aggregates** are pure functions over the parsed `Recording[]`.
 - **`sw://` custom protocol** streams `output.wav` files to the renderer's `<audio>` element — the renderer never touches `file://` directly.
-- **Web Audio API** decodes waveform peaks on the renderer side, lazily, when each transcript opens.
 
 ## Future Additions
 
@@ -105,6 +104,7 @@ Briefly:
   - [ ] Playwright smoke test (app boots, all screens render without console errors)
 - [ ] **Explore tab** — word / phrase usage exploration with full-text transcript search.
 - [ ] **Period comparison view** — compare two date ranges side-by-side.
+- [ ] **Group transcripts by session** — collapse the Transcripts list into sessions, where a session is a run of consecutive recordings separated by gaps of ≤ 15 minutes. Purely time-based, no model required. Analysis of an ~11k-recording personal history showed 90% of inter-recording gaps fall under 12 minutes with a clear drop-off past that; 15 minutes captures focused work blocks (~6 sessions per active day, ~12 recordings each in that dataset) without lumping morning and afternoon work into one. Each session row would show start time, mode breakdown, recording count and total duration, expandable to the underlying transcripts.
 - [ ] **Non-SuperWhisper data adapter** — a skill or CLI that points at arbitrary transcript data and converts it into a SuperWhisper-compatible folder structure for this app to read.
 
 ## Acknowledgements
