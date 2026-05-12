@@ -1,8 +1,10 @@
-# SuperWhisper Analytics
+# SuperWhisper Analytics (unofficial)
 
 A local Mac desktop app for browsing your SuperWhisper recording history. Reads your recordings from disk, never sends them anywhere. No telemetry. No accounts.
 
-> _**Personal project, not affiliated with SuperWhisper.** Shared in case it’s useful to anyone else._
+**Personal project, not affiliated with SuperWhisper.** Shared in case it’s useful to anyone else.
+
+![App Screenshots](docs/screenshots/app-screenshots.png)
 
 ## Why this exists
 
@@ -42,14 +44,6 @@ If yours lives elsewhere (custom install, external drive, etc.) point the picker
 ### macOS Files & Folders permission
 
 The first time the app reads a path under `~/Library/Application Support`, macOS will show a Files-and-Folders permission dialog. Allow it. If you point the app at `~/Documents` or `~/Downloads`, you'll get a similar prompt for that location.
-
-## Screenshots
-
-![Overview](docs/screenshots/overview.png)
-
-![Transcripts](docs/screenshots/transcripts.png)
-
-![Settings](docs/screenshots/settings.png)
 
 ## What it shows
 
