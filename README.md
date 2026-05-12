@@ -14,11 +14,9 @@ If you just want simple local transcription without the broader feature set, [Ai
 
 ## Install
 
-The app is unsigned (no Apple Developer cert yet), so macOS will flag it on first launch — see [Gatekeeper](#gatekeeper) below.
-
 ### Download a packaged `.dmg`
 
-Grab the latest `.dmg` from the [GitHub Releases page](https://github.com/aicayzer/superwhisper-analytics/releases/latest), open it, and drag `SuperWhisper Analytics.app` into `/Applications`.
+Grab the latest `.dmg` from the [GitHub Releases page](https://github.com/aicayzer/superwhisper-analytics/releases/latest), open it, and drag `SuperWhisper Analytics.app` into `/Applications`. The release `.dmg` is signed with an Apple Developer ID and notarised, so macOS opens it without the Gatekeeper warning.
 
 ### Or build from source
 
@@ -27,11 +25,7 @@ pnpm install
 pnpm build:mac
 ```
 
-The build drops a `.dmg` into `dist/`. Open it and drag `SuperWhisper Analytics.app` into `/Applications`.
-
-### Gatekeeper
-
-macOS will flag this as unverified on first launch — that's normal for an unsigned app. Either right-click `SuperWhisper Analytics.app` in Finder and select **Open**, or run:
+The build drops a `.dmg` into `dist/`. Open it and drag `SuperWhisper Analytics.app` into `/Applications`. A source build is unsigned, so macOS will flag it on first launch — either right-click the app in Finder and select **Open**, or run:
 
 ```bash
 xattr -d com.apple.quarantine "/Applications/SuperWhisper Analytics.app"

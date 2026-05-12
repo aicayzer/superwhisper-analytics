@@ -15,7 +15,18 @@ asarUnpack:
 mac:
   category: public.app-category.developer-tools
   entitlementsInherit: build/entitlements.mac.plist
-  notarize: false
+  # Hardened runtime + notarisation. electron-builder reads:
+  #   • CSC_LINK + CSC_KEY_PASSWORD for the Developer ID Application
+  #     certificate (signing)
+  #   • APPLE_ID + APPLE_APP_SPECIFIC_PASSWORD + APPLE_TEAM_ID for
+  #     notarytool (notarisation)
+  # All five live in GitHub Actions secrets; the release workflow
+  # passes them through as env vars. A local `pnpm build:mac` without
+  # those env vars will skip signing/notarisation and produce an
+  # unsigned .dmg — same as before.
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  notarize: true
 dmg:
   artifactName: ${name}-${version}.${ext}
 npmRebuild: false
