@@ -90,6 +90,7 @@ Briefly:
 
 ## Future Additions
 
+- [ ] **Group transcripts by session** — collapse the Transcripts list into sessions defined by ≥30 minutes of silence either side. Sessions are named by their time range and expand to reveal the underlying transcripts.
 - [ ] **Custom Variables** — bring more numbers under user control via Settings and a shared constants module.
 - [ ] **Tests**
   - [ ] Unit tests for shared aggregates (pure functions, fixture-driven)
@@ -98,7 +99,6 @@ Briefly:
   - [ ] Playwright smoke test (app boots, all screens render without console errors)
 - [ ] **Explore tab** — word / phrase usage exploration with full-text transcript search.
 - [ ] **Period comparison view** — compare two date ranges side-by-side.
-- [ ] **Group transcripts by session** — collapse the Transcripts list into sessions, where a session is a run of consecutive recordings separated by gaps of ≤ 15 minutes. Purely time-based, no model required. Analysis of an ~11k-recording personal history showed 90% of inter-recording gaps fall under 12 minutes with a clear drop-off past that; 15 minutes captures focused work blocks (~6 sessions per active day, ~12 recordings each in that dataset) without lumping morning and afternoon work into one. Each session row would show start time, mode breakdown, recording count and total duration, expandable to the underlying transcripts.
 - [ ] **Non-SuperWhisper data adapter** — a skill or CLI that points at arbitrary transcript data and converts it into a SuperWhisper-compatible folder structure for this app to read.
 
 ## Acknowledgements
