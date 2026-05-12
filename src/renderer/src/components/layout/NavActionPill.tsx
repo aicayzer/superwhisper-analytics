@@ -34,8 +34,10 @@ export function NavActionPill({
       aria-label={ariaLabel ?? label}
       title={title ?? label}
       className={cn(
-        'inline-flex h-7 items-center gap-1.5 rounded-[8px] border border-border bg-foreground/[0.03] px-2.5 text-[11.5px] font-medium text-foreground transition-colors',
-        'hover:bg-foreground/[0.05]',
+        // Text + icon stay muted to match the "Custom" segment in the
+        // RangePill — unselected/idle state. Hover bumps to foreground.
+        'inline-flex h-7 items-center gap-1.5 rounded-[8px] border border-border bg-foreground/[0.03] px-2.5 text-[11.5px] font-medium text-muted-foreground transition-colors',
+        'hover:bg-foreground/[0.05] hover:text-foreground',
         'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/40',
         '[-webkit-app-region:no-drag]'
       )}
