@@ -31,6 +31,23 @@ updates:
       - dependency-name: electron
         update-types:
           - version-update:semver-major
+      # Vite majors are locked to electron-vite's peer-dep range
+      # (currently ^5.0.0 || ^6.0.0 || ^7.0.0). Bump Vite manually only
+      # when electron-vite ships a compatible major.
+      - dependency-name: vite
+        update-types:
+          - version-update:semver-major
+      # TypeScript majors change strict-typing semantics enough that a
+      # green CI on an auto-merge isn't a safe signal — needs a manual
+      # tsconfig audit. Bump manually when ready.
+      - dependency-name: typescript
+        update-types:
+          - version-update:semver-major
+      # ESLint majors typically change flat-config plugin loading or
+      # core rule defaults; needs a manual rule sweep. Bump manually.
+      - dependency-name: eslint
+        update-types:
+          - version-update:semver-major
 
   - package-ecosystem: github-actions
     directory: '/'
@@ -43,3 +60,11 @@ updates:
     labels:
       - dependencies
       - github-actions
+    groups:
+      # Batch every actions update into a single PR per week so the
+      # repo doesn't get N parallel actions/checkout / setup-node /
+      # codeql-action / etc bumps each cycle.
+      all-actions:
+        applies-to: version-updates
+        patterns:
+          - '*'
