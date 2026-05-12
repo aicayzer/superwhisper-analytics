@@ -139,7 +139,7 @@ export function ModePie({
           data={data}
           dataKey="value"
           nameKey="name"
-          innerRadius={donut ? '55%' : 0}
+          innerRadius={donut ? '40%' : 0}
           outerRadius="70%"
           stroke="var(--card)"
           strokeWidth={1.5}

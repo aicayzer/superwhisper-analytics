@@ -1,5 +1,5 @@
 import type { StreakCell } from '@renderer/lib/types'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 
 interface StreakCalendarProps {
   /** One entry per day, ordered oldest → newest. */
@@ -51,28 +51,31 @@ function endOfMonth(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth() + 1, 0)
 }
 
+/** Format a yyyy-MM-dd into a long-form "Mon, 5 Mar 2026" for tooltips. */
+function formatTooltipDate(iso: string): string {
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return iso
+  return d.toLocaleDateString('en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  })
+}
+
 /**
  * Recording streak grid — full calendar months rendered as an HTML/CSS
  * grid (matching the When You Record heatmap). Each column = one ISO
  * week (Mon-start), each row = one day of week.
  *
- * Two reasons the grid always shows full calendar months instead of
- * matching the active range pill exactly:
+ * The grid always shows full calendar months regardless of the active
+ * range. Cells inside the range carry the normal muted → chart-1
+ * intensity ramp; cells outside render at a dimmer shade so the shape
+ * stays constant but the in-range stretch is the one that dominates.
  *
- *   1. Visual stability — flipping between 7d / 30d / 90d / All time
- *      should not reshape the calendar. The grid is "what this slice of
- *      your year looks like"; the range only changes which cells are
- *      shaded as "real" data.
- *   2. Read at a glance — a strip ending mid-month is hard to parse;
- *      a full Aug + Sep + Oct + Nov grid reads as the calendar it is.
- *
- * Cells INSIDE the active range carry the normal muted → chart-1
- * intensity ramp. Cells OUTSIDE render at a dimmer fixed shade so the
- * shape stays constant but the in-range stretch is the one that
- * dominates visually. Range = "All time" means every cell is in-range.
- *
- * Day labels are emitted for every row (Mon..Sun) and month labels use
- * a compact MM/YY format so a 12-month grid doesn't overflow.
+ * Hovering a cell surfaces a tooltip with the long-form date and the
+ * recording count. The month-label strip sits BELOW the grid (matching
+ * the Recordings-by-hour heatmap's x-axis convention).
  */
 export function StreakCalendar({
   data,
@@ -86,16 +89,10 @@ export function StreakCalendar({
     let m = 0
     for (const v of dataMap.values()) if (v > m) m = v
 
-    // Anchor the grid on the most recent date in the dataset (or today
-    // if it's later than any entry — keeps the calendar honest when the
-    // range pill moves but the underlying data is stale).
     const lastDate = new Date(data[data.length - 1]!.date)
     const today = new Date()
     const anchor = today.getTime() > lastDate.getTime() ? today : lastDate
     const lastMonth = endOfMonth(anchor)
-    // Pick the start month: enough months to cover the requested range
-    // but never fewer than MIN_VISIBLE_MONTHS, and never more than 12
-    // (which keeps the grid manageable at any window width).
     const requestedFrom = rangeFrom ?? new Date(data[0]!.date)
     const monthsByRange =
       (lastMonth.getFullYear() - requestedFrom.getFullYear()) * 12 +
@@ -105,9 +102,6 @@ export function StreakCalendar({
     const firstMonth = addMonths(lastMonth, -(monthCount - 1))
     const firstDay = startOfMonth(firstMonth)
 
-    // Build the grid column-by-column (Mon-start weeks). Pad the first
-    // week so the first column always has 7 cells but cells before
-    // `firstDay` are flagged `padding: true`.
     const cols: GridCell[][] = []
     let week: GridCell[] = []
     const firstDayIdx = mondayIndex(firstDay)
@@ -133,7 +127,6 @@ export function StreakCalendar({
       }
       cur.setDate(cur.getDate() + 1)
     }
-    // Flush any partial trailing week with padding cells.
     if (week.length > 0) {
       while (week.length < 7) {
         week.push({ date: '', count: 0, inRange: false, padding: true })
@@ -141,9 +134,6 @@ export function StreakCalendar({
       cols.push(week)
     }
 
-    // Month markers — one per month, positioned at the first column that
-    // contains a day of that month. Label format is MM/YY for compact
-    // rendering across many months.
     const markers: Array<{ col: number; label: string }> = []
     let lastSeen = -1
     cols.forEach((wk, col) => {
@@ -165,6 +155,11 @@ export function StreakCalendar({
     return { columns: cols, monthMarkers: markers, max: m || 1 }
   }, [data, rangeFrom, rangeTo])
 
+  // Tooltip state — { date, count } of the cell currently under the
+  // pointer, plus the pointer-relative anchor so the floating panel
+  // tracks the cursor.
+  const [tip, setTip] = useState<{ x: number; y: number; date: string; count: number } | null>(null)
+
   if (columns.length === 0) {
     return (
       <div className="flex h-full items-center justify-center text-[10px] text-muted-foreground">
@@ -174,26 +169,10 @@ export function StreakCalendar({
   }
 
   return (
-    <div className="flex h-full min-h-[110px] w-full flex-col gap-1 text-[10px] text-muted-foreground">
-      {/* Month label strip — sits above the grid, indexed by column.
-          The 22px gutter mirrors the day-label column below. */}
-      <div
-        className="grid gap-px"
-        style={{
-          gridTemplateColumns: `22px repeat(${columns.length}, minmax(0, 1fr))`,
-          height: 12
-        }}
-      >
-        <div />
-        {columns.map((_, col) => {
-          const marker = monthMarkers.find((m) => m.col === col)
-          return (
-            <div key={col} className="text-[9px] leading-none tabular-nums">
-              {marker ? marker.label : ''}
-            </div>
-          )
-        })}
-      </div>
+    <div
+      className="relative flex h-full min-h-[110px] w-full flex-col gap-1 text-[10px] text-muted-foreground"
+      onPointerLeave={() => setTip(null)}
+    >
       {/* Main grid: day-of-week label column + N week columns. */}
       <div
         className="grid min-h-0 flex-1 gap-px"
@@ -205,7 +184,7 @@ export function StreakCalendar({
         {DAY_LABELS.map((label, row) => (
           <div
             key={`label-${row}`}
-            className="pr-1 text-right text-[9px] leading-none"
+            className="pr-1 text-right text-[10px] leading-none"
             style={{ gridColumn: 1, gridRow: row + 1 }}
           >
             {label}
@@ -220,18 +199,62 @@ export function StreakCalendar({
             return (
               <div
                 key={key}
-                title={`${cell.date} — ${cell.count}`}
                 className="rounded-[2px]"
                 style={{
                   gridColumn: col + 2,
                   gridRow: row + 1,
                   backgroundColor: backgroundFor(cell, max)
                 }}
+                onPointerMove={(e) => {
+                  const target = e.currentTarget.parentElement?.parentElement
+                  const rect = target?.getBoundingClientRect()
+                  if (!rect) return
+                  setTip({
+                    x: e.clientX - rect.left,
+                    y: e.clientY - rect.top,
+                    date: cell.date,
+                    count: cell.count
+                  })
+                }}
+                onPointerLeave={() => setTip(null)}
               />
             )
           })
         )}
       </div>
+      {/* Month label strip — sits BELOW the grid (x-axis convention),
+          indexed by column. The 22px gutter mirrors the day-label column. */}
+      <div
+        className="grid gap-px pt-0.5"
+        style={{
+          gridTemplateColumns: `22px repeat(${columns.length}, minmax(0, 1fr))`,
+          height: 12
+        }}
+      >
+        <div />
+        {columns.map((_, col) => {
+          const marker = monthMarkers.find((m) => m.col === col)
+          return (
+            <div key={col} className="text-[10px] leading-none tabular-nums">
+              {marker ? marker.label : ''}
+            </div>
+          )
+        })}
+      </div>
+      {tip && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full rounded-md border border-border bg-card px-2.5 py-1.5 text-[11px] text-foreground shadow-[var(--shadow-float)]"
+          style={{ left: tip.x, top: tip.y - 6 }}
+        >
+          <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            {formatTooltipDate(tip.date)}
+          </div>
+          <div className="mt-0.5 tabular-nums">
+            {tip.count} recording{tip.count === 1 ? '' : 's'}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -254,7 +277,6 @@ function backgroundFor(cell: GridCell, max: number): string {
     return `color-mix(in oklab, var(--chart-1) ${intensity}%, var(--muted))`
   }
   if (cell.count === 0) return 'color-mix(in oklab, var(--muted) 35%, transparent)'
-  // Faded chart-1 — dimmer than any in-range shaded cell.
   const dim = Math.max(8, Math.round((cell.count / max) * 30))
   return `color-mix(in oklab, var(--chart-1) ${dim}%, color-mix(in oklab, var(--muted) 35%, transparent))`
 }

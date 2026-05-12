@@ -94,6 +94,12 @@ export function RootLayout(): React.JSX.Element {
   const leftPad = sidebarOpen
     ? sidebarWidth + SIDEBAR_GAP /* sidebar's own left-2 */ + SIDEBAR_GAP + CONTENT_GUTTER
     : Math.max(CONTENT_GUTTER, TRAFFIC_LIGHT_RESERVE)
+  // Symmetric content gutter when the sidebar is collapsed — pad the right
+  // edge the same amount as the left so the content area is visually
+  // centred in the window, not pushed right by the traffic-light reserve.
+  // When the sidebar is open we keep the smaller CONTENT_GUTTER on the
+  // right so the content stretches naturally toward it.
+  const rightPad = sidebarOpen ? CONTENT_GUTTER : leftPad
   // /chart/:slug renders a breadcrumb instead of a plain title; the
   // breadcrumb's <Link> segments are how the user navigates back.
   const chartMatch = location.pathname.match(/^\/chart\/([^/]+)/)
@@ -158,7 +164,7 @@ export function RootLayout(): React.JSX.Element {
         className="pointer-events-none absolute top-0 z-20 transition-[left,opacity] duration-200 ease-out"
         style={{
           left: leftPad - CONTENT_GUTTER / 2,
-          right: 0,
+          right: rightPad - CONTENT_GUTTER / 2,
           height: maskHeight,
           opacity: scrolled ? 1 : 0,
           background:
@@ -168,7 +174,7 @@ export function RootLayout(): React.JSX.Element {
       <MainHeader
         title={title}
         leftPad={leftPad}
-        rightPad={CONTENT_GUTTER}
+        rightPad={rightPad}
         // Hide the date-range pill on the single-transcript page — the
         // window only ever shows one recording, so a filter pill would
         // be meaningless. Every other route (including the maximised
@@ -183,7 +189,7 @@ export function RootLayout(): React.JSX.Element {
           // 8px gap to content above; same 8px gap to window bottom.
           paddingTop: HEADER_TOP + HEADER_H + FRAME_GAP,
           paddingLeft: leftPad,
-          paddingRight: CONTENT_GUTTER,
+          paddingRight: rightPad,
           paddingBottom: FRAME_GAP
         }}
       >

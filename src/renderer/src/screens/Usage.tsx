@@ -81,13 +81,15 @@ export function Usage(): React.JSX.Element {
         </ChartCard>
       </div>
 
-      {/* Bottom row — Daily activity (2fr) + Recordings by mode (1fr). */}
-      <div className="grid min-h-0 grid-cols-[2fr_1fr] gap-3">
-        <ChartCard title="Daily activity" slug="recording-streak">
-          <StreakCalendar data={streakCells} rangeFrom={rangeFrom} rangeTo={rangeTo} />
-        </ChartCard>
+      {/* Bottom row — Recordings by mode (1fr) on the left, Daily activity
+          (2fr) on the right. Donut takes the smaller slot so the calendar
+          gets the horizontal real estate that suits it. */}
+      <div className="grid min-h-0 grid-cols-[1fr_2fr] gap-3">
         <ChartCard title="Recordings by mode" slug="mode-pie" className="min-w-[240px]">
           <ModePie data={modePieData} />
+        </ChartCard>
+        <ChartCard title="Daily activity" slug="recording-streak">
+          <StreakCalendar data={streakCells} rangeFrom={rangeFrom} rangeTo={rangeTo} />
         </ChartCard>
       </div>
     </div>
