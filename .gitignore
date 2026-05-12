@@ -38,3 +38,4 @@ _local/
 .playwright-cli/
 *.png
 !resources/icon.png
+.claude/scheduled_tasks.lock
