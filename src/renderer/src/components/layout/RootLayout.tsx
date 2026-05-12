@@ -165,7 +165,16 @@ export function RootLayout(): React.JSX.Element {
             'linear-gradient(to bottom, var(--background) 0%, var(--background) 55%, color-mix(in srgb, var(--background) 60%, transparent) 80%, transparent 100%)'
         }}
       />
-      <MainHeader title={title} leftPad={leftPad} rightPad={CONTENT_GUTTER} />
+      <MainHeader
+        title={title}
+        leftPad={leftPad}
+        rightPad={CONTENT_GUTTER}
+        // Hide the date-range pill on the single-transcript page — the
+        // window only ever shows one recording, so a filter pill would
+        // be meaningless. Every other route (including the maximised
+        // chart view) keeps the pill.
+        showRange={!transcriptRec}
+      />
       <main
         ref={mainRef}
         className="absolute inset-0 overflow-y-auto bg-background transition-[padding] duration-200 ease-out"

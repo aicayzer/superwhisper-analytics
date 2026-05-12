@@ -5,6 +5,8 @@ import { cn } from '@renderer/lib/cn'
 import { formatDurationSec, formatTimestamp, truncate } from '@renderer/lib/format'
 import type { Recording } from '@renderer/lib/types'
 import { useDataStore } from '@renderer/state/dataStore'
+import { useRangeStore, windowFor } from '@renderer/state/rangeStore'
+import { filterByRange } from '@shared/range'
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Columns3 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
@@ -105,6 +107,7 @@ function sortRecordings(records: Recording[], key: SortKey, dir: Direction): Rec
 
 export function TranscriptsList(): React.JSX.Element {
   const recordings = useDataStore((s) => s.recordings)
+  const range = useRangeStore((s) => s.range)
   const [sortKey, setSortKey] = useState<SortKey>('datetime')
   const [dir, setDir] = useState<Direction>('desc')
   const [page, setPage] = useState(1)
@@ -123,9 +126,20 @@ export function TranscriptsList(): React.JSX.Element {
 
   const visibleCols = useMemo(() => COLS.filter((c) => visibility[c.key]), [visibility])
 
+  // The navbar's range pill filters the table — same windowing semantics
+  // as the rest of the app, so flipping between 7d/30d/All time stays
+  // consistent. The paginator clamps `page` to the new page count below
+  // via `safePage`, so a narrower window after pagination doesn't strand
+  // the user on an empty page.
+  const filteredRecordings = useMemo(() => {
+    const window = windowFor(range)
+    if (!window.from && !window.to) return recordings
+    return filterByRange(recordings, window)
+  }, [recordings, range])
+
   const sortedRows = useMemo(
-    () => sortRecordings(recordings, sortKey, dir),
-    [recordings, sortKey, dir]
+    () => sortRecordings(filteredRecordings, sortKey, dir),
+    [filteredRecordings, sortKey, dir]
   )
 
   const pageCount = Math.max(1, Math.ceil(sortedRows.length / PAGE_SIZE))

@@ -19,6 +19,10 @@ interface MainHeaderProps {
   /** Distance from window right to header content, in px — matches the
    *  content area's paddingRight. */
   rightPad: number
+  /** Show the date-range pill on the right side of the header. False on
+   *  routes where the pill would be meaningless (e.g. an individual
+   *  transcript). Default true. */
+  showRange?: boolean
 }
 
 /**
@@ -33,7 +37,12 @@ interface MainHeaderProps {
  * inside the sidebar itself (visible when it's open or peeked), so we
  * don't duplicate them here.
  */
-export function MainHeader({ title, leftPad, rightPad }: MainHeaderProps): React.JSX.Element {
+export function MainHeader({
+  title,
+  leftPad,
+  rightPad,
+  showRange = true
+}: MainHeaderProps): React.JSX.Element {
   const range = useRangeStore((s) => s.range)
   const setRange = useRangeStore((s) => s.setRange)
   const sidebarOpen = useLayoutStore((s) => s.sidebarOpen)
@@ -71,9 +80,11 @@ export function MainHeader({ title, leftPad, rightPad }: MainHeaderProps): React
       <div className="min-w-0 flex-1 [-webkit-app-region:no-drag]">
         <TitleNode title={title} />
       </div>
-      <div className="flex shrink-0 items-center gap-1 [-webkit-app-region:no-drag]">
-        <RangePill value={range} onChange={setRange} />
-      </div>
+      {showRange && (
+        <div className="flex shrink-0 items-center gap-1 [-webkit-app-region:no-drag]">
+          <RangePill value={range} onChange={setRange} />
+        </div>
+      )}
     </div>
   )
 }
