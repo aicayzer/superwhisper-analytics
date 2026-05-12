@@ -1,0 +1,12 @@
+# Disable blank issue creation so every issue starts from a structured
+# template — saves triage time for a one-person maintainer.
+
+blank_issues_enabled: false
+
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/aicayzer/superwhisper-analytics/security/advisories/new
+    about: Please report security issues privately via GitHub Security Advisories or email hello@cyzr.me — not as a public issue.
+  - name: Questions / general discussion
+    url: https://github.com/aicayzer/superwhisper-analytics/discussions
+    about: For open-ended questions, ideas, or anything that isn't clearly a bug or feature request.
