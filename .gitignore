@@ -36,6 +36,11 @@ _local/
 
 # playwright artefacts
 .playwright-cli/
+
+# Block stray PNGs (debug captures, screenshots dumped to repo root)
+# but whitelist the intentional product art.
 *.png
 !resources/icon.png
+!docs/screenshots/*.png
+
 .claude/scheduled_tasks.lock
