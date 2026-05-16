@@ -493,7 +493,7 @@ function computeModeByDay(
 ): {
   byDay: ModeByDay[]
   byWeek: ModeByDay[]
-  weekFlat: Array<Record<string, unknown>>
+  weekFlat: Array<Record<string, string | number>>
   keys: string[]
 } {
   const byDayMap = new Map<string, ModeByDay>()
@@ -532,8 +532,12 @@ function computeModeByDay(
   }
   const byWeek = Array.from(byWeekMap.values()).sort((a, b) => a.date.localeCompare(b.date))
   const keys = [...topModes, 'Other']
-  const weekFlat: Array<Record<string, unknown>> = byWeek.map((w) => {
-    const row: Record<string, unknown> = { date: w.date }
+  // Each row carries the ISO-week date string (under "date") plus one
+  // numeric count per mode key. `string | number` mirrors that shape
+  // exactly so Recharts consumers can index into the row without a
+  // cast.
+  const weekFlat: Array<Record<string, string | number>> = byWeek.map((w) => {
+    const row: Record<string, string | number> = { date: w.date }
     for (const k of keys) row[k] = w.modes[k] ?? 0
     return row
   })

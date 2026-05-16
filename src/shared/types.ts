@@ -159,7 +159,7 @@ export interface Aggregates {
   streakCells: StreakCell[]
   modeByDay: ModeByDay[]
   modeByWeek: ModeByDay[]
-  modeByWeekFlat: Array<Record<string, unknown>>
+  modeByWeekFlat: Array<Record<string, string | number>>
   stackModeKeys: string[]
   wpmDots: Array<{ period: string; value: number }>
 }
