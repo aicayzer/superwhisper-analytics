@@ -37,12 +37,6 @@ export interface Recording {
   fillerCount: number
   fillerBreakdown: Array<{ phrase: string; count: number }>
   excerpt: string
-  /**
-   * Optional pre-computed peaks. Real recordings don't ship these — the
-   * renderer decodes them lazily from the WAV file via Web Audio API.
-   * Mock data populates the field for back-compat with legacy tests.
-   */
-  waveform?: number[]
 }
 
 export interface OverviewStats {
@@ -165,7 +159,7 @@ export interface Aggregates {
   streakCells: StreakCell[]
   modeByDay: ModeByDay[]
   modeByWeek: ModeByDay[]
-  modeByWeekFlat: Array<Record<string, unknown>>
+  modeByWeekFlat: Array<Record<string, string | number>>
   stackModeKeys: string[]
   wpmDots: Array<{ period: string; value: number }>
 }

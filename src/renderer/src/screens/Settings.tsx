@@ -307,7 +307,7 @@ function IndexingCard(): React.JSX.Element {
         />
         <ToggleRow
           label="Index transcripts only"
-          description="Skip audio playback and waveform — transcripts only."
+          description="Hide the audio player on transcript pages — transcripts only."
           checked={transcriptsOnly}
           onChange={(next) => void setTranscriptsOnly(next)}
         />

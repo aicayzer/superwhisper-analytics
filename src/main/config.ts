@@ -16,9 +16,11 @@ import type { Config } from '../preload/api'
  *     DEFAULT_CONFIG injects the canonical defaults on read.
  */
 
+// Single canonical location for SuperWhisper recordings. Non-standard
+// installs use the folder picker in the welcome modal / Settings; we
+// don't try to be clever about other locations.
 const CANDIDATE_PATHS = [
-  join(homedir(), 'Library/Application Support/com.superduper.superwhisper/recordings'),
-  join(homedir(), 'Services/superwhisper/recordings')
+  join(homedir(), 'Library/Application Support/com.superduper.superwhisper/recordings')
 ]
 
 function defaultConfig(): Config {
