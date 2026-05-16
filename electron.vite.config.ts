@@ -12,7 +12,15 @@ const sharedAlias = { '@shared': resolve('src/shared') }
 
 export default defineConfig({
   main: {
-    resolve: { alias: sharedAlias }
+    resolve: { alias: sharedAlias },
+    build: {
+      // electron-vite's default `externalizeDepsPlugin` marks every
+      // entry in package.json `dependencies` as a runtime CJS require.
+      // The Myme SDK is ESM-only — `require('@mymehq/sdk')` blows up
+      // with `ERR_PACKAGE_PATH_NOT_EXPORTED`. Exclude the two packages
+      // here so they're bundled into the main process output instead.
+      externalizeDeps: { exclude: ['@mymehq/sdk', '@mymehq/shared'] }
+    }
   },
   preload: {
     resolve: { alias: sharedAlias }

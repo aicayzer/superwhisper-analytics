@@ -25,6 +25,7 @@ interface MymeState {
   hydrate: () => Promise<void>
   setEndpoint: (url: string) => Promise<void>
   connect: () => Promise<void>
+  submitApiKey: (key: string) => Promise<void>
   disconnect: () => Promise<void>
   syncNow: () => Promise<void>
 }
@@ -50,6 +51,11 @@ export const useMymeStore = create<MymeState>((set, get) => ({
 
   connect: async () => {
     const next = await window.api.myme.connect()
+    set({ status: next })
+  },
+
+  submitApiKey: async (key) => {
+    const next = await window.api.myme.submitApiKey(key)
     set({ status: next })
   },
 

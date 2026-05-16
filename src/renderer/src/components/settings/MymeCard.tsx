@@ -77,15 +77,9 @@ function PendingBody(): React.JSX.Element {
 function StatusBody({ status }: { status: MymeStatus }): React.JSX.Element {
   switch (status.kind) {
     case 'disconnected':
-      return <DisconnectedBody endpoint={status.endpoint} />
+      return <DisconnectedBody endpoint={status.endpoint} lastError={status.lastError} />
     case 'connecting':
-      return (
-        <ConnectingBody
-          userCode={status.userCode}
-          verificationUri={status.verificationUri}
-          verificationUriComplete={status.verificationUriComplete}
-        />
-      )
+      return <ConnectingBody />
     case 'connected':
       return (
         <ConnectedBody
@@ -102,7 +96,13 @@ function StatusBody({ status }: { status: MymeStatus }): React.JSX.Element {
 const CHROME_BUTTON =
   'inline-flex h-7 items-center gap-1.5 rounded-md border border-border bg-floating px-3 text-[12px] text-foreground transition-colors hover:bg-foreground/5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-floating'
 
-function DisconnectedBody({ endpoint }: { endpoint: string }): React.JSX.Element {
+function DisconnectedBody({
+  endpoint,
+  lastError
+}: {
+  endpoint: string
+  lastError: string | null
+}): React.JSX.Element {
   const setEndpoint = useMymeStore((s) => s.setEndpoint)
   const connect = useMymeStore((s) => s.connect)
   const [draft, setDraft] = useState(endpoint)
@@ -156,6 +156,11 @@ function DisconnectedBody({ endpoint }: { endpoint: string }): React.JSX.Element
           </span>
         )}
       </label>
+      {lastError && (
+        <p className="rounded-md border border-accent-orange/40 bg-accent-orange/10 px-3 py-2 text-[12px] text-accent-orange">
+          {lastError}
+        </p>
+      )}
       <div className="flex justify-end">
         <button
           type="button"
@@ -170,18 +175,23 @@ function DisconnectedBody({ endpoint }: { endpoint: string }): React.JSX.Element
   )
 }
 
-function ConnectingBody({
-  userCode,
-  verificationUri,
-  verificationUriComplete
-}: {
-  userCode: string
-  verificationUri: string
-  verificationUriComplete: string
-}): React.JSX.Element {
+function ConnectingBody(): React.JSX.Element {
+  const submitApiKey = useMymeStore((s) => s.submitApiKey)
   const disconnect = useMymeStore((s) => s.disconnect)
-  function openLink(): void {
-    void window.api.openExternal(verificationUriComplete)
+  const [key, setKey] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const trimmed = key.trim()
+  const canSubmit = trimmed.length > 0 && !busy
+
+  async function submit(): Promise<void> {
+    if (!canSubmit) return
+    setBusy(true)
+    try {
+      await submitApiKey(trimmed)
+    } finally {
+      setBusy(false)
+    }
   }
   function cancel(): void {
     void disconnect()
@@ -189,22 +199,34 @@ function ConnectingBody({
   return (
     <div className="space-y-3">
       <p className="text-[12.5px] text-foreground">
-        Approve this app in Myme to finish connecting. Open the link below and confirm the code
-        matches.
+        Paste your Myme API key to connect. Generate one in your Myme client — it stays on this Mac,
+        encrypted via Keychain.
       </p>
-      <div className="rounded-md border border-border bg-foreground/[0.03] px-3 py-2">
-        <div className="text-[11px] uppercase tracking-wide text-muted-foreground">User code</div>
-        <div className="mt-0.5 font-mono text-[15px] tracking-wider text-foreground">
-          {userCode}
-        </div>
-        <div className="mt-2 text-[11px] text-muted-foreground">{verificationUri}</div>
-      </div>
+      <label className="block text-[12px] text-muted-foreground">
+        API key
+        <input
+          type="password"
+          value={key}
+          onChange={(e) => setKey(e.target.value)}
+          disabled={busy}
+          spellCheck={false}
+          autoCapitalize="off"
+          autoCorrect="off"
+          placeholder="myme_k1_…"
+          className="mt-1 block w-full rounded-md border border-border bg-card px-2.5 py-1.5 font-mono text-[12.5px] text-foreground placeholder:text-muted-foreground focus:border-foreground/30 focus:outline-none disabled:opacity-50"
+        />
+      </label>
       <div className="flex justify-end gap-1.5">
-        <button type="button" onClick={cancel} className={CHROME_BUTTON}>
+        <button type="button" onClick={cancel} disabled={busy} className={CHROME_BUTTON}>
           Cancel
         </button>
-        <button type="button" onClick={openLink} className={CHROME_BUTTON}>
-          Open verification page
+        <button
+          type="button"
+          onClick={() => void submit()}
+          disabled={!canSubmit}
+          className={CHROME_BUTTON}
+        >
+          {busy ? 'Verifying…' : 'Connect'}
         </button>
       </div>
     </div>

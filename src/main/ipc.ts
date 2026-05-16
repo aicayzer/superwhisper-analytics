@@ -165,8 +165,12 @@ export function registerIpcHandlers(): void {
     if (!/^https?:\/\//i.test(url)) return myme.getStatus()
     return myme.setEndpoint(url)
   })
-  ipcMain.handle('myme:connect', (): Promise<MymeStatus> => myme.connect())
-  ipcMain.handle('myme:disconnect', (): Promise<MymeStatus> => myme.disconnect())
+  ipcMain.handle('myme:connect', (): MymeStatus => myme.connect())
+  ipcMain.handle('myme:submitApiKey', (_, key: unknown): Promise<MymeStatus> => {
+    if (!validString(key)) return Promise.resolve(myme.getStatus())
+    return myme.submitApiKey(key)
+  })
+  ipcMain.handle('myme:disconnect', (): MymeStatus => myme.disconnect())
   ipcMain.handle('myme:syncNow', (): Promise<MymeStatus> => myme.syncNow())
 
   // Apply the persisted watch-folder preference on startup.
