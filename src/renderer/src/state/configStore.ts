@@ -28,7 +28,7 @@ interface ConfigState {
   fillerWords: string[]
   /** fs.watch on the recordings folder — see main/watcher.ts. */
   watchFolder: boolean
-  /** Hide audio + waveform from TranscriptDetail when true. */
+  /** Hide the audio player on TranscriptDetail when true. */
   transcriptsOnly: boolean
   /** When true, the app shows a synthetic demo dataset instead of the
    *  real recordings folder. */

@@ -22,9 +22,9 @@ import type { HydratePayload } from '@shared/types'
  * `watchFolder` toggles the main-process fs.watch on the recordings
  * folder — when on, new recordings auto-trigger a reindex.
  *
- * `transcriptsOnly` hides the audio player + waveform from
- * TranscriptDetail when on. The on-disk WAVs are untouched; this is a
- * renderer-side preference only.
+ * `transcriptsOnly` hides the audio player on TranscriptDetail when
+ * on. The on-disk WAVs are untouched; this is a renderer-side
+ * preference only.
  */
 export interface Config {
   superwhisperPath: string | null
