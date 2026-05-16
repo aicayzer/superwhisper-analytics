@@ -72,17 +72,22 @@ export function initAutoUpdater(): void {
   autoUpdater.on('update-downloaded', (info: { version: string }) => {
     broadcast({ kind: 'downloaded', version: info.version })
     // Native macOS dialog so the prompt is visible regardless of which
-    // app window has focus.
-    const choice = dialog.showMessageBoxSync({
-      type: 'info',
-      buttons: ['Restart', 'Later'],
-      defaultId: 0,
-      cancelId: 1,
-      title: 'Update ready',
-      message: `Version ${info.version} has been downloaded.`,
-      detail: 'Restart SuperWhisper Analytics to apply the update.'
-    })
-    if (choice === 0) autoUpdater.quitAndInstall()
+    // app window has focus. Async form so the main process keeps
+    // pumping events (watcher, IPC) while the user decides — the sync
+    // variant would block until they hit a button.
+    void dialog
+      .showMessageBox({
+        type: 'info',
+        buttons: ['Restart', 'Later'],
+        defaultId: 0,
+        cancelId: 1,
+        title: 'Update ready',
+        message: `Version ${info.version} has been downloaded.`,
+        detail: 'Restart SuperWhisper Analytics to apply the update.'
+      })
+      .then((result) => {
+        if (result.response === 0) autoUpdater.quitAndInstall()
+      })
   })
 
   autoUpdater.on('error', (err: Error) => {
