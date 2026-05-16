@@ -11,6 +11,12 @@ import { reindex } from './cache'
  * `<unix-timestamp>/` directory under the root, so a single watcher at
  * the root catches every fresh recording.
  *
+ * Known limitation: only direct children trigger an event. If
+ * SuperWhisper ever mutates an *existing* recording's `meta.json` in
+ * place (transcript correction, model upgrade, llmResult population),
+ * that's a grandchild change and this watcher won't fire. The
+ * user-facing Reindex button in Settings is the workaround.
+ *
  * We debounce — a single new recording is followed by a flurry of file
  * writes inside its folder, and macOS sometimes fires multiple events
  * for the same change. 1.5s of quiet means "settled", at which point we
