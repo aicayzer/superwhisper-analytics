@@ -14,6 +14,9 @@ importers:
       '@electron-toolkit/utils':
         specifier: ^4.0.0
         version: 4.0.0(electron@42.0.1)
+      '@mymehq/sdk':
+        specifier: ^5.6.0
+        version: 5.6.0
       '@radix-ui/react-slot':
         specifier: ^1.2.0
         version: 1.2.4(@types/react@19.2.14)(react@19.2.6)
@@ -771,6 +774,12 @@ packages:
   '@malept/flatpak-bundler@0.4.0':
     resolution: {integrity: sha512-9QOtNffcOF/c1seMCDnjckb3R9WHcG34tky+FHpNKKCW0wc/scYLwMtO+ptyGUfMW0/b/n4qRiALlaFHc9Oj7Q==}
     engines: {node: '>= 10.0.0'}
+
+  '@mymehq/sdk@5.6.0':
+    resolution: {integrity: sha512-QPjcmRKtdBp6xY3s7CvPPzjFYzz923YyL1yWz3fp/AqeAW7fiCgHe9AcLYhISSGLDhzGVUfUVff7B2SRlYEp1Q==}
+
+  '@mymehq/shared@5.6.0':
+    resolution: {integrity: sha512-rlvyNn/cmVijh6/jmhGfQeRQlMD9Dci8fJXmopWtOsPOLEiWKzuWVRyN3+rF6iN57dOjljmFgfUlTZxYg2kYTQ==}
 
   '@pkgr/core@0.2.9':
     resolution: {integrity: sha512-QNqXyfVS2wm9hweSYD2O7F0G06uurj9kZ96TRQE5Y9hU7+tgdZwIkbAKc5Ocy1HxEY2kuDQa6cQ1WRs/O5LFKA==}
@@ -4025,6 +4034,10 @@ packages:
   utf8-byte-length@1.0.5:
     resolution: {integrity: sha512-Xn0w3MtiQ6zoz2vFyUVruaCL53O/DwUvkEeOvj+uulMm0BkUGYWmBYVyElqZaSLhY6ZD0ulfU3aBra2aVT4xfA==}
 
+  uuidv7@1.2.1:
+    resolution: {integrity: sha512-4kPkK3/XTQW9Hbm4CaqfICn+kY9LJtDVEOfgsRRra/+n2Ofg4NqzRFceAkxvQ/Ud/6BpHOPzj8cirqM7TzTN5Q==}
+    hasBin: true
+
   verror@1.10.1:
     resolution: {integrity: sha512-veufcmxri4e3XSrT0xwfUR7kguIkaxBeosDg00yDWhk49wdwkSUrvvsm7nc75e1PUyvIeZj6nS8VQRYz2/S4Xg==}
     engines: {node: '>=0.6.0'}
@@ -4807,6 +4820,15 @@ snapshots:
       tmp-promise: 3.0.3
     transitivePeerDependencies:
       - supports-color
+
+  '@mymehq/sdk@5.6.0':
+    dependencies:
+      '@mymehq/shared': 5.6.0
+
+  '@mymehq/shared@5.6.0':
+    dependencies:
+      uuidv7: 1.2.1
+      zod: 4.3.6
 
   '@pkgr/core@0.2.9': {}
 
@@ -8459,6 +8481,8 @@ snapshots:
       react: 19.2.6
 
   utf8-byte-length@1.0.5: {}
+
+  uuidv7@1.2.1: {}
 
   verror@1.10.1:
     dependencies:
