@@ -42,6 +42,12 @@ export interface Config {
   autoHideSidebar: boolean
   /** When true, DevTools open on launch. Equivalent to Cmd+Option+I. */
   devTools: boolean
+  /** Optional Myme integration settings. The endpoint URL is plain
+   *  config; OAuth tokens live in encrypted storage via Electron's
+   *  safeStorage, sync state in its own JSON file. */
+  myme: {
+    endpoint: string
+  }
 }
 
 /**
@@ -85,6 +91,48 @@ export type UpdaterStatus =
   | { kind: 'downloading'; percent: number }
   | { kind: 'downloaded'; version: string }
   | { kind: 'error'; message: string }
+
+/**
+ * Status of the optional Myme integration. Mirrors the implementation in
+ * `src/main/myme/index.ts`; lives here so the IPC contract is one place.
+ *
+ * The renderer composes the "disabled" UX (when demo mode is on or no
+ * recordings path is set) from `configStore` — main always reports the
+ * sync engine's actual state. Card states the user sees:
+ *
+ *   - `disconnected`            → endpoint + "Connect to Myme" button
+ *   - `connecting`              → device-flow code + verification URI
+ *   - `connected` (no error)    → "last synced …" + "Sync now"
+ *   - `connected` (with error)  → as above + inline error row
+ *   - `syncing`                 → progress phase + processed/total
+ */
+export type MymeSyncPhase = 'preparing' | 'recordings' | 'sessions'
+
+export type MymeStatus =
+  | { kind: 'disconnected'; endpoint: string }
+  | {
+      kind: 'connecting'
+      endpoint: string
+      userCode: string
+      verificationUri: string
+      verificationUriComplete: string
+      expiresAt: string
+    }
+  | {
+      kind: 'connected'
+      endpoint: string
+      /** ISO; null until the first successful sync. */
+      lastSyncedAt: string | null
+      /** Set after a failed sync; cleared on the next success. */
+      lastError: string | null
+    }
+  | {
+      kind: 'syncing'
+      endpoint: string
+      phase: MymeSyncPhase
+      processed: number
+      total: number
+    }
 
 export const api = {
   config: {
@@ -153,7 +201,30 @@ export const api = {
       return () => ipcRenderer.removeListener('updater:status', listener)
     }
   },
-  openExternal: (url: string): Promise<void> => ipcRenderer.invoke('shell:openExternal', url)
+  openExternal: (url: string): Promise<void> => ipcRenderer.invoke('shell:openExternal', url),
+  myme: {
+    /** Current sync-engine status. The renderer composes the
+     *  "disabled" state from configStore (demoMode / null path); main
+     *  always reports `disconnected` / `connected` / etc. */
+    status: (): Promise<MymeStatus> => ipcRenderer.invoke('myme:status'),
+    /** Persist a new Myme endpoint URL. Returns the updated status. */
+    setEndpoint: (url: string): Promise<MymeStatus> => ipcRenderer.invoke('myme:setEndpoint', url),
+    /** Kick off the OAuth device flow. Resolves with the device-flow
+     *  handle; the renderer subscribes to `onStatus` to find out when
+     *  the user has approved (status transitions to `connected`). */
+    connect: (): Promise<MymeStatus> => ipcRenderer.invoke('myme:connect'),
+    /** Revoke the persisted token + clear sync state. */
+    disconnect: (): Promise<MymeStatus> => ipcRenderer.invoke('myme:disconnect'),
+    /** Manual sync trigger. Returns when the sync completes (success
+     *  or otherwise); intermediate progress lands via `onStatus`. */
+    syncNow: (): Promise<MymeStatus> => ipcRenderer.invoke('myme:syncNow'),
+    /** Subscribe to status changes from the sync engine. */
+    onStatus: (handler: (status: MymeStatus) => void): Unsubscribe => {
+      const listener = (_e: unknown, payload: MymeStatus): void => handler(payload)
+      ipcRenderer.on('myme:status', listener)
+      return () => ipcRenderer.removeListener('myme:status', listener)
+    }
+  }
 }
 
 export type Api = typeof api

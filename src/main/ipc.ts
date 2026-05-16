@@ -12,8 +12,9 @@ import {
 import { hydrate, reindex, setFillerWords } from './cache'
 import { checkForUpdatesManually, getUpdaterStatus, type UpdaterStatus } from './updater'
 import { disableWatch, enableWatch } from './watcher'
+import * as myme from './myme'
 import { validBool, validString, validStringArray } from './validators'
-import type { ConfigStatus } from '../preload/api'
+import type { ConfigStatus, MymeStatus } from '../preload/api'
 
 /**
  * Central IPC registration. Called once on app ready.
@@ -152,6 +153,21 @@ export function registerIpcHandlers(): void {
     await checkForUpdatesManually()
     return getUpdaterStatus()
   })
+
+  // Myme integration — optional, off by default. The renderer composes
+  // the "disabled" UX (demo mode / no path) from configStore; main
+  // always reports the sync engine's actual state. Push notifications
+  // go out on `myme:status` from `src/main/myme/index.ts` whenever the
+  // status transitions.
+  ipcMain.handle('myme:status', (): MymeStatus => myme.getStatus())
+  ipcMain.handle('myme:setEndpoint', (_, url: unknown): MymeStatus => {
+    if (!validString(url)) return myme.getStatus()
+    if (!/^https?:\/\//i.test(url)) return myme.getStatus()
+    return myme.setEndpoint(url)
+  })
+  ipcMain.handle('myme:connect', (): Promise<MymeStatus> => myme.connect())
+  ipcMain.handle('myme:disconnect', (): Promise<MymeStatus> => myme.disconnect())
+  ipcMain.handle('myme:syncNow', (): Promise<MymeStatus> => myme.syncNow())
 
   // Apply the persisted watch-folder preference on startup.
   syncWatcher()

@@ -21,6 +21,8 @@ const CANDIDATE_PATHS = [
   join(homedir(), 'Services/superwhisper/recordings')
 ]
 
+const DEFAULT_MYME_ENDPOINT = 'https://staging.myme.so'
+
 function defaultConfig(): Config {
   return {
     superwhisperPath: null,
@@ -29,7 +31,8 @@ function defaultConfig(): Config {
     transcriptsOnly: false,
     demoMode: false,
     autoHideSidebar: true,
-    devTools: false
+    devTools: false,
+    myme: { endpoint: DEFAULT_MYME_ENDPOINT }
   }
 }
 
@@ -64,6 +67,13 @@ export function getConfig(): Config {
       const missing = DEFAULT_FILLER_PHRASES.filter((p) => !known.has(p.toLowerCase()))
       return missing.length === 0 ? persisted : normalisePhrases([...persisted, ...missing])
     })()
+    // Additive migration: pre-Myme configs have no `myme` block; default
+    // the endpoint to staging on first read so the Settings card has a
+    // sensible value to display without forcing the user to type it in.
+    const mymeEndpoint =
+      typeof parsed.myme?.endpoint === 'string' && parsed.myme.endpoint.length > 0
+        ? parsed.myme.endpoint
+        : DEFAULT_MYME_ENDPOINT
     return {
       superwhisperPath: parsed.superwhisperPath ?? null,
       fillerWords,
@@ -73,7 +83,8 @@ export function getConfig(): Config {
       // Default ON when absent — first-launch behaviour is auto-hide on
       // narrow windows, which matches the plan's UX intent.
       autoHideSidebar: parsed.autoHideSidebar !== false,
-      devTools: parsed.devTools === true
+      devTools: parsed.devTools === true,
+      myme: { endpoint: mymeEndpoint }
     }
   } catch (err) {
     console.warn('[config] failed to read config.json, falling back to defaults:', err)

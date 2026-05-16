@@ -1,4 +1,5 @@
 import { AppearancePicker } from '@renderer/components/settings/AppearancePicker'
+import { MymeCard } from '@renderer/components/settings/MymeCard'
 import { SettingsCard } from '@renderer/components/settings/SettingsCard'
 import { SegmentedTabs } from '@renderer/components/ui/SegmentedTabs'
 import { Switch } from '@renderer/components/ui/Switch'
@@ -25,11 +26,12 @@ import {
 import { useEffect, useMemo, useState } from 'react'
 import type { UpdaterStatus } from '../../../preload/api'
 
-type SettingsTab = 'general' | 'data' | 'about'
+type SettingsTab = 'general' | 'data' | 'integrations' | 'about'
 
 const SETTINGS_TABS: ReadonlyArray<{ id: SettingsTab; label: string }> = [
   { id: 'general', label: 'General' },
   { id: 'data', label: 'Data' },
+  { id: 'integrations', label: 'Integrations' },
   { id: 'about', label: 'About' }
 ]
 
@@ -75,6 +77,7 @@ export function Settings(): React.JSX.Element {
           <DictionaryCard />
         </>
       )}
+      {tab === 'integrations' && <MymeCard />}
       {tab === 'about' && (
         <>
           <AboutCard />
