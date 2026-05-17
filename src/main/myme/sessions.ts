@@ -37,7 +37,7 @@ export interface SessionGroup {
    *  surfaces fresh source_ids when the user changes it. */
   gapThresholdMinutes: number
   /** Recording source_ids in chronological order — used for the
-   *  `core.parent-of` edges from session → recording. */
+   *  `parent-of` edges from session → recording. */
   recordingIds: string[]
 }
 

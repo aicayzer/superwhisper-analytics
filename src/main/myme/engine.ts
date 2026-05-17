@@ -306,7 +306,7 @@ export async function syncRun(opts: SyncOptions = {}): Promise<SyncOutcome> {
   }
 
   // Build the next-recordings state up-front so the session pass can
-  // resolve recording itemIds (for `core.parent-of` edges) from a
+  // resolve recording itemIds (for `parent-of` edges) from a
   // single coherent map of "everything that successfully landed,
   // including this run's upserts".
   const nextRecordings: Record<string, SyncStateEntry> = { ...state.recordings }
@@ -443,8 +443,8 @@ async function syncSessions(opts: {
       out.noop += 1
       continue
     }
-    // Resolve the recording itemIds the session's `core.parent-of`
-    // edges should point at. If a recording's still pending (its
+    // Resolve the recording itemIds the session's `parent-of` edges
+    // should point at. If a recording's still pending (its
     // upsert failed earlier in the run, or it isn't in state yet),
     // skip it from the edge list — we'd rather mint a session with a
     // partial edge set than fail the whole session push.
@@ -461,7 +461,7 @@ async function syncSessions(opts: {
         source_id: projection.source_id,
         tier: projection.tier,
         properties: projection.properties,
-        edges: { 'core.parent-of': recordingItemIds }
+        edges: { 'parent-of': recordingItemIds }
       }
     })
   }
