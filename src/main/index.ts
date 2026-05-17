@@ -5,9 +5,14 @@ import icon from '../../resources/icon.png?asset'
 import { registerIpcHandlers } from './ipc'
 import { registerReindexHook } from './myme'
 import { registerSwProtocolHandler, registerSwSchemeAsPrivileged } from './protocol'
-import { initAutoUpdater } from './updater'
 import { disableWatch } from './watcher'
 import { getConfig } from './config'
+
+// Local Myme install build: redirect the app name + userData dir so this
+// build coexists with an installed v0.2.x release without sharing config,
+// Myme tokens, or sync state. Must run before any module reads userData.
+app.setName('superwhisper-analytics-myme')
+app.setPath('userData', join(app.getPath('appData'), 'superwhisper-analytics-myme'))
 
 // Privileged scheme registration must happen BEFORE app.whenReady — the
 // renderer's session inherits these privileges at startup. Doing this at
@@ -50,7 +55,7 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
-  electronApp.setAppUserModelId('me.cyzr.superwhisper-analytics')
+  electronApp.setAppUserModelId('me.cyzr.superwhisper-analytics-myme')
 
   // In dev, the dock icon comes from Electron's bundled framework .app —
   // not from build/icon.icns (which only applies to packaged builds).
@@ -72,10 +77,8 @@ app.whenReady().then(() => {
 
   createWindow()
 
-  // Production-only: kick off a silent check for a newer release on
-  // GitHub. Dev builds skip this — electron-updater errors on a
-  // non-packaged app.
-  if (!is.dev) initAutoUpdater()
+  // Auto-updater intentionally disabled for the local Myme install build —
+  // the upstream release channel ships v0.2.x without Myme code.
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

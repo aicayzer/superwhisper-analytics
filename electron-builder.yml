@@ -1,5 +1,5 @@
-appId: me.cyzr.superwhisper-analytics
-productName: SuperWhisper Analytics
+appId: me.cyzr.superwhisper-analytics-myme
+productName: SuperWhisper Analytics (Myme)
 directories:
   buildResources: build
 files:
@@ -30,7 +30,5 @@ mac:
 dmg:
   artifactName: ${name}-${version}.${ext}
 npmRebuild: false
-publish:
-  provider: github
-  owner: aicayzer
-  repo: superwhisper-analytics
+# publish stanza intentionally removed for the local Myme install build —
+# no latest-mac.yml is produced and auto-update is disabled in main.ts.
