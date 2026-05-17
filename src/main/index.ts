@@ -3,6 +3,7 @@ import { join } from 'path'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { registerIpcHandlers } from './ipc'
+import { registerReindexHook } from './myme'
 import { registerSwProtocolHandler, registerSwSchemeAsPrivileged } from './protocol'
 import { initAutoUpdater } from './updater'
 import { disableWatch } from './watcher'
@@ -64,6 +65,10 @@ app.whenReady().then(() => {
 
   registerIpcHandlers()
   registerSwProtocolHandler()
+  // Light up the optional Myme integration's reindex hook so a sync
+  // fires whenever the recording set changes. Stays inert until the
+  // user connects via Settings → Integrations → Myme.
+  registerReindexHook()
 
   createWindow()
 

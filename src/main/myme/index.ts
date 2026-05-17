@@ -1,6 +1,7 @@
 import { BrowserWindow } from 'electron'
 import { MymeError, UnauthorizedError } from '@mymehq/sdk'
-import type { MymeStatus, MymeSyncPhase } from '../../preload/api'
+import type { MymeStatus } from '../../preload/api'
+import { onReindexed } from '../cache'
 import { getConfig, setConfig } from '../config'
 import { getClient, invalidateClient } from './client'
 import { syncRun } from './engine'
@@ -220,7 +221,22 @@ function describeAuthError(err: unknown): string {
   return 'Connection failed.'
 }
 
-/** Convenience for the engine: emit progress while syncing. */
-export function emitSyncing(phase: MymeSyncPhase, processed: number, total: number): void {
-  setStatus({ kind: 'syncing', endpoint: getConfig().myme.endpoint, phase, processed, total })
+/**
+ * Subscribe the integration to the cache's reindex cascade so a sync
+ * fires whenever the recording set changes. Fire-and-forget; the
+ * engine's `syncInFlight` guard coalesces overlapping runs, so back-
+ * to-back watcher events don't spawn parallel syncs.
+ *
+ * Demo mode / no-path / disconnected → noop (the engine bails on no
+ * client, but we'd rather skip the round trip entirely). Called once
+ * from `src/main/index.ts` at `app.whenReady`.
+ */
+export function registerReindexHook(): void {
+  onReindexed((payload) => {
+    if (payload.error) return
+    if (currentStatus?.kind !== 'connected') return
+    const config = getConfig()
+    if (config.demoMode || !config.superwhisperPath) return
+    void syncNow().catch((err) => console.warn('[myme] reindex-triggered sync failed:', err))
+  })
 }

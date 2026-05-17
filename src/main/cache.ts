@@ -48,6 +48,39 @@ function clear(): void {
   scanSkipped = 0
 }
 
+/**
+ * Subscribers invoked after every `rescan()` returns. Used by the Myme
+ * integration to kick off a fire-and-forget sync whenever the
+ * recording set changes — either via the fs.watch cascade or a manual
+ * Reindex. Plain array of callbacks rather than an EventEmitter to keep
+ * the surface small and explicit; the Myme module is the only consumer
+ * today.
+ *
+ * Listeners run with the freshly-built payload (errors and all) so they
+ * can inspect what changed; they should not throw — a thrown listener
+ * is logged and skipped, the cache state is unaffected.
+ */
+type ReindexListener = (payload: HydratePayload) => void
+const reindexListeners: ReindexListener[] = []
+
+export function onReindexed(cb: ReindexListener): () => void {
+  reindexListeners.push(cb)
+  return () => {
+    const i = reindexListeners.indexOf(cb)
+    if (i >= 0) reindexListeners.splice(i, 1)
+  }
+}
+
+function notifyReindexed(payload: HydratePayload): void {
+  for (const cb of reindexListeners) {
+    try {
+      cb(payload)
+    } catch (err) {
+      console.warn('[cache] onReindexed listener threw:', err)
+    }
+  }
+}
+
 function rescan(): HydratePayload {
   const config = getConfig()
 
@@ -77,7 +110,9 @@ function rescan(): HydratePayload {
     console.log(
       `[cache] generated ${recordings.length} demo recordings in ${Date.now() - t0}ms (${reason})`
     )
-    return buildPayload(null)
+    const demoPayload = buildPayload(null)
+    notifyReindexed(demoPayload)
+    return demoPayload
   }
 
   // `superwhisperPath` is guaranteed non-null here: the demo fallback
@@ -86,7 +121,9 @@ function rescan(): HydratePayload {
   const path = config.superwhisperPath as string
   if (!isPathValid(path)) {
     clear()
-    return buildPayload(`Path not found: ${path}`)
+    const errorPayload = buildPayload(`Path not found: ${path}`)
+    notifyReindexed(errorPayload)
+    return errorPayload
   }
 
   const t0 = Date.now()
@@ -105,7 +142,9 @@ function rescan(): HydratePayload {
       (result.skipped ? ` (${result.skipped} folders without meta.json)` : '') +
       (result.errors ? ` (${result.errors} parse errors)` : '')
   )
-  return buildPayload(null)
+  const payload = buildPayload(null)
+  notifyReindexed(payload)
+  return payload
 }
 
 /**
