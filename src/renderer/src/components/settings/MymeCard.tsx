@@ -1,6 +1,7 @@
+import { ConnectionPanel } from './ConnectionPanel'
 import { MappingPanel } from './MappingPanel'
 import { SettingsCard } from './SettingsCard'
-import { cn } from '@renderer/lib/cn'
+import { SyncControlsPanel } from './SyncControlsPanel'
 import { useConfigStore } from '@renderer/state/configStore'
 import { useMymeStore } from '@renderer/state/mymeStore'
 import { Check, Cloud, CloudOff, Copy, ExternalLink, RefreshCw } from 'lucide-react'
@@ -409,16 +410,9 @@ function ConnectedBody({
   lastError: string | null
 }): React.JSX.Element {
   const syncNow = useMymeStore((s) => s.syncNow)
-  const disconnect = useMymeStore((s) => s.disconnect)
   const setSyncLimit = useMymeStore((s) => s.setSyncLimit)
   const mapping = useMymeStore((s) => s.mapping)
   const [busy, setBusy] = useState(false)
-  // Re-render once a minute so "5m ago" drifts without a custom hook.
-  const [, setNow] = useState(() => Date.now())
-  useEffect(() => {
-    const t = window.setInterval(() => setNow(Date.now()), 60_000)
-    return () => window.clearInterval(t)
-  }, [])
 
   async function doSync(): Promise<void> {
     setBusy(true)
@@ -428,117 +422,19 @@ function ConnectedBody({
       setBusy(false)
     }
   }
-  async function doDisconnect(): Promise<void> {
-    setBusy(true)
-    try {
-      await disconnect()
-    } finally {
-      setBusy(false)
-    }
-  }
 
   return (
-    <div className="space-y-3">
-      <dl className="divide-y divide-border text-[13px]">
-        <Row k="Endpoint" v={endpoint} />
-        <Row k="Last synced" v={lastSyncedAt ? formatRelative(lastSyncedAt) : 'Never'} />
-      </dl>
-      {lastError && (
-        <p className="rounded-md border border-accent-orange/40 bg-accent-orange/10 px-3 py-2 text-[12px] text-accent-orange">
-          Last sync failed: {lastError}
-        </p>
-      )}
+    <div className="space-y-4">
+      <ConnectionPanel endpoint={endpoint} busy={busy} />
       {mapping && <MappingPanel mapping={mapping} disabled={busy} />}
-      <SyncLimitRow value={syncLimit} onCommit={setSyncLimit} disabled={busy} />
-      <div className="flex justify-end gap-1.5">
-        <button
-          type="button"
-          onClick={() => void doDisconnect()}
-          disabled={busy}
-          className={CHROME_BUTTON}
-        >
-          Disconnect
-        </button>
-        <button
-          type="button"
-          onClick={() => void doSync()}
-          disabled={busy}
-          className={CHROME_BUTTON}
-        >
-          <RefreshCw className={cn('h-3 w-3', busy && 'animate-spin')} strokeWidth={1.8} />
-          Sync now
-        </button>
-      </div>
-    </div>
-  )
-}
-
-/**
- * Sync-cap setting. Placed inside the connected card so it's clearly
- * bound to the active integration. Default is 100; 0 means no cap.
- * Capping skips session derivation + disk-delete propagation by
- * design — surfaced in the copy below so the trade-off is explicit
- * rather than hidden. Number-only input, persisted on blur (so
- * typing-in-progress doesn't churn the IPC). Hidden in any other
- * card state.
- */
-function SyncLimitRow({
-  value,
-  onCommit,
-  disabled
-}: {
-  value: number
-  onCommit: (n: number) => Promise<void>
-  disabled: boolean
-}): React.JSX.Element {
-  // Key the row by the committed value so the input resets to the new
-  // canonical value whenever it changes externally (e.g. disconnect →
-  // reconnect resets back to whatever was persisted). Avoids the
-  // setState-in-effect anti-pattern.
-  return <SyncLimitRowInner key={value} value={value} onCommit={onCommit} disabled={disabled} />
-}
-
-function SyncLimitRowInner({
-  value,
-  onCommit,
-  disabled
-}: {
-  value: number
-  onCommit: (n: number) => Promise<void>
-  disabled: boolean
-}): React.JSX.Element {
-  const [draft, setDraft] = useState(String(value))
-
-  async function commit(): Promise<void> {
-    const n = Number.parseInt(draft, 10)
-    const next = Number.isFinite(n) && n > 0 ? n : 0
-    if (next === value) return
-    await onCommit(next)
-  }
-
-  return (
-    <div className="rounded-md border border-border px-3 py-2.5">
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-[12px] font-medium text-foreground">
-            Sync most recent N recordings
-          </div>
-          <div className="mt-0.5 text-[11.5px] text-muted-foreground">
-            0 = no cap. When capped, session derivation and disk-delete propagation are skipped —
-            turn off the cap to test the full sync surface.
-          </div>
-        </div>
-        <input
-          type="number"
-          min="0"
-          inputMode="numeric"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={() => void commit()}
-          disabled={disabled}
-          className="w-20 rounded-md border border-border bg-card px-2 py-1 text-right text-[12.5px] tabular-nums text-foreground focus:border-foreground/30 focus:outline-none disabled:opacity-50"
-        />
-      </div>
+      <SyncControlsPanel
+        syncLimit={syncLimit}
+        lastSyncedAt={lastSyncedAt}
+        lastError={lastError}
+        busy={busy}
+        onSync={doSync}
+        onSyncLimit={setSyncLimit}
+      />
     </div>
   )
 }
@@ -595,28 +491,4 @@ function SyncingBody({
       </div>
     </div>
   )
-}
-
-function Row({ k, v }: { k: string; v: string }): React.JSX.Element {
-  return (
-    <div className="flex items-center justify-between py-2 first:pt-0 last:pb-0">
-      <dt className="text-muted-foreground">{k}</dt>
-      <dd className="truncate text-foreground" title={v}>
-        {v}
-      </dd>
-    </div>
-  )
-}
-
-function formatRelative(iso: string): string {
-  const then = new Date(iso).getTime()
-  if (!Number.isFinite(then)) return iso
-  const diffSec = Math.floor((Date.now() - then) / 1000)
-  if (diffSec < 60) return 'Just now'
-  const diffMin = Math.floor(diffSec / 60)
-  if (diffMin < 60) return `${diffMin}m ago`
-  const diffHr = Math.floor(diffMin / 60)
-  if (diffHr < 24) return `${diffHr}h ago`
-  const diffD = Math.floor(diffHr / 24)
-  return `${diffD}d ago`
 }
