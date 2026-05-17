@@ -56,7 +56,29 @@ const STATUS_CHANNEL = 'myme:status'
 /** OAuth client metadata used for DCR + device-flow. Stored in the
  *  credential blob alongside the tokens. */
 const CLIENT_NAME = 'SuperWhisper Analytics'
-const DEFAULT_SCOPES = ['*:read', '*:write']
+/**
+ * Scopes the test app actually needs. Must be a subset of the server's
+ * allowlist (`TYPE_REGISTRY.keys() + EDGE_TYPE_REGISTRY.keys()` + OIDC
+ * standards). Bare wildcards like `*:read` / `*:write` are NOT in the
+ * allowlist and produce `invalid_scope` at DCR time — the prior set was
+ * a placeholder, replaced here with the genuine surface:
+ *
+ *  - `superwhisper.recording:*` — the data plane
+ *  - `superwhisper.session:*`   — derived sessions
+ *  - `metadata.types:write`     — registers the custom types on first sync
+ *  - `openid profile email offline_access` — OIDC standards + refresh
+ */
+const DEFAULT_SCOPES = [
+  'superwhisper.recording:read',
+  'superwhisper.recording:write',
+  'superwhisper.session:read',
+  'superwhisper.session:write',
+  'metadata.types:write',
+  'openid',
+  'profile',
+  'email',
+  'offline_access'
+]
 
 const DEVICE_CODE_GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:device_code'
 
