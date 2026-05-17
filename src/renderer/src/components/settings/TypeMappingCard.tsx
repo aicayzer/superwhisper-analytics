@@ -590,11 +590,9 @@ function FieldMapList({
     return null as unknown as React.JSX.Element
   }
 
-  // Three-column subgrid: target | arrow | source. Target column is
-  // `max-content` so it stretches to fit the longest target — that
-  // locks the arrow into the same x-position on every row. Source
-  // sits in the third column, right-aligned. Editable mode adds a
-  // fourth `auto` column for the remove button.
+  // Each row is a simple two-side flex: target flush left, source
+  // flush right. No arrow — the visual rhythm of left/right columns
+  // already reads as "target maps to source" without one.
   return (
     <div className="space-y-2">
       <div className="flex items-baseline justify-between">
@@ -610,63 +608,50 @@ function FieldMapList({
           No fields mapped yet — pick a target type or add one below.
         </p>
       ) : (
-        <div
-          className="grid divide-y divide-border overflow-hidden rounded-md border border-border"
-          style={{
-            gridTemplateColumns: editable
-              ? 'max-content auto minmax(0, 1fr) auto'
-              : 'max-content auto minmax(0, 1fr)'
-          }}
-        >
+        <ul className="divide-y divide-border overflow-hidden rounded-md border border-border">
           {entries.map(([target, ref]) => (
-            <div
-              key={target}
-              className="col-span-full grid grid-cols-subgrid items-center gap-x-3 px-3 py-1.5"
-            >
+            <li key={target} className="flex items-center justify-between gap-3 px-3 py-1.5">
               <code className="truncate font-mono text-[12px] text-foreground">{target}</code>
-              <span className="text-muted-foreground" aria-hidden>
-                ←
-              </span>
               {editable ? (
-                <div className="relative min-w-0 justify-self-end">
-                  <select
-                    value={refValue(ref)}
-                    onChange={(e) => onChange(target, e.target.value)}
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <select
+                      value={refValue(ref)}
+                      onChange={(e) => onChange(target, e.target.value)}
+                      disabled={disabled}
+                      className="block w-[14rem] appearance-none rounded-md border border-border bg-card px-2 py-1 pr-7 text-[12px] text-foreground focus:border-foreground/30 focus:outline-none disabled:opacity-50"
+                    >
+                      <option value={UNMAPPED}>— unmapped —</option>
+                      {sourceOptions.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown
+                      className="pointer-events-none absolute right-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground"
+                      strokeWidth={1.8}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onRemove(target)}
                     disabled={disabled}
-                    className="block w-[14rem] appearance-none rounded-md border border-border bg-card px-2 py-1 pr-7 text-[12px] text-foreground focus:border-foreground/30 focus:outline-none disabled:opacity-50"
+                    className="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-foreground/5 hover:text-foreground disabled:opacity-50"
+                    title="Remove field"
+                    aria-label={`Remove ${target}`}
                   >
-                    <option value={UNMAPPED}>— unmapped —</option>
-                    {sourceOptions.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown
-                    className="pointer-events-none absolute right-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground"
-                    strokeWidth={1.8}
-                  />
+                    <X className="h-3 w-3" strokeWidth={1.8} />
+                  </button>
                 </div>
               ) : (
-                <span className="justify-self-end truncate whitespace-nowrap text-[12px] text-muted-foreground">
+                <span className="truncate whitespace-nowrap text-[12px] text-muted-foreground">
                   {describeRef(ref)}
                 </span>
               )}
-              {editable && (
-                <button
-                  type="button"
-                  onClick={() => onRemove(target)}
-                  disabled={disabled}
-                  className="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-foreground/5 hover:text-foreground disabled:opacity-50"
-                  title="Remove field"
-                  aria-label={`Remove ${target}`}
-                >
-                  <X className="h-3 w-3" strokeWidth={1.8} />
-                </button>
-              )}
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
       {editable && (
         <div className="flex items-center gap-1.5">
