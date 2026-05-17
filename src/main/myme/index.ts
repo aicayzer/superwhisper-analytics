@@ -3,6 +3,8 @@ import { MymeError, UnauthorizedError } from '@mymehq/sdk'
 import type { MymeStatus, MymeSyncPhase } from '../../preload/api'
 import { getConfig, setConfig } from '../config'
 import { getClient, invalidateClient } from './client'
+import { syncRun } from './engine'
+import { clearState } from './state'
 import { clearCredential, credentialExists, readCredential, writeCredential } from './tokens'
 
 /**
@@ -35,7 +37,11 @@ import { clearCredential, credentialExists, readCredential, writeCredential } fr
 
 const STATUS_CHANNEL = 'myme:status'
 
-let currentStatus: MymeStatus = buildInitialStatus()
+// Lazy-initialised so the boot-time probe runs after `app.ready` —
+// `safeStorage.isEncryptionAvailable()` returns false until then on
+// macOS, which would mis-classify a connected user as disconnected on
+// every launch.
+let currentStatus: MymeStatus | null = null
 
 function buildInitialStatus(): MymeStatus {
   const endpoint = getConfig().myme.endpoint
@@ -45,16 +51,22 @@ function buildInitialStatus(): MymeStatus {
   return { kind: 'disconnected', endpoint, lastError: null }
 }
 
-function setStatus(next: MymeStatus): void {
+function ensureStatus(): MymeStatus {
+  if (currentStatus === null) currentStatus = buildInitialStatus()
+  return currentStatus
+}
+
+function setStatus(next: MymeStatus): MymeStatus {
   currentStatus = next
   for (const win of BrowserWindow.getAllWindows()) {
     if (win.isDestroyed()) continue
     win.webContents.send(STATUS_CHANNEL, next)
   }
+  return next
 }
 
 export function getStatus(): MymeStatus {
-  return currentStatus
+  return ensureStatus()
 }
 
 export function setEndpoint(url: string): MymeStatus {
@@ -65,8 +77,8 @@ export function setEndpoint(url: string): MymeStatus {
   // credential still applies. If the card is currently `connected` but
   // the user changed the endpoint, the next sync attempt is what
   // surfaces a failure — we don't pre-emptively flip status here.
-  setStatus({ ...currentStatus, endpoint: trimmed } as MymeStatus)
-  return currentStatus
+  setStatus({ ...ensureStatus(), endpoint: trimmed } as MymeStatus)
+  return ensureStatus()
 }
 
 /** Transition to `connecting` so the renderer renders the API-key
@@ -74,7 +86,7 @@ export function setEndpoint(url: string): MymeStatus {
 export function connect(): MymeStatus {
   const endpoint = getConfig().myme.endpoint
   setStatus({ kind: 'connecting', endpoint })
-  return currentStatus
+  return ensureStatus()
 }
 
 /**
@@ -90,49 +102,107 @@ export async function submitApiKey(key: string): Promise<MymeStatus> {
   const trimmed = key.trim()
   const endpoint = getConfig().myme.endpoint
   if (!trimmed) {
-    setStatus({ kind: 'disconnected', endpoint, lastError: 'API key is empty.' })
-    return currentStatus
+    return setStatus({ kind: 'disconnected', endpoint, lastError: 'API key is empty.' })
   }
   // Temporarily stage the key so getClient() picks it up; persist only
   // after verification succeeds (so a failed attempt doesn't leave a
   // bad credential on disk).
   const persisted = writeCredential(trimmed)
   if (!persisted) {
-    setStatus({
+    return setStatus({
       kind: 'disconnected',
       endpoint,
       lastError: 'Could not encrypt credential (safeStorage unavailable).'
     })
-    return currentStatus
   }
   invalidateClient()
   try {
     const client = getClient()
     if (!client) throw new Error('client construction failed')
     await client.items.stats()
-    setStatus({ kind: 'connected', endpoint, lastSyncedAt: null, lastError: null })
-    return currentStatus
+    return setStatus({ kind: 'connected', endpoint, lastSyncedAt: null, lastError: null })
   } catch (err) {
     clearCredential()
     invalidateClient()
     const message = describeAuthError(err)
-    setStatus({ kind: 'disconnected', endpoint, lastError: message })
-    return currentStatus
+    return setStatus({ kind: 'disconnected', endpoint, lastError: message })
   }
 }
 
 export function disconnect(): MymeStatus {
   clearCredential()
+  clearState()
   invalidateClient()
   setStatus({ kind: 'disconnected', endpoint: getConfig().myme.endpoint, lastError: null })
-  return currentStatus
+  return ensureStatus()
 }
 
-/** Sync engine integration point — milestone 4 lands the real
- *  implementation. For now `syncNow` is a noop that returns the
- *  current status. */
+/**
+ * Run one sync pass against the configured tenant. Flips the card to
+ * `syncing` for the duration; resolves to `connected` (with or without
+ * a last-sync error) on success, or `disconnected` on auth failure.
+ *
+ * Concurrent calls are coalesced — a second `syncNow` while one is in
+ * flight returns the current status without spawning a parallel run.
+ * Same engine path is reused by the watcher cascade in milestone 5.
+ */
+let syncInFlight: Promise<MymeStatus> | null = null
+
 export async function syncNow(): Promise<MymeStatus> {
-  return currentStatus
+  if (syncInFlight) return syncInFlight
+  const status = ensureStatus()
+  if (status.kind !== 'connected') return status
+  syncInFlight = runSync()
+  try {
+    return await syncInFlight
+  } finally {
+    syncInFlight = null
+  }
+}
+
+async function runSync(): Promise<MymeStatus> {
+  const endpoint = getConfig().myme.endpoint
+  const status = ensureStatus()
+  const previousLastSyncedAt = status.kind === 'connected' ? status.lastSyncedAt : null
+
+  setStatus({ kind: 'syncing', endpoint, phase: 'preparing', processed: 0, total: 0 })
+
+  const outcome = await syncRun({
+    onProgress: (e) => {
+      setStatus({
+        kind: 'syncing',
+        endpoint,
+        phase: e.phase,
+        processed: e.processed,
+        total: e.total
+      })
+    }
+  })
+
+  if (outcome.skipped === 'no-client') {
+    // Credential disappeared between status check and engine call —
+    // surface as disconnected so the card prompts a reconnect.
+    return setStatus({ kind: 'disconnected', endpoint, lastError: 'No credential available.' })
+  }
+
+  if (outcome.error && /Authentication/i.test(outcome.error)) {
+    clearCredential()
+    return setStatus({ kind: 'disconnected', endpoint, lastError: outcome.error })
+  }
+
+  const lastSyncedAt = outcome.ok ? outcome.finishedAt : previousLastSyncedAt
+  const next = setStatus({
+    kind: 'connected',
+    endpoint,
+    lastSyncedAt,
+    lastError: outcome.ok ? null : outcome.error
+  })
+  console.log(
+    `[myme] sync completed: created=${outcome.counts.created} updated=${outcome.counts.updated} ` +
+      `soft-deleted=${outcome.counts.softDeleted} no-op=${outcome.counts.noop} ` +
+      `errored=${outcome.counts.errored}`
+  )
+  return next
 }
 
 /** Translate an arbitrary error from the SDK or transport into the
