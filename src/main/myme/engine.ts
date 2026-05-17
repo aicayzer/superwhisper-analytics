@@ -2,7 +2,8 @@ import { MymeError, UnauthorizedError, ValidationError, type CreateItemInput } f
 import type { Recording } from '@shared/types'
 import { hydrate } from '../cache'
 import { getClient, invalidateClient } from './client'
-import { hashProjection, projectRecording } from './projection'
+import { hashProjection, projectRecording, projectSession } from './projection'
+import { DEFAULT_GAP_THRESHOLD_MINUTES, groupIntoSessions } from './sessions'
 import { loadState, saveState, type SyncState, type SyncStateEntry } from './state'
 
 /**
@@ -237,7 +238,10 @@ export async function syncRun(opts: SyncOptions = {}): Promise<SyncOutcome> {
     }
   }
 
-  // ── Persist new state ─────────────────────────────────────────────
+  // Build the next-recordings state up-front so the session pass can
+  // resolve recording itemIds (for `core.parent-of` edges) from a
+  // single coherent map of "everything that successfully landed,
+  // including this run's upserts".
   const nextRecordings: Record<string, SyncStateEntry> = { ...state.recordings }
   for (const [sourceId, entry] of successesById) {
     nextRecordings[sourceId] = entry
@@ -245,9 +249,38 @@ export async function syncRun(opts: SyncOptions = {}): Promise<SyncOutcome> {
   for (const sourceId of softDeletedSourceIds) {
     delete nextRecordings[sourceId]
   }
+
+  // ── Sessions ──────────────────────────────────────────────────────
+  // Derived from the current recording set, full-replaced every run.
+  // Threshold change yields fresh source_ids → fresh items → the
+  // diff naturally trash-and-re-mints.
+  const sessionOutcome = await syncSessions({
+    client,
+    recordings,
+    state,
+    recordingIds: nextRecordings,
+    pushedAt,
+    onProgress: opts.onProgress
+  })
+  counts.created += sessionOutcome.created
+  counts.updated += sessionOutcome.updated
+  counts.softDeleted += sessionOutcome.softDeleted
+  counts.errored += sessionOutcome.errored
+  counts.noop += sessionOutcome.noop
+  if (sessionOutcome.error && !lastError) lastError = sessionOutcome.error
+  if (sessionOutcome.authFailed) {
+    return failAuth(counts, successesById, {
+      ...state,
+      recordings: nextRecordings,
+      sessions: sessionOutcome.nextSessions
+    })
+  }
+
+  // ── Persist new state ─────────────────────────────────────────────
   const nextState: SyncState = {
     ...state,
     recordings: nextRecordings,
+    sessions: sessionOutcome.nextSessions,
     lastFullSyncAt: pushedAt
   }
   saveState(nextState)
@@ -259,6 +292,135 @@ export async function syncRun(opts: SyncOptions = {}): Promise<SyncOutcome> {
     error: lastError,
     skipped: null
   }
+}
+
+interface SessionSyncOutcome {
+  created: number
+  updated: number
+  softDeleted: number
+  errored: number
+  noop: number
+  error: string | null
+  authFailed: boolean
+  nextSessions: Record<string, SyncStateEntry>
+}
+
+async function syncSessions(opts: {
+  client: ReturnType<typeof getClient> & object
+  recordings: Recording[]
+  state: SyncState
+  recordingIds: Record<string, SyncStateEntry>
+  pushedAt: string
+  onProgress?: SyncOptions['onProgress']
+}): Promise<SessionSyncOutcome> {
+  const { client, recordings, state, recordingIds, pushedAt, onProgress } = opts
+  const out: SessionSyncOutcome = {
+    created: 0,
+    updated: 0,
+    softDeleted: 0,
+    errored: 0,
+    noop: 0,
+    error: null,
+    authFailed: false,
+    nextSessions: { ...state.sessions }
+  }
+
+  const groups = groupIntoSessions(recordings, DEFAULT_GAP_THRESHOLD_MINUTES)
+  type SessionItem = {
+    sourceId: string
+    hash: string
+    payload: CreateItemInput & { edges?: Record<string, string[]> }
+  }
+  const toUpsert: SessionItem[] = []
+  const seenSourceIds = new Set<string>()
+
+  for (const g of groups) {
+    const projection = projectSession(g)
+    const hash = hashProjection(projection)
+    seenSourceIds.add(projection.source_id)
+    const prev = state.sessions[projection.source_id]
+    if (prev && prev.hash === hash) {
+      out.noop += 1
+      continue
+    }
+    // Resolve the recording itemIds the session's `core.parent-of`
+    // edges should point at. If a recording's still pending (its
+    // upsert failed earlier in the run, or it isn't in state yet),
+    // skip it from the edge list — we'd rather mint a session with a
+    // partial edge set than fail the whole session push.
+    const recordingItemIds: string[] = []
+    for (const rid of g.recordingIds) {
+      const entry = recordingIds[rid]
+      if (entry) recordingItemIds.push(entry.itemId)
+    }
+    toUpsert.push({
+      sourceId: projection.source_id,
+      hash,
+      payload: {
+        type: projection.type,
+        source_id: projection.source_id,
+        tier: projection.tier,
+        properties: projection.properties,
+        edges: { 'core.parent-of': recordingItemIds }
+      }
+    })
+  }
+
+  const toSoftDelete = Object.keys(state.sessions).filter((id) => !seenSourceIds.has(id))
+
+  // Sessions are far fewer than recordings (typical: dozens) so a
+  // serial loop is fine.
+  for (let i = 0; i < toUpsert.length; i += 1) {
+    const item = toUpsert[i]
+    if (!item) continue
+    onProgress?.({ phase: 'sessions', processed: i, total: toUpsert.length })
+    try {
+      const { item: stored, created } = await client.items.upsert(item.payload)
+      if (created) out.created += 1
+      else out.updated += 1
+      out.nextSessions[item.sourceId] = {
+        hash: item.hash,
+        itemId: stored.id,
+        lastPushedAt: pushedAt
+      }
+    } catch (err) {
+      if (err instanceof UnauthorizedError) {
+        out.authFailed = true
+        return out
+      }
+      out.errored += 1
+      out.error = err instanceof Error ? err.message : 'Unknown error.'
+      console.warn(`[myme] session upsert failed for ${item.sourceId}:`, err)
+    }
+  }
+  onProgress?.({ phase: 'sessions', processed: toUpsert.length, total: toUpsert.length })
+
+  for (const sourceId of toSoftDelete) {
+    const prev = state.sessions[sourceId]
+    if (!prev) {
+      delete out.nextSessions[sourceId]
+      continue
+    }
+    try {
+      await client.items.transition(prev.itemId, 'trashed')
+      out.softDeleted += 1
+      delete out.nextSessions[sourceId]
+    } catch (err) {
+      if (err instanceof UnauthorizedError) {
+        out.authFailed = true
+        return out
+      }
+      if (err instanceof MymeError && /not.?found|404/i.test(err.message)) {
+        delete out.nextSessions[sourceId]
+        continue
+      }
+      out.errored += 1
+      out.error = err instanceof Error ? err.message : out.error
+      console.warn(`[myme] session soft-delete failed for ${sourceId}:`, err)
+    }
+  }
+
+  return out
 }
 
 function failAuth(

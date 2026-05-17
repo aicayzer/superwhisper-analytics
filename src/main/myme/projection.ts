@@ -1,6 +1,7 @@
 import { createHash } from 'crypto'
 import type { Recording } from '@shared/types'
 import { SOURCE } from './schemas'
+import type { SessionGroup } from './sessions'
 
 /**
  * Pure mapping from a local `Recording` to the `superwhisper.recording`
@@ -65,6 +66,48 @@ export function projectRecording(r: Recording): RecordingProjection {
     }
   }
   return projection
+}
+
+/** Wire shape for a `superwhisper.session` item — standalone (no
+ *  parent type), gap-grouped recordings minted client-side. The natural
+ *  key `(source, source_id)` includes the threshold so a threshold
+ *  change yields a fresh item set rather than mutating existing ones in
+ *  place; see `sessions.ts` for the rationale. */
+export interface SessionProjection {
+  type: 'superwhisper.session'
+  source: string
+  source_id: string
+  tier: 'feed'
+  properties: {
+    title: string
+    started_at: string
+    ended_at: string
+    recording_count: number
+    total_duration_seconds: number
+    dominant_mode: string
+    gap_threshold_minutes: number
+  }
+}
+
+export function projectSession(s: SessionGroup): SessionProjection {
+  return {
+    type: 'superwhisper.session',
+    source: SOURCE,
+    source_id: s.sourceId,
+    tier: 'feed',
+    properties: {
+      // Default empty so the user can name the session in their Myme
+      // client without us clobbering on the next sync (the merge_policy
+      // declares `title` as keep_both_copies).
+      title: '',
+      started_at: s.startedAt,
+      ended_at: s.endedAt,
+      recording_count: s.recordingCount,
+      total_duration_seconds: s.totalDurationSeconds,
+      dominant_mode: s.dominantMode,
+      gap_threshold_minutes: s.gapThresholdMinutes
+    }
+  }
 }
 
 /**
