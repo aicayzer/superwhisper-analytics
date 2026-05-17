@@ -15,8 +15,8 @@ importers:
         specifier: ^4.0.0
         version: 4.0.0(electron@42.0.1)
       '@mymehq/sdk':
-        specifier: ^5.6.0
-        version: 5.6.0
+        specifier: ^5.7.1
+        version: 5.7.1
       '@radix-ui/react-slot':
         specifier: ^1.2.0
         version: 1.2.4(@types/react@19.2.14)(react@19.2.6)
@@ -775,11 +775,11 @@ packages:
     resolution: {integrity: sha512-9QOtNffcOF/c1seMCDnjckb3R9WHcG34tky+FHpNKKCW0wc/scYLwMtO+ptyGUfMW0/b/n4qRiALlaFHc9Oj7Q==}
     engines: {node: '>= 10.0.0'}
 
-  '@mymehq/sdk@5.6.0':
-    resolution: {integrity: sha512-QPjcmRKtdBp6xY3s7CvPPzjFYzz923YyL1yWz3fp/AqeAW7fiCgHe9AcLYhISSGLDhzGVUfUVff7B2SRlYEp1Q==}
+  '@mymehq/sdk@5.7.1':
+    resolution: {integrity: sha512-zSbKnweeU/kyaoSuLkTmO0ujPmGWMiBnte3jI7i1iquceWfiO4FFS1dgdfgEfROC4mFHeHqv5vwXteSgLXJ8HQ==}
 
-  '@mymehq/shared@5.6.0':
-    resolution: {integrity: sha512-rlvyNn/cmVijh6/jmhGfQeRQlMD9Dci8fJXmopWtOsPOLEiWKzuWVRyN3+rF6iN57dOjljmFgfUlTZxYg2kYTQ==}
+  '@mymehq/shared@5.7.0':
+    resolution: {integrity: sha512-jjQG7re04cypMoYl4/rgDKDt0GpgTviq/dB1s4HS+azEbPoH0NOi63H3hdIqCaLC83K4VvvLLFyM0hy14g9kZg==}
 
   '@pkgr/core@0.2.9':
     resolution: {integrity: sha512-QNqXyfVS2wm9hweSYD2O7F0G06uurj9kZ96TRQE5Y9hU7+tgdZwIkbAKc5Ocy1HxEY2kuDQa6cQ1WRs/O5LFKA==}
@@ -4821,11 +4821,11 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@mymehq/sdk@5.6.0':
+  '@mymehq/sdk@5.7.1':
     dependencies:
-      '@mymehq/shared': 5.6.0
+      '@mymehq/shared': 5.7.0
 
-  '@mymehq/shared@5.6.0':
+  '@mymehq/shared@5.7.0':
     dependencies:
       uuidv7: 1.2.1
       zod: 4.3.6

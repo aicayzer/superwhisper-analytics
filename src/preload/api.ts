@@ -105,17 +105,19 @@ export type UpdaterStatus =
  * recordings path is set) from `configStore` — main always reports the
  * sync engine's actual state. Card states the user sees:
  *
- *   - `disconnected`            → endpoint + "Connect to Myme" CTA
- *   - `connecting`              → API-key paste-and-verify pane
- *   - `connected` (no error)    → "last synced …" + "Sync now"
- *   - `connected` (with error)  → as above + inline error row
- *   - `syncing`                 → progress phase + processed/total
+ *   - `disconnected`              → endpoint + "Connect to Myme" CTA
+ *   - `connecting` (mode: device) → user-code + "Verify in browser" pane,
+ *                                   with a "use API key instead" link
+ *   - `connecting` (mode: api-key)→ API-key paste-and-verify pane
+ *   - `connected` (no error)      → "last synced …" + "Sync now"
+ *   - `connected` (with error)    → as above + inline error row
+ *   - `syncing`                   → progress phase + processed/total
  *
- * The OAuth device flow [[Myme integration — May 2026]] specifies isn't
- * actually wired end-to-end on staging today (see the running log).
- * v1 uses an API key the user generates in their Myme client and
- * pastes into the connecting pane; encrypted via `safeStorage` and
- * persisted to `<userData>/myme-credential.enc`.
+ * Default auth is the OAuth device-flow (`startDeviceFlow` from the SDK).
+ * The API-key paste path stays as a dev/escape hatch — surfaced via the
+ * "use API key instead" link on the device-flow connecting pane.
+ * Tokens are encrypted via `safeStorage` and persisted to
+ * `<userData>/myme-credential.enc`.
  */
 export type MymeSyncPhase = 'preparing' | 'recordings' | 'sessions'
 
@@ -130,8 +132,28 @@ export type MymeStatus =
     }
   | {
       kind: 'connecting'
+      mode: 'api-key'
       endpoint: string
       syncLimit: number
+    }
+  | {
+      kind: 'connecting'
+      mode: 'device'
+      endpoint: string
+      syncLimit: number
+      /** Short user-readable code (XXXX-XXXX shape) the user types into
+       *  the verification page. */
+      userCode: string
+      /** Plain verification URL — show as fallback if `verificationUriComplete`
+       *  is absent or the user wants to type the code manually. */
+      verificationUri: string
+      /** Deep-link variant with the code pre-filled. When present, the
+       *  "Verify in browser" button opens this so the user doesn't have
+       *  to type the code at all. */
+      verificationUriComplete: string | null
+      /** Unix ms — used by the renderer to show a "code expires in …"
+       *  countdown if we want one later. */
+      expiresAt: number
     }
   | {
       kind: 'connected'
@@ -226,16 +248,25 @@ export const api = {
     status: (): Promise<MymeStatus> => ipcRenderer.invoke('myme:status'),
     /** Persist a new Myme endpoint URL. Returns the updated status. */
     setEndpoint: (url: string): Promise<MymeStatus> => ipcRenderer.invoke('myme:setEndpoint', url),
-    /** Transition the card into the "paste your API key" state. Until
-     *  staging's OAuth device flow is viable end-to-end, the integration
-     *  authenticates via a user-supplied API key (see the running log). */
+    /** Default connect path — initiates the OAuth device flow against
+     *  the configured endpoint. Returns a `connecting` (mode: 'device')
+     *  status carrying the user code + verification URI; the renderer
+     *  shows that, and a background poll resolves to `connected` on
+     *  user approval (push lands via `onStatus`). */
     connect: (): Promise<MymeStatus> => ipcRenderer.invoke('myme:connect'),
+    /** Dev/escape-hatch path: transition the card into the API-key
+     *  paste pane. Linked from the device-flow connecting pane via
+     *  "use API key instead". */
+    useApiKey: (): Promise<MymeStatus> => ipcRenderer.invoke('myme:useApiKey'),
     /** Verify the supplied API key against the current endpoint and, on
      *  success, encrypt + persist it. Resolves with the new status —
      *  `connected` on success, `disconnected` with `lastError` set on
      *  failure. */
     submitApiKey: (key: string): Promise<MymeStatus> =>
       ipcRenderer.invoke('myme:submitApiKey', key),
+    /** Cancel an in-progress connect attempt (device-flow polling or
+     *  API-key pane). Falls back to `disconnected`. */
+    cancelConnect: (): Promise<MymeStatus> => ipcRenderer.invoke('myme:cancelConnect'),
     /** Revoke the persisted token + clear sync state. */
     disconnect: (): Promise<MymeStatus> => ipcRenderer.invoke('myme:disconnect'),
     /** Manual sync trigger. Returns when the sync completes (success

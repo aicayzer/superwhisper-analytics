@@ -2,26 +2,32 @@ import { SettingsCard } from './SettingsCard'
 import { cn } from '@renderer/lib/cn'
 import { useConfigStore } from '@renderer/state/configStore'
 import { useMymeStore } from '@renderer/state/mymeStore'
-import { Cloud, CloudOff, RefreshCw } from 'lucide-react'
+import { Check, Cloud, CloudOff, Copy, ExternalLink, RefreshCw } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { MymeStatus } from '../../../../preload/api'
 
 /**
  * Settings → Integrations → Myme card.
  *
- * One card, five effective states:
+ * One card, six effective states:
  *
- *   1. `disabled`     — demo mode is on, or no recordings path. Card is
- *                       greyed out; sync engine is inert.
- *   2. `disconnected` — endpoint URL + "Connect to Myme" button.
- *   3. `connecting`   — API-key paste-and-verify pane.
- *   4. `connected`    — last synced time + "Sync now" + a sync-cap
- *                       setting (default 100; 0 = no cap). If
- *                       `lastError` is set, an inline error row appears
- *                       below.
- *   5. `syncing`      — progress text + Cancel button. The signal
- *                       threaded into the engine stops further upserts
- *                       once aborted; partial state is persisted.
+ *   1. `disabled`              — demo mode is on, or no recordings path.
+ *                                Card is greyed out; sync engine is inert.
+ *   2. `disconnected`          — endpoint URL + "Connect to Myme" button.
+ *   3. `connecting (device)`   — default. User-code + "Verify in browser"
+ *                                button; opens the verification URI in
+ *                                the system browser. Includes a
+ *                                "Use API key instead" fallback link.
+ *   4. `connecting (api-key)`  — dev/escape hatch. API-key paste-and-verify
+ *                                pane.
+ *   5. `connected`             — last synced time + "Sync now" + a sync-cap
+ *                                setting (default 100; 0 = no cap). If
+ *                                `lastError` is set, an inline error row
+ *                                appears below.
+ *   6. `syncing`               — progress text + Cancel button. The signal
+ *                                threaded into the engine stops further
+ *                                upserts once aborted; partial state is
+ *                                persisted.
  *
  * Failure paths never reach the main app — Myme is optional, so its
  * problems stay in this card. (Deliberate departure from how scan
@@ -82,7 +88,16 @@ function StatusBody({ status }: { status: MymeStatus }): React.JSX.Element {
     case 'disconnected':
       return <DisconnectedBody endpoint={status.endpoint} lastError={status.lastError} />
     case 'connecting':
-      return <ConnectingBody />
+      if (status.mode === 'device') {
+        return (
+          <DeviceConnectingBody
+            userCode={status.userCode}
+            verificationUri={status.verificationUri}
+            verificationUriComplete={status.verificationUriComplete}
+          />
+        )
+      }
+      return <ApiKeyConnectingBody />
     case 'connected':
       return (
         <ConnectedBody
@@ -179,9 +194,154 @@ function DisconnectedBody({
   )
 }
 
-function ConnectingBody(): React.JSX.Element {
+/**
+ * Default connecting pane — shows the user code + a "Verify in browser"
+ * button that opens the verification URI (deep-link variant if the
+ * server provided one). A "Use API key instead" link drops down to the
+ * legacy paste path for development.
+ *
+ * The user code is shown prominently with a copy-to-clipboard button so
+ * the user can paste it on the verification page if the deep-link
+ * variant isn't available or they prefer to type the code by hand.
+ *
+ * Empty `userCode` / `verificationUri` means we're still mid-DCR (the
+ * status payload arrives in two ticks — preparing, then with the real
+ * code). Show a spinner placeholder during that window.
+ */
+function DeviceConnectingBody({
+  userCode,
+  verificationUri,
+  verificationUriComplete
+}: {
+  userCode: string
+  verificationUri: string
+  verificationUriComplete: string | null
+}): React.JSX.Element {
+  const switchToApiKey = useMymeStore((s) => s.useApiKey)
+  const cancelConnect = useMymeStore((s) => s.cancelConnect)
+  const [copied, setCopied] = useState(false)
+  const [busy, setBusy] = useState(false)
+
+  const ready = userCode.length > 0 && verificationUri.length > 0
+  const openHref = verificationUriComplete ?? verificationUri
+
+  async function copyCode(): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(userCode)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1500)
+    } catch {
+      // clipboard refused — silent
+    }
+  }
+
+  function openVerify(): void {
+    void window.api.openExternal(openHref)
+  }
+
+  async function cancel(): Promise<void> {
+    setBusy(true)
+    try {
+      await cancelConnect()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function fallback(): Promise<void> {
+    setBusy(true)
+    try {
+      await switchToApiKey()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (!ready) {
+    return (
+      <div className="space-y-3">
+        <p className="inline-flex items-center gap-1.5 text-[12.5px] text-muted-foreground">
+          <RefreshCw className="h-3 w-3 animate-spin" strokeWidth={1.8} />
+          Preparing device-flow request…
+        </p>
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => void cancel()}
+            disabled={busy}
+            className={CHROME_BUTTON}
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-[12.5px] text-foreground">
+        Approve this device in your browser to connect. The verification page will ask for the code
+        below.
+      </p>
+      <div className="rounded-md border border-border bg-card px-3 py-3">
+        <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Your code</div>
+        <div className="mt-1 flex items-center justify-between gap-3">
+          <div className="font-mono text-[20px] font-medium tracking-[0.18em] text-foreground tabular-nums">
+            {userCode}
+          </div>
+          <button
+            type="button"
+            onClick={() => void copyCode()}
+            disabled={busy}
+            className={CHROME_BUTTON}
+            title="Copy code"
+          >
+            {copied ? (
+              <>
+                <Check className="h-3 w-3" strokeWidth={1.8} />
+                Copied
+              </>
+            ) : (
+              <>
+                <Copy className="h-3 w-3" strokeWidth={1.8} />
+                Copy
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => void fallback()}
+          disabled={busy}
+          className="text-[12px] text-muted-foreground underline-offset-2 hover:underline disabled:opacity-50"
+        >
+          Use API key instead
+        </button>
+        <div className="flex gap-1.5">
+          <button
+            type="button"
+            onClick={() => void cancel()}
+            disabled={busy}
+            className={CHROME_BUTTON}
+          >
+            Cancel
+          </button>
+          <button type="button" onClick={openVerify} disabled={busy} className={CHROME_BUTTON}>
+            <ExternalLink className="h-3 w-3" strokeWidth={1.8} />
+            Verify in browser
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ApiKeyConnectingBody(): React.JSX.Element {
   const submitApiKey = useMymeStore((s) => s.submitApiKey)
-  const disconnect = useMymeStore((s) => s.disconnect)
+  const cancelConnect = useMymeStore((s) => s.cancelConnect)
   const [key, setKey] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -198,13 +358,12 @@ function ConnectingBody(): React.JSX.Element {
     }
   }
   function cancel(): void {
-    void disconnect()
+    void cancelConnect()
   }
   return (
     <div className="space-y-3">
       <p className="text-[12.5px] text-foreground">
-        Paste your Myme API key to connect. Generate one in your Myme client — it stays on this Mac,
-        encrypted via Keychain.
+        Dev path. Paste your Myme API key to connect — it stays on this Mac, encrypted via Keychain.
       </p>
       <label className="block text-[12px] text-muted-foreground">
         API key
