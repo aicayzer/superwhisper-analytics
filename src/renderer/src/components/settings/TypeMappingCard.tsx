@@ -1,6 +1,7 @@
+import { SettingsCard } from './SettingsCard'
 import { useMymeStore } from '@renderer/state/mymeStore'
-import { ChevronDown, X } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { ChevronDown, Layers, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import type {
   FieldMap,
   MappingBinding,
@@ -10,20 +11,15 @@ import type {
 } from '../../../../preload/api'
 
 /**
- * Type-mapping panel — renders the binding for each source kind
- * (recording, session) as an always-visible card. No Edit gate;
- * everything the user might change is on screen.
+ * Type-mapping card — bottom of the Myme tab when connected. Renders
+ * a binding panel per source kind (recording, session). Each panel:
  *
- * Each card carries:
- *   - a segmented [Bundled | Existing | Authored] mode control;
- *   - the current type id;
- *   - the field map (read-only for bundled, editable otherwise);
- *   - inline authoring form when authored;
- *   - Apply / Reset, only when the draft differs from the persisted
- *     binding.
- *
- * Apply runs the trash-and-re-mint confirmation before persisting —
- * fresh source_ids on next sync soft-delete the old items.
+ *   • Segmented [Bundled · Existing · Authored] mode control.
+ *   • Type id label, with the inline authoring inputs when authored.
+ *   • Field map, with columns aligned via CSS subgrid so target / arrow
+ *     / source line up across rows regardless of name length.
+ *   • Reset / Apply, only when the draft differs from the persisted
+ *     binding. Apply gates the trash-and-re-mint confirmation.
  */
 
 const RECORDING_FIELD_OPTIONS: Array<{ value: string; label: string }> = [
@@ -59,50 +55,46 @@ const SOURCE_LABEL: Record<string, string> = Object.fromEntries(
 
 const UNMAPPED = '__unmapped__'
 
-interface Props {
-  mapping: MymeMapping
-  disabled?: boolean
-}
+const CHROME_BUTTON =
+  'inline-flex h-7 items-center gap-1.5 rounded-md border border-border bg-floating px-3 text-[12px] text-foreground transition-colors hover:bg-foreground/5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-floating'
 
-export function MappingPanel({ mapping, disabled }: Props): React.JSX.Element {
-  return (
-    <section className="space-y-3">
-      <SectionHeader
+export function TypeMappingCard({ disabled }: { disabled?: boolean }): React.JSX.Element {
+  const mapping = useMymeStore((s) => s.mapping)
+  if (!mapping) {
+    return (
+      <SettingsCard
+        icon={Layers}
         title="Type mapping"
         subtitle="Where your recordings and sessions land in Myme."
-      />
-      <div className="space-y-3">
-        <BindingCard
+      >
+        <p className="text-[12.5px] text-muted-foreground">Loading…</p>
+      </SettingsCard>
+    )
+  }
+  return (
+    <SettingsCard
+      icon={Layers}
+      title="Type mapping"
+      subtitle="Where your recordings and sessions land in Myme."
+    >
+      <div className="space-y-5">
+        <BindingPanel
           key={bindingKey(mapping.recording)}
           kind="recording"
           binding={mapping.recording}
+          mapping={mapping}
           disabled={disabled}
         />
-        <BindingCard
+        <div className="border-t border-border" aria-hidden />
+        <BindingPanel
           key={bindingKey(mapping.session)}
           kind="session"
           binding={mapping.session}
+          mapping={mapping}
           disabled={disabled}
         />
       </div>
-    </section>
-  )
-}
-
-function SectionHeader({
-  title,
-  subtitle
-}: {
-  title: string
-  subtitle: string
-}): React.JSX.Element {
-  return (
-    <div className="space-y-0.5">
-      <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-        {title}
-      </h3>
-      <p className="text-[12px] text-muted-foreground">{subtitle}</p>
-    </div>
+    </SettingsCard>
   )
 }
 
@@ -113,13 +105,15 @@ interface DraftState {
   authoredLabel: string
 }
 
-function BindingCard({
+function BindingPanel({
   kind,
   binding,
+  mapping,
   disabled
 }: {
   kind: 'recording' | 'session'
   binding: MappingBinding
+  mapping: MymeMapping
   disabled?: boolean
 }): React.JSX.Element {
   const typeList = useMymeStore((s) => s.typeList)
@@ -127,7 +121,6 @@ function BindingCard({
   const refreshTypeList = useMymeStore((s) => s.refreshTypeList)
   const setMapping = useMymeStore((s) => s.setMapping)
   const registerType = useMymeStore((s) => s.registerType)
-  const currentMapping = useMymeStore((s) => s.mapping)
 
   const [draft, setDraft] = useState<DraftState>({
     mode: binding.mode,
@@ -139,11 +132,6 @@ function BindingCard({
   const [error, setError] = useState<string | null>(null)
   const [confirming, setConfirming] = useState(false)
 
-  // The parent keys this component on the binding identity, so a fresh
-  // mount handles the "binding changed externally" case (disconnect →
-  // reconnect, another window pushed a mapping change) without a
-  // setState-in-effect dance.
-
   // Fetch the type list lazily — only when the user reaches for the
   // existing-type picker for the first time.
   useEffect(() => {
@@ -153,7 +141,7 @@ function BindingCard({
   }, [draft.mode, typeList, typeListLoading, refreshTypeList])
 
   const bundledTypeId = kind === 'recording' ? 'superwhisper.recording' : 'superwhisper.session'
-  const bundledFieldMap = useMemo(() => buildBundledFieldMap(kind), [kind])
+  const bundledFieldMap = buildBundledFieldMap(kind)
   const sourceOptions = kind === 'recording' ? RECORDING_FIELD_OPTIONS : SESSION_FIELD_OPTIONS
 
   function selectMode(mode: DraftState['mode']): void {
@@ -262,7 +250,6 @@ function BindingCard({
       setError(v)
       return
     }
-    if (!currentMapping) return
     setBusy(true)
     setError(null)
     try {
@@ -271,7 +258,7 @@ function BindingCard({
         const schema = buildAuthoredSchema(kind, draft)
         const registered = await registerType(schema)
         if (!registered) {
-          setError('Failed to register the new type. Check the type id and try again.')
+          setError('Couldn’t register the new type. Check the id and try again.')
           setBusy(false)
           return
         }
@@ -284,13 +271,13 @@ function BindingCard({
         ...(authoredSchema ? { authoredSchema } : {})
       }
       const nextMapping: MymeMapping = {
-        ...currentMapping,
+        ...mapping,
         [kind]: nextBinding
       }
       await setMapping(nextMapping)
       setConfirming(false)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to apply mapping.')
+      setError(err instanceof Error ? err.message : 'Couldn’t apply the mapping.')
     } finally {
       setBusy(false)
     }
@@ -302,107 +289,107 @@ function BindingCard({
     !sameFieldMap(draft.fieldMap, binding.fieldMap)
 
   const editableFieldMap = draft.mode !== 'bundled'
+  const titleLabel = kind === 'recording' ? 'Recordings' : 'Sessions'
 
   return (
-    <article className="rounded-md border border-border bg-card">
-      <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3.5 py-2.5">
-        <div>
-          <h4 className="text-[12.5px] font-medium text-foreground capitalize">{kind}s</h4>
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="text-[13px] font-medium text-foreground">{titleLabel}</h3>
           <p className="mt-0.5 truncate font-mono text-[11.5px] text-muted-foreground">
             {draft.typeId || '—'}
           </p>
         </div>
         <SegmentedModePicker mode={draft.mode} onChange={selectMode} disabled={busy || disabled} />
-      </header>
+      </div>
 
-      <div className="space-y-3 px-3.5 py-3">
-        {draft.mode === 'existing' && (
-          <ExistingTypePicker
-            types={typeList}
-            loading={typeListLoading}
-            value={draft.typeId}
-            onChange={pickExistingType}
-            onRefresh={() => void refreshTypeList()}
-            disabled={busy || disabled}
-          />
-        )}
-
-        {draft.mode === 'authored' && (
-          <AuthoredTypeForm
-            typeId={draft.typeId}
-            label={draft.authoredLabel}
-            onTypeIdChange={setTypeId}
-            onLabelChange={setAuthoredLabel}
-            disabled={busy || disabled}
-          />
-        )}
-
-        <FieldMap
-          fieldMap={draft.fieldMap}
-          sourceOptions={sourceOptions}
-          editable={editableFieldMap}
-          onChange={setFieldRef}
-          onAdd={addTargetField}
-          onRemove={removeTargetField}
+      {draft.mode === 'existing' && (
+        <ExistingTypePicker
+          types={typeList}
+          loading={typeListLoading}
+          value={draft.typeId}
+          onChange={pickExistingType}
+          onRefresh={() => void refreshTypeList()}
           disabled={busy || disabled}
         />
+      )}
 
-        {error && (
-          <p className="rounded-md border border-accent-orange/40 bg-accent-orange/10 px-3 py-2 text-[12px] text-accent-orange">
-            {error}
+      {draft.mode === 'authored' && (
+        <AuthoredTypeForm
+          typeId={draft.typeId}
+          label={draft.authoredLabel}
+          onTypeIdChange={setTypeId}
+          onLabelChange={setAuthoredLabel}
+          disabled={busy || disabled}
+        />
+      )}
+
+      <FieldMapList
+        fieldMap={draft.fieldMap}
+        sourceOptions={sourceOptions}
+        editable={editableFieldMap}
+        loading={draft.mode === 'existing' && typeListLoading && !typeList}
+        onChange={setFieldRef}
+        onAdd={addTargetField}
+        onRemove={removeTargetField}
+        disabled={busy || disabled}
+      />
+
+      {error && (
+        <p className="rounded-md border border-accent-orange/40 bg-accent-orange/10 px-3 py-2 text-[12px] text-accent-orange">
+          {error}
+        </p>
+      )}
+
+      {dirty && !confirming && (
+        <div className="flex justify-end gap-1.5">
+          <button
+            type="button"
+            onClick={reset}
+            disabled={busy}
+            className="inline-flex h-7 items-center gap-1.5 rounded-md border border-transparent px-3 text-[12px] text-muted-foreground hover:bg-foreground/5 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Reset
+          </button>
+          <button
+            type="button"
+            onClick={() => setConfirming(true)}
+            disabled={busy || disabled}
+            className={CHROME_BUTTON}
+          >
+            Apply
+          </button>
+        </div>
+      )}
+
+      {confirming && (
+        <div className="space-y-2 rounded-md border border-accent-orange/40 bg-accent-orange/10 p-3">
+          <p className="text-[12.5px] text-foreground">
+            Applying this mapping trashes items synced under the previous binding and re-mints them
+            under the new one on the next sync. Old items soft-delete — recoverable from your Myme
+            client.
           </p>
-        )}
-
-        {dirty && !confirming && (
-          <div className="flex justify-end gap-1.5 pt-1">
+          <div className="flex justify-end gap-1.5">
             <button
               type="button"
-              onClick={reset}
+              onClick={() => setConfirming(false)}
               disabled={busy}
-              className="inline-flex h-7 items-center gap-1.5 rounded-md border border-transparent px-2.5 text-[12px] text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              className={CHROME_BUTTON}
             >
-              Reset
+              Cancel
             </button>
             <button
               type="button"
-              onClick={() => setConfirming(true)}
-              disabled={busy || disabled}
-              className="inline-flex h-7 items-center gap-1.5 rounded-md border border-foreground/30 bg-foreground/5 px-3 text-[12px] text-foreground transition-colors hover:bg-foreground/10 disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={() => void applyDraft()}
+              disabled={busy}
+              className="inline-flex h-7 items-center gap-1.5 rounded-md border border-accent-orange/60 bg-accent-orange/20 px-3 text-[12px] text-foreground hover:bg-accent-orange/30 disabled:opacity-50"
             >
-              Apply
+              {busy ? 'Applying…' : 'Apply & re-mint'}
             </button>
           </div>
-        )}
-
-        {confirming && (
-          <div className="space-y-2 rounded-md border border-accent-orange/40 bg-accent-orange/10 p-3">
-            <p className="text-[12.5px] text-foreground">
-              Applying this mapping will trash items synced under the previous binding and re-mint
-              them under the new one on the next sync. Old items are soft-deleted, not purged — you
-              can recover them via your Myme client.
-            </p>
-            <div className="flex justify-end gap-1.5">
-              <button
-                type="button"
-                onClick={() => setConfirming(false)}
-                disabled={busy}
-                className="inline-flex h-7 items-center gap-1.5 rounded-md border border-border bg-floating px-3 text-[12px] text-foreground hover:bg-foreground/5 disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => void applyDraft()}
-                disabled={busy}
-                className="inline-flex h-7 items-center gap-1.5 rounded-md border border-accent-orange/60 bg-accent-orange/20 px-3 text-[12px] text-foreground hover:bg-accent-orange/30 disabled:opacity-50"
-              >
-                {busy ? 'Applying…' : 'Apply & re-mint'}
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-    </article>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -439,7 +426,7 @@ function SegmentedModePicker({
             className={
               'inline-flex h-6 items-center rounded-[5px] px-2.5 text-[11.5px] transition-colors disabled:cursor-not-allowed disabled:opacity-50 ' +
               (active
-                ? 'bg-foreground/10 text-foreground shadow-[inset_0_0_0_1px_rgba(0,0,0,0.04)]'
+                ? 'bg-foreground/10 text-foreground'
                 : 'text-muted-foreground hover:text-foreground')
             }
           >
@@ -467,12 +454,12 @@ function ExistingTypePicker({
   disabled?: boolean
 }): React.JSX.Element {
   if (loading && !types) {
-    return <p className="text-[12px] text-muted-foreground">Loading types…</p>
+    return <p className="text-[12px] text-muted-foreground">Loading types from Myme…</p>
   }
   if (!types || types.length === 0) {
     return (
       <div className="flex items-center justify-between text-[12px] text-muted-foreground">
-        <span>No types loaded.</span>
+        <span>No types found on the server.</span>
         <button
           type="button"
           onClick={onRefresh}
@@ -487,9 +474,7 @@ function ExistingTypePicker({
   const selected = types.find((t) => t.id === value)
   return (
     <div className="space-y-1.5">
-      <label className="block text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground">
-        Target type
-      </label>
+      <label className="block text-[12px] text-muted-foreground">Target type</label>
       <div className="relative">
         <select
           value={value}
@@ -531,9 +516,7 @@ function AuthoredTypeForm({
   return (
     <div className="grid gap-2 sm:grid-cols-2">
       <label className="block">
-        <span className="block text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground">
-          Type id
-        </span>
+        <span className="block text-[12px] text-muted-foreground">Type id</span>
         <input
           type="text"
           value={typeId}
@@ -547,9 +530,7 @@ function AuthoredTypeForm({
         />
       </label>
       <label className="block">
-        <span className="block text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground">
-          Label
-        </span>
+        <span className="block text-[12px] text-muted-foreground">Label</span>
         <input
           type="text"
           value={label}
@@ -563,10 +544,23 @@ function AuthoredTypeForm({
   )
 }
 
-function FieldMap({
+/**
+ * Field map laid out as a grid where the columns line up across all
+ * rows regardless of target-name length. Uses CSS subgrid (supported in
+ * Electron's Chromium) so each row inherits column widths from the
+ * outer grid.
+ *
+ *   ┌────────────────┬───┬────────────────────────┬───┐
+ *   │ body           │ ← │ transcript (cleaned)   │ × │
+ *   │ raw_result     │ ← │ transcript (raw)       │ × │
+ *   │ duration_sec…  │ ← │ duration (s)           │ × │
+ *   └────────────────┴───┴────────────────────────┴───┘
+ */
+function FieldMapList({
   fieldMap,
   sourceOptions,
   editable,
+  loading,
   onChange,
   onAdd,
   onRemove,
@@ -575,6 +569,7 @@ function FieldMap({
   fieldMap: FieldMap
   sourceOptions: Array<{ value: string; label: string }>
   editable: boolean
+  loading?: boolean
   onChange: (target: string, raw: string) => void
   onAdd: (name: string) => void
   onRemove: (name: string) => void
@@ -591,32 +586,46 @@ function FieldMap({
     setNewField('')
   }
 
+  if (loading) {
+    return null as unknown as React.JSX.Element
+  }
+
+  // Outer grid defines the four columns; each row spans all four via
+  // `col-span-full` + `grid-cols-subgrid`. The target column is
+  // `max-content` so it stretches to fit the longest target name; the
+  // source dropdown takes the rest.
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-2">
       <div className="flex items-baseline justify-between">
-        <span className="text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground">
-          Fields
-        </span>
+        <span className="text-[12px] text-muted-foreground">Fields</span>
         {!editable && (
-          <span className="text-[11px] text-muted-foreground">Fixed by the bundled type.</span>
+          <span className="text-[11.5px] text-muted-foreground">Fixed by the bundled type.</span>
         )}
       </div>
       {entries.length === 0 ? (
         <p className="rounded-md border border-dashed border-border px-3 py-2 text-[12px] text-muted-foreground">
-          No fields mapped.
+          No fields mapped yet.
         </p>
       ) : (
-        <ul className="divide-y divide-border rounded-md border border-border">
+        <div
+          className="grid divide-y divide-border overflow-hidden rounded-md border border-border"
+          style={{
+            gridTemplateColumns: editable
+              ? 'max-content auto minmax(0, 1fr) auto'
+              : 'max-content auto minmax(0, 1fr)'
+          }}
+        >
           {entries.map(([target, ref]) => (
-            <li key={target} className="flex items-center gap-2 px-3 py-1.5">
-              <code className="min-w-[8rem] truncate font-mono text-[12px] text-foreground">
-                {target}
-              </code>
+            <div
+              key={target}
+              className="col-span-full grid grid-cols-subgrid items-center gap-x-3 px-3 py-1.5"
+            >
+              <code className="truncate font-mono text-[12px] text-foreground">{target}</code>
               <span className="text-muted-foreground" aria-hidden>
                 ←
               </span>
               {editable ? (
-                <div className="relative flex-1">
+                <div className="relative min-w-0">
                   <select
                     value={refValue(ref)}
                     onChange={(e) => onChange(target, e.target.value)}
@@ -636,7 +645,7 @@ function FieldMap({
                   />
                 </div>
               ) : (
-                <span className="flex-1 truncate text-[12px] text-muted-foreground">
+                <span className="min-w-0 truncate text-[12px] text-muted-foreground">
                   {describeRef(ref)}
                 </span>
               )}
@@ -647,13 +656,14 @@ function FieldMap({
                   disabled={disabled}
                   className="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-foreground/5 hover:text-foreground disabled:opacity-50"
                   title="Remove field"
+                  aria-label={`Remove ${target}`}
                 >
                   <X className="h-3 w-3" strokeWidth={1.8} />
                 </button>
               )}
-            </li>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
       {editable && (
         <div className="flex items-center gap-1.5">
@@ -678,7 +688,7 @@ function FieldMap({
             type="button"
             onClick={commitNew}
             disabled={disabled || !newField.trim()}
-            className="inline-flex h-7 items-center rounded-md border border-border bg-floating px-2.5 text-[12px] text-foreground hover:bg-foreground/5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-floating"
+            className={CHROME_BUTTON}
           >
             Add
           </button>
@@ -695,7 +705,7 @@ function refValue(ref: SourceFieldRef): string {
 
 function describeRef(ref: SourceFieldRef): string {
   if (ref.kind === 'literal') {
-    if (typeof ref.value === 'string' && ref.value === '') return '"" (empty string)'
+    if (typeof ref.value === 'string' && ref.value === '') return 'empty (filled by user in Myme)'
     return `${JSON.stringify(ref.value)} (literal)`
   }
   return SOURCE_LABEL[ref.field] ?? ref.field

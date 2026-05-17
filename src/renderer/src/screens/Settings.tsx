@@ -26,12 +26,12 @@ import {
 import { useEffect, useMemo, useState } from 'react'
 import type { UpdaterStatus } from '../../../preload/api'
 
-type SettingsTab = 'general' | 'data' | 'integrations' | 'about'
+type SettingsTab = 'general' | 'data' | 'myme' | 'about'
 
 const SETTINGS_TABS: ReadonlyArray<{ id: SettingsTab; label: string }> = [
   { id: 'general', label: 'General' },
   { id: 'data', label: 'Data' },
-  { id: 'integrations', label: 'Integrations' },
+  { id: 'myme', label: 'Myme' },
   { id: 'about', label: 'About' }
 ]
 
@@ -77,7 +77,7 @@ export function Settings(): React.JSX.Element {
           <DictionaryCard />
         </>
       )}
-      {tab === 'integrations' && <MymeCard />}
+      {tab === 'myme' && <MymeCard />}
       {tab === 'about' && (
         <>
           <AboutCard />
