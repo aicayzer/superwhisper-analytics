@@ -10,7 +10,14 @@ import {
   setConfig
 } from './config'
 import { hydrate, reindex, setFillerWords } from './cache'
-import { checkForUpdatesManually, getUpdaterStatus, type UpdaterStatus } from './updater'
+import type { UpdaterStatus } from '../preload/api'
+// Local Myme install build: do not import './updater' — that pulls
+// electron-updater into the bundle, and the pnpm-packaged asar is
+// missing transitive deps (e.g. `ms`), which crashes the main process
+// at module load. The Myme build has auto-update disabled in main.ts
+// anyway, so the renderer's "Check for updates" button is stubbed.
+const getUpdaterStatus = (): UpdaterStatus => ({ kind: 'idle' })
+const checkForUpdatesManually = async (): Promise<void> => {}
 import { disableWatch, enableWatch } from './watcher'
 import * as myme from './myme'
 import { validBool, validString, validStringArray } from './validators'
