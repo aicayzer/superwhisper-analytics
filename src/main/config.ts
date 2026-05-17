@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { homedir } from 'os'
 import { dirname, join } from 'path'
 import { DEFAULT_FILLER_PHRASES, normalisePhrases } from '@shared/text-metrics'
+import { defaultMapping, type MymeMapping } from './myme/mapping'
 import type { Config } from '../preload/api'
 
 /**
@@ -32,7 +33,12 @@ function defaultConfig(): Config {
     demoMode: false,
     autoHideSidebar: true,
     devTools: false,
-    myme: { endpoint: DEFAULT_MYME_ENDPOINT, syncLimit: 100 }
+    myme: {
+      endpoint: DEFAULT_MYME_ENDPOINT,
+      syncLimit: 100,
+      mapping: defaultMapping(),
+      modeFilter: null
+    }
   }
 }
 
@@ -78,6 +84,16 @@ export function getConfig(): Config {
       typeof parsed.myme?.syncLimit === 'number' && Number.isFinite(parsed.myme.syncLimit)
         ? Math.max(0, Math.floor(parsed.myme.syncLimit))
         : 0
+    // Additive migration: configs pre-dating the mapping work have no
+    // `mapping` block. Drop in the bundled default so the engine has a
+    // working mapping to project against from the very first sync.
+    const mymeMapping = isPlainObject(parsed.myme?.mapping)
+      ? (parsed.myme.mapping as MymeMapping)
+      : defaultMapping()
+    const rawModeFilter: unknown = parsed.myme?.modeFilter
+    const mymeModeFilter: string[] | null = Array.isArray(rawModeFilter)
+      ? rawModeFilter.filter((s: unknown): s is string => typeof s === 'string')
+      : null
     return {
       superwhisperPath: parsed.superwhisperPath ?? null,
       fillerWords,
@@ -88,7 +104,12 @@ export function getConfig(): Config {
       // narrow windows, which matches the plan's UX intent.
       autoHideSidebar: parsed.autoHideSidebar !== false,
       devTools: parsed.devTools === true,
-      myme: { endpoint: mymeEndpoint, syncLimit: mymeSyncLimit }
+      myme: {
+        endpoint: mymeEndpoint,
+        syncLimit: mymeSyncLimit,
+        mapping: mymeMapping,
+        modeFilter: mymeModeFilter
+      }
     }
   } catch (err) {
     console.warn('[config] failed to read config.json, falling back to defaults:', err)
@@ -119,6 +140,10 @@ export function resetConfig(): Config {
   mkdirSync(dirname(file), { recursive: true })
   writeFileSync(file, JSON.stringify(fresh, null, 2), 'utf-8')
   return fresh
+}
+
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v)
 }
 
 /**

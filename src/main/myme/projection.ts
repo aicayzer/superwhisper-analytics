@@ -1,112 +1,133 @@
 import { createHash } from 'crypto'
 import type { Recording } from '@shared/types'
+import { bindingFingerprint, isBundled, type MappingBinding, type SourceFieldRef } from './mapping'
 import { SOURCE } from './schemas'
 import type { SessionGroup } from './sessions'
 
 /**
- * Pure mapping from a local `Recording` to the `superwhisper.recording`
- * item payload that gets pushed to Myme.
+ * Pure mapping layer — given a local source object and a `MappingBinding`,
+ * produce the Myme item payload that gets pushed.
  *
- * The shape here is the contract between the analytics app and the Myme
- * tenant — every key in `properties` must be a field on the registered
- * schema (`schemas.ts`). Add a field → update both files; the hash
- * function below will surface the change as a forced re-push for every
- * existing recording, which is the right thing.
+ * `source_id` is derived from the source identifier plus the binding
+ * fingerprint. Bundled bindings emit the bare source identifier (so
+ * existing data stays valid mid-migration); non-bundled bindings get a
+ * `#<fp>` suffix that flips when the binding changes, driving
+ * trash-and-re-mint on the next sync. See `mapping.ts` for the
+ * fingerprint rules.
  *
- * `source_id` is the recording's directory name (a 10-digit unix
- * timestamp). Stable per recording — used as the natural key for
- * upsert. `source` is stamped server-side from the credential, but we
- * include it on the input shape so the projection is self-contained
- * for hashing and tests.
+ * `properties` is built from the binding's field map: each entry pulls
+ * a value off the source object (or a literal) and lands under the
+ * target field name. Undefined / empty-string values are dropped so a
+ * sparse mapping doesn't write empty strings into Myme fields.
  */
 
-export interface RecordingProjection {
-  type: 'superwhisper.recording'
+export interface Projection {
+  type: string
   source: string
   source_id: string
   tier: 'feed'
-  properties: {
-    body: string
-    title?: string
-    raw_result: string
-    segments: Array<{ start: number; end: number; text: string }>
-    duration_seconds: number
-    model: string
-    mode: string
-    device: string
-    app_version: string
-    datetime: string
-    language?: string
-  }
+  properties: Record<string, unknown>
 }
 
-/**
- * Project a single recording into its Myme item payload. Pure — same
- * input always yields the same output, which is what makes the content
- * hash meaningful.
- */
-export function projectRecording(r: Recording): RecordingProjection {
-  const projection: RecordingProjection = {
-    type: 'superwhisper.recording',
-    source: SOURCE,
-    source_id: r.id,
-    tier: 'feed',
-    properties: {
-      // The cleaned transcript lands in `body` (inherited from core.note).
-      body: r.result,
-      raw_result: r.rawResult,
-      segments: r.segments.map((s) => ({ start: s.start, end: s.end, text: s.text })),
-      duration_seconds: r.duration / 1000,
-      model: r.modelName,
-      mode: r.modeName,
-      device: r.recordingDevice,
-      app_version: r.appVersion,
-      datetime: r.datetime,
-      language: r.languageSelected || undefined
-    }
-  }
-  return projection
-}
-
-/** Wire shape for a `superwhisper.session` item — standalone (no
- *  parent type), gap-grouped recordings minted client-side. The natural
- *  key `(source, source_id)` includes the threshold so a threshold
- *  change yields a fresh item set rather than mutating existing ones in
- *  place; see `sessions.ts` for the rationale. */
-export interface SessionProjection {
-  type: 'superwhisper.session'
-  source: string
-  source_id: string
-  tier: 'feed'
-  properties: {
-    title: string
-    started_at: string
-    ended_at: string
-    recording_count: number
-    total_duration_seconds: number
-    dominant_mode: string
-    gap_threshold_minutes: number
-  }
-}
-
-export function projectSession(s: SessionGroup): SessionProjection {
+export function projectRecording(r: Recording, binding: MappingBinding): Projection {
+  const sourceId = isBundled(binding) ? r.id : `${r.id}#${bindingFingerprint(binding)}`
   return {
-    type: 'superwhisper.session',
+    type: binding.typeId,
     source: SOURCE,
-    source_id: s.sourceId,
+    source_id: sourceId,
     tier: 'feed',
-    properties: {
-      // Default empty so the user can name the session in their Myme
-      // client without us clobbering on the next sync (the merge_policy
-      // declares `title` as keep_both_copies).
-      title: '',
-      started_at: s.startedAt,
-      ended_at: s.endedAt,
-      recording_count: s.recordingCount,
-      total_duration_seconds: s.totalDurationSeconds,
-      dominant_mode: s.dominantMode,
-      gap_threshold_minutes: s.gapThresholdMinutes
-    }
+    properties: buildProperties(binding.fieldMap, (ref) => readRecordingField(r, ref))
+  }
+}
+
+export function projectSession(s: SessionGroup, binding: MappingBinding): Projection {
+  // Session source identifiers already encode the gap threshold
+  // (`${first.id}-${threshold}`); the binding fingerprint is appended
+  // only for non-bundled bindings so changing the binding trash-and-
+  // re-mints sessions the same way changing the threshold does.
+  const sourceId = isBundled(binding) ? s.sourceId : `${s.sourceId}#${bindingFingerprint(binding)}`
+  return {
+    type: binding.typeId,
+    source: SOURCE,
+    source_id: sourceId,
+    tier: 'feed',
+    properties: buildProperties(binding.fieldMap, (ref) => readSessionField(s, ref))
+  }
+}
+
+function buildProperties(
+  fieldMap: Record<string, SourceFieldRef>,
+  read: (ref: SourceFieldRef) => unknown
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  for (const [target, ref] of Object.entries(fieldMap)) {
+    const value = read(ref)
+    if (value === undefined) continue
+    if (typeof value === 'string' && value.length === 0) continue
+    out[target] = value
+  }
+  return out
+}
+
+function readRecordingField(r: Recording, ref: SourceFieldRef): unknown {
+  if (ref.kind === 'literal') return ref.value
+  switch (ref.field) {
+    case 'recording.id':
+      return r.id
+    case 'recording.datetime':
+      return r.datetime
+    case 'recording.transcript':
+      return r.result
+    case 'recording.rawTranscript':
+      return r.rawResult
+    case 'recording.excerpt':
+      return r.excerpt
+    case 'recording.mode':
+      return r.modeName
+    case 'recording.model':
+      return r.modelName
+    case 'recording.device':
+      return r.recordingDevice
+    case 'recording.appVersion':
+      return r.appVersion
+    case 'recording.language':
+      return r.languageSelected || undefined
+    case 'recording.durationSeconds':
+      return r.duration / 1000
+    case 'recording.segments':
+      return r.segments.map((s) => ({ start: s.start, end: s.end, text: s.text }))
+    case 'recording.wordCount':
+      return r.wordCount
+    case 'recording.wordsPerMinute':
+      return r.wordsPerMinute
+    default:
+      // Session-kind ref on a recording — return undefined so the entry
+      // gets dropped rather than emitting nonsense. Shouldn't happen
+      // through legitimate UI but the type system can't enforce kind-
+      // matching here.
+      return undefined
+  }
+}
+
+function readSessionField(s: SessionGroup, ref: SourceFieldRef): unknown {
+  if (ref.kind === 'literal') return ref.value
+  switch (ref.field) {
+    case 'session.sourceId':
+      return s.sourceId
+    case 'session.startedAt':
+      return s.startedAt
+    case 'session.endedAt':
+      return s.endedAt
+    case 'session.recordingCount':
+      return s.recordingCount
+    case 'session.totalDurationSeconds':
+      return s.totalDurationSeconds
+    case 'session.dominantMode':
+      return s.dominantMode
+    case 'session.gapThresholdMinutes':
+      return s.gapThresholdMinutes
+    default:
+      return undefined
   }
 }
 
