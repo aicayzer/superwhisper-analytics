@@ -1,7 +1,7 @@
-import { ConnectionPanel } from './ConnectionPanel'
-import { MappingPanel } from './MappingPanel'
+import { ConnectionCard } from './ConnectionCard'
 import { SettingsCard } from './SettingsCard'
-import { SyncControlsPanel } from './SyncControlsPanel'
+import { SyncCard } from './SyncCard'
+import { TypeMappingCard } from './TypeMappingCard'
 import { useConfigStore } from '@renderer/state/configStore'
 import { useMymeStore } from '@renderer/state/mymeStore'
 import { Check, Cloud, CloudOff, Copy, ExternalLink, RefreshCw } from 'lucide-react'
@@ -9,31 +9,18 @@ import { useEffect, useState } from 'react'
 import type { MymeStatus } from '../../../../preload/api'
 
 /**
- * Settings → Integrations → Myme card.
+ * Settings → Myme tab. Renders one or more SettingsCards depending on
+ * the integration's lifecycle state:
  *
- * One card, six effective states:
+ *   • disabled                  → single "Myme" card explaining why.
+ *   • disconnected / connecting → single "Connection" card carrying the
+ *     endpoint + connect flow (device-flow code / API-key paste).
+ *   • connected / syncing       → three sibling cards in order:
+ *                                  Connection · Sync · Type mapping.
  *
- *   1. `disabled`              — demo mode is on, or no recordings path.
- *                                Card is greyed out; sync engine is inert.
- *   2. `disconnected`          — endpoint URL + "Connect to Myme" button.
- *   3. `connecting (device)`   — default. User-code + "Verify in browser"
- *                                button; opens the verification URI in
- *                                the system browser. Includes a
- *                                "Use API key instead" fallback link.
- *   4. `connecting (api-key)`  — dev/escape hatch. API-key paste-and-verify
- *                                pane.
- *   5. `connected`             — last synced time + "Sync now" + a sync-cap
- *                                setting (default 100; 0 = no cap). If
- *                                `lastError` is set, an inline error row
- *                                appears below.
- *   6. `syncing`               — progress text + Cancel button. The signal
- *                                threaded into the engine stops further
- *                                upserts once aborted; partial state is
- *                                persisted.
- *
- * Failure paths never reach the main app — Myme is optional, so its
- * problems stay in this card. (Deliberate departure from how scan
- * errors surface elsewhere.)
+ * The tab strip lives in `Settings.tsx`; this module knows nothing
+ * about it. Each connected-state card lives in its own file
+ * (`ConnectionCard.tsx`, `SyncCard.tsx`, `TypeMappingCard.tsx`).
  */
 export function MymeCard(): React.JSX.Element {
   const path = useConfigStore((s) => s.path)
@@ -52,40 +39,88 @@ export function MymeCard(): React.JSX.Element {
       ? 'no-recordings-path'
       : null
 
-  return (
-    <SettingsCard
-      icon={disabledReason ? CloudOff : Cloud}
-      title="Myme"
-      subtitle="Optional — push your recordings into a Myme tenant. Local-only by default."
-    >
-      {disabledReason ? (
-        <DisabledBody reason={disabledReason} />
-      ) : !hydrated || !status ? (
-        <PendingBody />
-      ) : (
-        <StatusBody status={status} />
-      )}
-    </SettingsCard>
-  )
+  if (disabledReason) {
+    return <DisabledCard reason={disabledReason} />
+  }
+  if (!hydrated || !status) {
+    return (
+      <SettingsCard
+        icon={Cloud}
+        title="Myme"
+        subtitle="Push your recordings into a Myme tenant. Off by default — local-only until you connect."
+      >
+        <p className="text-[12.5px] text-muted-foreground">Loading…</p>
+      </SettingsCard>
+    )
+  }
+
+  if (status.kind === 'connected' || status.kind === 'syncing') {
+    return (
+      <>
+        <ConnectionCard
+          endpoint={status.endpoint}
+          syncing={status.kind === 'syncing'}
+          syncProgress={
+            status.kind === 'syncing'
+              ? { phase: status.phase, processed: status.processed, total: status.total }
+              : null
+          }
+        />
+        <SyncCard
+          lastSyncedAt={status.kind === 'connected' ? status.lastSyncedAt : null}
+          lastError={status.kind === 'connected' ? status.lastError : null}
+          syncing={status.kind === 'syncing'}
+          syncProgress={
+            status.kind === 'syncing'
+              ? { phase: status.phase, processed: status.processed, total: status.total }
+              : null
+          }
+        />
+        <TypeMappingCard disabled={status.kind === 'syncing'} />
+      </>
+    )
+  }
+
+  // disconnected / connecting — single card carrying the connect flow.
+  return <ConnectFlowCard status={status} />
 }
 
-function DisabledBody({
+function DisabledCard({
   reason
 }: {
   reason: 'demo-mode' | 'no-recordings-path'
 }): React.JSX.Element {
   const message =
     reason === 'demo-mode'
-      ? 'Disabled while demo mode is on. Toggle demo off to enable.'
-      : 'Disabled until a recordings folder is configured.'
-  return <p className="text-[12.5px] text-muted-foreground">{message}</p>
+      ? 'Turn demo mode off to push real recordings into Myme.'
+      : 'Pick a recordings folder under General before connecting to Myme.'
+  return (
+    <SettingsCard
+      icon={CloudOff}
+      title="Myme"
+      subtitle="Push your recordings into a Myme tenant. Off by default — local-only until you connect."
+    >
+      <p className="text-[12.5px] text-muted-foreground">{message}</p>
+    </SettingsCard>
+  )
 }
 
-function PendingBody(): React.JSX.Element {
-  return <p className="text-[12.5px] text-muted-foreground">Loading…</p>
+const CHROME_BUTTON =
+  'inline-flex h-7 items-center gap-1.5 rounded-md border border-border bg-floating px-3 text-[12px] text-foreground transition-colors hover:bg-foreground/5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-floating'
+
+function ConnectFlowCard({ status }: { status: MymeStatus }): React.JSX.Element {
+  return (
+    <SettingsCard
+      icon={Cloud}
+      title="Connect to Myme"
+      subtitle="Sign in to push your recordings into a Myme tenant. Off by default — local-only until you connect."
+    >
+      <ConnectFlowBody status={status} />
+    </SettingsCard>
+  )
 }
 
-function StatusBody({ status }: { status: MymeStatus }): React.JSX.Element {
+function ConnectFlowBody({ status }: { status: MymeStatus }): React.JSX.Element {
   switch (status.kind) {
     case 'disconnected':
       return <DisconnectedBody endpoint={status.endpoint} lastError={status.lastError} />
@@ -101,21 +136,12 @@ function StatusBody({ status }: { status: MymeStatus }): React.JSX.Element {
       }
       return <ApiKeyConnectingBody />
     case 'connected':
-      return (
-        <ConnectedBody
-          endpoint={status.endpoint}
-          syncLimit={status.syncLimit}
-          lastSyncedAt={status.lastSyncedAt}
-          lastError={status.lastError}
-        />
-      )
     case 'syncing':
-      return <SyncingBody phase={status.phase} processed={status.processed} total={status.total} />
+      // Unreachable — handled by the orchestrator. Render nothing
+      // rather than throwing.
+      return <p className="text-[12.5px] text-muted-foreground">—</p>
   }
 }
-
-const CHROME_BUTTON =
-  'inline-flex h-7 items-center gap-1.5 rounded-md border border-border bg-floating px-3 text-[12px] text-foreground transition-colors hover:bg-foreground/5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-floating'
 
 function DisconnectedBody({
   endpoint,
@@ -146,9 +172,6 @@ function DisconnectedBody({
   async function doConnect(): Promise<void> {
     setBusy(true)
     try {
-      // Make sure the endpoint is persisted before kicking off the flow
-      // so the connect path uses the user's intended URL even if they
-      // didn't blur out of the input first.
       if (changed) await setEndpoint(trimmed)
       await connect()
     } finally {
@@ -189,27 +212,13 @@ function DisconnectedBody({
           disabled={busy || !looksValid}
           className={CHROME_BUTTON}
         >
-          Connect to Myme
+          Connect
         </button>
       </div>
     </div>
   )
 }
 
-/**
- * Default connecting pane — shows the user code + a "Verify in browser"
- * button that opens the verification URI (deep-link variant if the
- * server provided one). A "Use API key instead" link drops down to the
- * legacy paste path for development.
- *
- * The user code is shown prominently with a copy-to-clipboard button so
- * the user can paste it on the verification page if the deep-link
- * variant isn't available or they prefer to type the code by hand.
- *
- * Empty `userCode` / `verificationUri` means we're still mid-DCR (the
- * status payload arrives in two ticks — preparing, then with the real
- * code). Show a spinner placeholder during that window.
- */
 function DeviceConnectingBody({
   userCode,
   verificationUri,
@@ -283,8 +292,7 @@ function DeviceConnectingBody({
   return (
     <div className="space-y-3">
       <p className="text-[12.5px] text-foreground">
-        Approve this device in your browser to connect. The verification page will ask for the code
-        below.
+        Approve this device in your browser. The Myme verification page will ask for the code below.
       </p>
       <div className="rounded-md border border-border bg-card px-3 py-3">
         <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Your code</div>
@@ -365,7 +373,7 @@ function ApiKeyConnectingBody(): React.JSX.Element {
   return (
     <div className="space-y-3">
       <p className="text-[12.5px] text-foreground">
-        Dev path. Paste your Myme API key to connect — it stays on this Mac, encrypted via Keychain.
+        Paste a Myme API key. Stored locally in Keychain — never leaves your Mac.
       </p>
       <label className="block text-[12px] text-muted-foreground">
         API key
@@ -392,101 +400,6 @@ function ApiKeyConnectingBody(): React.JSX.Element {
           className={CHROME_BUTTON}
         >
           {busy ? 'Verifying…' : 'Connect'}
-        </button>
-      </div>
-    </div>
-  )
-}
-
-function ConnectedBody({
-  endpoint,
-  syncLimit,
-  lastSyncedAt,
-  lastError
-}: {
-  endpoint: string
-  syncLimit: number
-  lastSyncedAt: string | null
-  lastError: string | null
-}): React.JSX.Element {
-  const syncNow = useMymeStore((s) => s.syncNow)
-  const setSyncLimit = useMymeStore((s) => s.setSyncLimit)
-  const mapping = useMymeStore((s) => s.mapping)
-  const [busy, setBusy] = useState(false)
-
-  async function doSync(): Promise<void> {
-    setBusy(true)
-    try {
-      await syncNow()
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <div className="space-y-4">
-      <ConnectionPanel endpoint={endpoint} busy={busy} />
-      {mapping && <MappingPanel mapping={mapping} disabled={busy} />}
-      <SyncControlsPanel
-        syncLimit={syncLimit}
-        lastSyncedAt={lastSyncedAt}
-        lastError={lastError}
-        busy={busy}
-        onSync={doSync}
-        onSyncLimit={setSyncLimit}
-      />
-    </div>
-  )
-}
-
-function SyncingBody({
-  phase,
-  processed,
-  total
-}: {
-  phase: 'preparing' | 'recordings' | 'sessions'
-  processed: number
-  total: number
-}): React.JSX.Element {
-  const cancelSync = useMymeStore((s) => s.cancelSync)
-  const [cancelling, setCancelling] = useState(false)
-  const label =
-    phase === 'preparing'
-      ? 'Preparing…'
-      : phase === 'recordings'
-        ? 'Syncing recordings'
-        : 'Syncing sessions'
-
-  async function doCancel(): Promise<void> {
-    setCancelling(true)
-    try {
-      await cancelSync()
-    } finally {
-      setCancelling(false)
-    }
-  }
-
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between text-[12.5px] text-foreground">
-        <span className="inline-flex items-center gap-1.5">
-          <RefreshCw className="h-3 w-3 animate-spin" strokeWidth={1.8} />
-          {label}
-        </span>
-        {total > 0 && (
-          <span className="tabular-nums text-muted-foreground">
-            {processed.toLocaleString()} / {total.toLocaleString()}
-          </span>
-        )}
-      </div>
-      <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={() => void doCancel()}
-          disabled={cancelling}
-          className={CHROME_BUTTON}
-        >
-          {cancelling ? 'Cancelling…' : 'Cancel'}
         </button>
       </div>
     </div>

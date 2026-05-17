@@ -97,17 +97,23 @@ let currentStatus: MymeStatus | null = null
 // short-circuit a long-running poll.
 let activeDeviceFlowAbort: AbortController | null = null
 
-function configSnapshot(): { endpoint: string; syncLimit: number } {
-  const c = getConfig()
-  return { endpoint: c.myme.endpoint, syncLimit: c.myme.syncLimit }
+// In-flight sync state. Coalesces concurrent `syncNow` / `testSync`
+// calls; the single-promise guard means a click on either while a sync
+// is running returns the in-flight promise rather than spawning a
+// second pass.
+let syncInFlight: Promise<MymeStatus> | null = null
+let activeAbort: AbortController | null = null
+
+function endpointSnapshot(): string {
+  return getConfig().myme.endpoint
 }
 
 function buildInitialStatus(): MymeStatus {
-  const { endpoint, syncLimit } = configSnapshot()
+  const endpoint = endpointSnapshot()
   if (credentialExists() && readCredential() !== null) {
-    return { kind: 'connected', endpoint, syncLimit, lastSyncedAt: null, lastError: null }
+    return { kind: 'connected', endpoint, lastSyncedAt: null, lastError: null }
   }
-  return { kind: 'disconnected', endpoint, syncLimit, lastError: null }
+  return { kind: 'disconnected', endpoint, lastError: null }
 }
 
 function ensureStatus(): MymeStatus {
@@ -141,14 +147,22 @@ export function setEndpoint(url: string): MymeStatus {
   return ensureStatus()
 }
 
-/** Persist the "push N most-recent" testing knob. Reflected on the
- *  card and threaded through the engine's next `syncRun()`. */
-export function setSyncLimit(value: number): MymeStatus {
-  const clamped = Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0
-  const existing = getConfig().myme
-  setConfig({ myme: { ...existing, syncLimit: clamped } })
-  setStatus({ ...ensureStatus(), syncLimit: clamped } as MymeStatus)
-  return ensureStatus()
+/** Run a small dry-run sync against the 5 most recent recordings.
+ *  Useful for sanity-checking the integration without touching the
+ *  full corpus. Skips soft-delete and session derivation while the
+ *  cap is in effect, so the test run never trashes existing items
+ *  beyond the cap. */
+export async function testSync(): Promise<MymeStatus> {
+  if (syncInFlight) return syncInFlight
+  const status = ensureStatus()
+  if (status.kind !== 'connected') return status
+  syncInFlight = runSync({ limit: 5 })
+  try {
+    return await syncInFlight
+  } finally {
+    syncInFlight = null
+    activeAbort = null
+  }
 }
 
 /** Read the persisted mapping config. The renderer hydrates this on
@@ -267,14 +281,14 @@ export async function registerType(schema: TypeSchema): Promise<TypeSchema | nul
  * failure to `disconnected` with a sensible `lastError`.
  */
 export async function connect(): Promise<MymeStatus> {
-  const { endpoint, syncLimit } = configSnapshot()
+  const endpoint = endpointSnapshot()
   // Optimistic transition so the renderer can show a "preparing…" UX if
   // it wants; the real device-flow payload arrives a moment later.
   setStatus({
     kind: 'connecting',
     mode: 'device',
     endpoint,
-    syncLimit,
+
     userCode: '',
     verificationUri: '',
     verificationUriComplete: null,
@@ -300,7 +314,7 @@ export async function connect(): Promise<MymeStatus> {
     return setStatus({
       kind: 'disconnected',
       endpoint,
-      syncLimit,
+
       lastError: describeAuthError(err)
     })
   }
@@ -309,7 +323,7 @@ export async function connect(): Promise<MymeStatus> {
     kind: 'connecting',
     mode: 'device',
     endpoint,
-    syncLimit,
+
     userCode: handle.user_code,
     verificationUri: handle.verification_uri,
     verificationUriComplete: handle.verification_uri_complete || null,
@@ -337,7 +351,7 @@ export async function connect(): Promise<MymeStatus> {
     return setStatus({
       kind: 'connected',
       endpoint,
-      syncLimit,
+
       lastSyncedAt: null,
       lastError: null
     })
@@ -347,7 +361,7 @@ export async function connect(): Promise<MymeStatus> {
     return setStatus({
       kind: 'disconnected',
       endpoint,
-      syncLimit,
+
       lastError: describeAuthError(err)
     })
   } finally {
@@ -365,8 +379,8 @@ export function useApiKey(): MymeStatus {
     activeDeviceFlowAbort.abort()
     activeDeviceFlowAbort = null
   }
-  const { endpoint, syncLimit } = configSnapshot()
-  return setStatus({ kind: 'connecting', mode: 'api-key', endpoint, syncLimit })
+  const endpoint = endpointSnapshot()
+  return setStatus({ kind: 'connecting', mode: 'api-key', endpoint })
 }
 
 /** Cancel an in-progress connect attempt. Aborts a device-flow poll if
@@ -377,8 +391,8 @@ export function cancelConnect(): MymeStatus {
     activeDeviceFlowAbort.abort()
     activeDeviceFlowAbort = null
   }
-  const { endpoint, syncLimit } = configSnapshot()
-  return setStatus({ kind: 'disconnected', endpoint, syncLimit, lastError: null })
+  const endpoint = endpointSnapshot()
+  return setStatus({ kind: 'disconnected', endpoint, lastError: null })
 }
 
 /**
@@ -392,12 +406,12 @@ export function cancelConnect(): MymeStatus {
  */
 export async function submitApiKey(key: string): Promise<MymeStatus> {
   const trimmed = key.trim()
-  const { endpoint, syncLimit } = configSnapshot()
+  const endpoint = endpointSnapshot()
   if (!trimmed) {
     return setStatus({
       kind: 'disconnected',
       endpoint,
-      syncLimit,
+
       lastError: 'API key is empty.'
     })
   }
@@ -409,7 +423,7 @@ export async function submitApiKey(key: string): Promise<MymeStatus> {
     return setStatus({
       kind: 'disconnected',
       endpoint,
-      syncLimit,
+
       lastError: 'Could not encrypt credential (safeStorage unavailable).'
     })
   }
@@ -421,7 +435,7 @@ export async function submitApiKey(key: string): Promise<MymeStatus> {
     return setStatus({
       kind: 'connected',
       endpoint,
-      syncLimit,
+
       lastSyncedAt: null,
       lastError: null
     })
@@ -429,7 +443,7 @@ export async function submitApiKey(key: string): Promise<MymeStatus> {
     clearCredential()
     invalidateClient()
     const message = describeAuthError(err)
-    return setStatus({ kind: 'disconnected', endpoint, syncLimit, lastError: message })
+    return setStatus({ kind: 'disconnected', endpoint, lastError: message })
   }
 }
 
@@ -441,8 +455,8 @@ export function disconnect(): MymeStatus {
   clearCredential()
   clearState()
   invalidateClient()
-  const { endpoint, syncLimit } = configSnapshot()
-  setStatus({ kind: 'disconnected', endpoint, syncLimit, lastError: null })
+  const endpoint = endpointSnapshot()
+  setStatus({ kind: 'disconnected', endpoint, lastError: null })
   return ensureStatus()
 }
 
@@ -455,9 +469,6 @@ export function disconnect(): MymeStatus {
  * flight returns the current status without spawning a parallel run.
  * Same engine path is reused by the watcher cascade in milestone 5.
  */
-let syncInFlight: Promise<MymeStatus> | null = null
-let activeAbort: AbortController | null = null
-
 export async function syncNow(): Promise<MymeStatus> {
   if (syncInFlight) return syncInFlight
   const status = ensureStatus()
@@ -480,15 +491,14 @@ export function cancelSync(): MymeStatus {
   return ensureStatus()
 }
 
-async function runSync(): Promise<MymeStatus> {
-  const { endpoint, syncLimit } = configSnapshot()
+async function runSync(opts: { limit?: number } = {}): Promise<MymeStatus> {
+  const endpoint = endpointSnapshot()
   const status = ensureStatus()
   const previousLastSyncedAt = status.kind === 'connected' ? status.lastSyncedAt : null
 
   setStatus({
     kind: 'syncing',
     endpoint,
-    syncLimit,
     phase: 'preparing',
     processed: 0,
     total: 0
@@ -497,7 +507,7 @@ async function runSync(): Promise<MymeStatus> {
   activeAbort = new AbortController()
   const cfg = getConfig().myme
   const outcome = await syncRun({
-    limit: syncLimit,
+    limit: opts.limit ?? 0,
     mapping: cfg.mapping,
     modeFilter: cfg.modeFilter,
     signal: activeAbort.signal,
@@ -505,7 +515,6 @@ async function runSync(): Promise<MymeStatus> {
       setStatus({
         kind: 'syncing',
         endpoint,
-        syncLimit,
         phase: e.phase,
         processed: e.processed,
         total: e.total
@@ -519,21 +528,21 @@ async function runSync(): Promise<MymeStatus> {
     return setStatus({
       kind: 'disconnected',
       endpoint,
-      syncLimit,
+
       lastError: 'No credential available.'
     })
   }
 
   if (outcome.error && /Authentication/i.test(outcome.error)) {
     clearCredential()
-    return setStatus({ kind: 'disconnected', endpoint, syncLimit, lastError: outcome.error })
+    return setStatus({ kind: 'disconnected', endpoint, lastError: outcome.error })
   }
 
   const lastSyncedAt = outcome.ok ? outcome.finishedAt : previousLastSyncedAt
   const next = setStatus({
     kind: 'connected',
     endpoint,
-    syncLimit,
+
     lastSyncedAt,
     lastError: outcome.ok ? null : outcome.error
   })

@@ -33,13 +33,13 @@ interface MymeState {
   typeListLoading: boolean
   hydrate: () => Promise<void>
   setEndpoint: (url: string) => Promise<void>
-  setSyncLimit: (n: number) => Promise<void>
   connect: () => Promise<void>
   useApiKey: () => Promise<void>
   cancelConnect: () => Promise<void>
   submitApiKey: (key: string) => Promise<void>
   disconnect: () => Promise<void>
   syncNow: () => Promise<void>
+  testSync: () => Promise<void>
   cancelSync: () => Promise<void>
   refreshMapping: () => Promise<void>
   setMapping: (mapping: MymeMapping) => Promise<void>
@@ -77,11 +77,6 @@ export const useMymeStore = create<MymeState>((set, get) => ({
     set({ status: next })
   },
 
-  setSyncLimit: async (n) => {
-    const next = await window.api.myme.setSyncLimit(n)
-    set({ status: next })
-  },
-
   connect: async () => {
     const next = await window.api.myme.connect()
     set({ status: next })
@@ -109,6 +104,11 @@ export const useMymeStore = create<MymeState>((set, get) => ({
 
   syncNow: async () => {
     const next = await window.api.myme.syncNow()
+    set({ status: next })
+  },
+
+  testSync: async () => {
+    const next = await window.api.myme.testSync()
     set({ status: next })
   },
 
