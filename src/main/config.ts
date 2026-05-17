@@ -35,7 +35,6 @@ function defaultConfig(): Config {
     devTools: false,
     myme: {
       endpoint: DEFAULT_MYME_ENDPOINT,
-      syncLimit: 100,
       mapping: defaultMapping(),
       modeFilter: null
     }
@@ -80,10 +79,6 @@ export function getConfig(): Config {
       typeof parsed.myme?.endpoint === 'string' && parsed.myme.endpoint.length > 0
         ? parsed.myme.endpoint
         : DEFAULT_MYME_ENDPOINT
-    const mymeSyncLimit =
-      typeof parsed.myme?.syncLimit === 'number' && Number.isFinite(parsed.myme.syncLimit)
-        ? Math.max(0, Math.floor(parsed.myme.syncLimit))
-        : 0
     // Additive migration: configs pre-dating the mapping work have no
     // `mapping` block. Drop in the bundled default so the engine has a
     // working mapping to project against from the very first sync.
@@ -106,7 +101,6 @@ export function getConfig(): Config {
       devTools: parsed.devTools === true,
       myme: {
         endpoint: mymeEndpoint,
-        syncLimit: mymeSyncLimit,
         mapping: mymeMapping,
         modeFilter: mymeModeFilter
       }

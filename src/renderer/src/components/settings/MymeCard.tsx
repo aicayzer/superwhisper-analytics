@@ -47,7 +47,7 @@ export function MymeCard(): React.JSX.Element {
       <SettingsCard
         icon={Cloud}
         title="Myme"
-        subtitle="Optional — push your recordings into a Myme tenant."
+        subtitle="Push your recordings into a Myme tenant. Off by default — local-only until you connect."
       >
         <p className="text-[12.5px] text-muted-foreground">Loading…</p>
       </SettingsCard>
@@ -67,7 +67,6 @@ export function MymeCard(): React.JSX.Element {
           }
         />
         <SyncCard
-          syncLimit={status.syncLimit}
           lastSyncedAt={status.kind === 'connected' ? status.lastSyncedAt : null}
           lastError={status.kind === 'connected' ? status.lastError : null}
           syncing={status.kind === 'syncing'}
@@ -93,13 +92,13 @@ function DisabledCard({
 }): React.JSX.Element {
   const message =
     reason === 'demo-mode'
-      ? 'Disabled while demo mode is on. Toggle demo off to enable.'
-      : 'Disabled until a recordings folder is configured.'
+      ? 'Turn demo mode off to push real recordings into Myme.'
+      : 'Pick a recordings folder under General before connecting to Myme.'
   return (
     <SettingsCard
       icon={CloudOff}
       title="Myme"
-      subtitle="Optional — push your recordings into a Myme tenant."
+      subtitle="Push your recordings into a Myme tenant. Off by default — local-only until you connect."
     >
       <p className="text-[12.5px] text-muted-foreground">{message}</p>
     </SettingsCard>
@@ -114,7 +113,7 @@ function ConnectFlowCard({ status }: { status: MymeStatus }): React.JSX.Element 
     <SettingsCard
       icon={Cloud}
       title="Connect to Myme"
-      subtitle="Optional — push your recordings into a Myme tenant. Local-only by default."
+      subtitle="Sign in to push your recordings into a Myme tenant. Off by default — local-only until you connect."
     >
       <ConnectFlowBody status={status} />
     </SettingsCard>
@@ -293,7 +292,7 @@ function DeviceConnectingBody({
   return (
     <div className="space-y-3">
       <p className="text-[12.5px] text-foreground">
-        Approve this device in your browser. The verification page will ask for the code below.
+        Approve this device in your browser. The Myme verification page will ask for the code below.
       </p>
       <div className="rounded-md border border-border bg-card px-3 py-3">
         <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Your code</div>
@@ -374,7 +373,7 @@ function ApiKeyConnectingBody(): React.JSX.Element {
   return (
     <div className="space-y-3">
       <p className="text-[12.5px] text-foreground">
-        Dev path. Paste your Myme API key — it stays on this Mac, encrypted via Keychain.
+        Paste a Myme API key. Stored locally in Keychain — never leaves your Mac.
       </p>
       <label className="block text-[12px] text-muted-foreground">
         API key

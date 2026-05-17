@@ -50,11 +50,6 @@ export interface Config {
    *  safeStorage, sync state in its own JSON file. */
   myme: {
     endpoint: string
-    /** Testing knob: cap each sync to the N most-recent recordings.
-     *  0 (default) syncs the full set; positive values are useful for
-     *  smoke runs against staging where the full corpus is too slow.
-     *  Also gates soft-delete + session passes — see engine.ts. */
-    syncLimit: number
     /** Active mapping config — which Myme type each source kind binds
      *  to, plus the field map for projection. Defaults to the bundled
      *  superwhisper.* types. Older configs without a `mapping` block
@@ -167,7 +162,6 @@ export type MymeStatus =
   | {
       kind: 'disconnected'
       endpoint: string
-      syncLimit: number
       /** Populated when a previous connect attempt failed. Cleared on
        *  successful connect or disconnect. */
       lastError: string | null
@@ -176,13 +170,11 @@ export type MymeStatus =
       kind: 'connecting'
       mode: 'api-key'
       endpoint: string
-      syncLimit: number
     }
   | {
       kind: 'connecting'
       mode: 'device'
       endpoint: string
-      syncLimit: number
       /** Short user-readable code (XXXX-XXXX shape) the user types into
        *  the verification page. */
       userCode: string
@@ -200,7 +192,6 @@ export type MymeStatus =
   | {
       kind: 'connected'
       endpoint: string
-      syncLimit: number
       /** ISO; null until the first successful sync. */
       lastSyncedAt: string | null
       /** Set after a failed sync; cleared on the next success. */
@@ -209,7 +200,6 @@ export type MymeStatus =
   | {
       kind: 'syncing'
       endpoint: string
-      syncLimit: number
       phase: MymeSyncPhase
       processed: number
       total: number
@@ -318,9 +308,11 @@ export const api = {
      *  status (typically `connected` with `lastError = 'Cancelled'`).
      *  No-op when nothing is in flight. */
     cancelSync: (): Promise<MymeStatus> => ipcRenderer.invoke('myme:cancelSync'),
-    /** Set the "push N most-recent recordings" testing knob.
-     *  `0` disables it (full sync). Persisted to `config.json`. */
-    setSyncLimit: (n: number): Promise<MymeStatus> => ipcRenderer.invoke('myme:setSyncLimit', n),
+    /** Run a small dry-run sync against the 5 most recent recordings.
+     *  Useful for sanity-checking the integration without touching the
+     *  full corpus. Skips soft-delete and session derivation while the
+     *  cap is in effect. */
+    testSync: (): Promise<MymeStatus> => ipcRenderer.invoke('myme:testSync'),
     /** Read the persisted mapping config. */
     getMapping: (): Promise<MymeMapping> => ipcRenderer.invoke('myme:getMapping'),
     /** Persist a new mapping. Resets the sync state so the next pass

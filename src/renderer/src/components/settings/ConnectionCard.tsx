@@ -71,7 +71,7 @@ export function ConnectionCard({
     <SettingsCard
       icon={Cloud}
       title="Connection"
-      subtitle="Where the app pushes to and which account is signed in."
+      subtitle="The Myme tenant the app pushes into, and the signed-in account."
       headerExtra={<StatusPill probe={probe} probing={probing} syncing={syncing} />}
     >
       <div className="space-y-3">

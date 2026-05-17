@@ -365,9 +365,9 @@ function BindingPanel({
       {confirming && (
         <div className="space-y-2 rounded-md border border-accent-orange/40 bg-accent-orange/10 p-3">
           <p className="text-[12.5px] text-foreground">
-            Applying this mapping trashes items synced under the previous binding and re-mints them
-            under the new one on the next sync. Old items soft-delete — recoverable from your Myme
-            client.
+            Changing the mapping re-mints your items under a new type id on the next sync. Items
+            from the previous binding move to the trash — recover them from your Myme client if you
+            change your mind.
           </p>
           <div className="flex justify-end gap-1.5">
             <button
@@ -590,29 +590,32 @@ function FieldMapList({
     return null as unknown as React.JSX.Element
   }
 
-  // Outer grid defines the four columns; each row spans all four via
-  // `col-span-full` + `grid-cols-subgrid`. The target column is
-  // `max-content` so it stretches to fit the longest target name; the
-  // source dropdown takes the rest.
+  // Five-column subgrid: target | spacer (flexes) | arrow | source |
+  // remove. Target is flush left, the source cluster (arrow + value +
+  // optional remove button) is flush right. Spacer columns keep the
+  // two halves apart and let target/arrow alignment stay stable
+  // regardless of how wide either side is.
   return (
     <div className="space-y-2">
       <div className="flex items-baseline justify-between">
         <span className="text-[12px] text-muted-foreground">Fields</span>
         {!editable && (
-          <span className="text-[11.5px] text-muted-foreground">Fixed by the bundled type.</span>
+          <span className="text-[11.5px] text-muted-foreground">
+            Defined by the bundled type — not editable.
+          </span>
         )}
       </div>
       {entries.length === 0 ? (
         <p className="rounded-md border border-dashed border-border px-3 py-2 text-[12px] text-muted-foreground">
-          No fields mapped yet.
+          No fields mapped yet — pick a target type or add one below.
         </p>
       ) : (
         <div
           className="grid divide-y divide-border overflow-hidden rounded-md border border-border"
           style={{
             gridTemplateColumns: editable
-              ? 'max-content auto minmax(0, 1fr) auto'
-              : 'max-content auto minmax(0, 1fr)'
+              ? 'max-content minmax(0, 1fr) auto minmax(10rem, 18rem) auto'
+              : 'max-content minmax(0, 1fr) auto max-content'
           }}
         >
           {entries.map(([target, ref]) => (
@@ -621,6 +624,7 @@ function FieldMapList({
               className="col-span-full grid grid-cols-subgrid items-center gap-x-3 px-3 py-1.5"
             >
               <code className="truncate font-mono text-[12px] text-foreground">{target}</code>
+              <span aria-hidden />
               <span className="text-muted-foreground" aria-hidden>
                 ←
               </span>
@@ -645,7 +649,7 @@ function FieldMapList({
                   />
                 </div>
               ) : (
-                <span className="min-w-0 truncate text-[12px] text-muted-foreground">
+                <span className="truncate whitespace-nowrap text-[12px] text-muted-foreground">
                   {describeRef(ref)}
                 </span>
               )}
