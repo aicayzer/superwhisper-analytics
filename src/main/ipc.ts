@@ -172,6 +172,11 @@ export function registerIpcHandlers(): void {
   })
   ipcMain.handle('myme:disconnect', (): MymeStatus => myme.disconnect())
   ipcMain.handle('myme:syncNow', (): Promise<MymeStatus> => myme.syncNow())
+  ipcMain.handle('myme:cancelSync', (): MymeStatus => myme.cancelSync())
+  ipcMain.handle('myme:setSyncLimit', (_, n: unknown): MymeStatus => {
+    if (typeof n !== 'number' || !Number.isFinite(n)) return myme.getStatus()
+    return myme.setSyncLimit(n)
+  })
 
   // Apply the persisted watch-folder preference on startup.
   syncWatcher()

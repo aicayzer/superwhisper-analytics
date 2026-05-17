@@ -47,6 +47,11 @@ export interface Config {
    *  safeStorage, sync state in its own JSON file. */
   myme: {
     endpoint: string
+    /** Testing knob: cap each sync to the N most-recent recordings.
+     *  0 (default) syncs the full set; positive values are useful for
+     *  smoke runs against staging where the full corpus is too slow.
+     *  Also gates soft-delete + session passes — see engine.ts. */
+    syncLimit: number
   }
 }
 
@@ -118,6 +123,7 @@ export type MymeStatus =
   | {
       kind: 'disconnected'
       endpoint: string
+      syncLimit: number
       /** Populated when a previous connect attempt failed. Cleared on
        *  successful connect or disconnect. */
       lastError: string | null
@@ -125,10 +131,12 @@ export type MymeStatus =
   | {
       kind: 'connecting'
       endpoint: string
+      syncLimit: number
     }
   | {
       kind: 'connected'
       endpoint: string
+      syncLimit: number
       /** ISO; null until the first successful sync. */
       lastSyncedAt: string | null
       /** Set after a failed sync; cleared on the next success. */
@@ -137,6 +145,7 @@ export type MymeStatus =
   | {
       kind: 'syncing'
       endpoint: string
+      syncLimit: number
       phase: MymeSyncPhase
       processed: number
       total: number
@@ -232,6 +241,13 @@ export const api = {
     /** Manual sync trigger. Returns when the sync completes (success
      *  or otherwise); intermediate progress lands via `onStatus`. */
     syncNow: (): Promise<MymeStatus> => ipcRenderer.invoke('myme:syncNow'),
+    /** Abort the currently-running sync. Returns the post-cancel
+     *  status (typically `connected` with `lastError = 'Cancelled'`).
+     *  No-op when nothing is in flight. */
+    cancelSync: (): Promise<MymeStatus> => ipcRenderer.invoke('myme:cancelSync'),
+    /** Set the "push N most-recent recordings" testing knob.
+     *  `0` disables it (full sync). Persisted to `config.json`. */
+    setSyncLimit: (n: number): Promise<MymeStatus> => ipcRenderer.invoke('myme:setSyncLimit', n),
     /** Subscribe to status changes from the sync engine. */
     onStatus: (handler: (status: MymeStatus) => void): Unsubscribe => {
       const listener = (_e: unknown, payload: MymeStatus): void => handler(payload)

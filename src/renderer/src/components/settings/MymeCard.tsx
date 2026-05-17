@@ -14,11 +14,14 @@ import type { MymeStatus } from '../../../../preload/api'
  *   1. `disabled`     — demo mode is on, or no recordings path. Card is
  *                       greyed out; sync engine is inert.
  *   2. `disconnected` — endpoint URL + "Connect to Myme" button.
- *   3. `connecting`   — show the device-flow code and verification URI.
- *   4. `connected`    — last synced time + "Sync now". If `lastError`
- *                       is set, an inline error row appears below.
- *   5. `syncing`      — progress text only. No cancel — initial sync of
- *                       ~11k recordings takes ~20–30s; let it run.
+ *   3. `connecting`   — API-key paste-and-verify pane.
+ *   4. `connected`    — last synced time + "Sync now" + a "Push N most
+ *                       recent (testing)" knob for smoke runs. If
+ *                       `lastError` is set, an inline error row appears
+ *                       below.
+ *   5. `syncing`      — progress text + Cancel button. The signal
+ *                       threaded into the engine stops further upserts
+ *                       once aborted; partial state is persisted.
  *
  * Failure paths never reach the main app — Myme is optional, so its
  * problems stay in this card. (Deliberate departure from how scan
@@ -84,6 +87,7 @@ function StatusBody({ status }: { status: MymeStatus }): React.JSX.Element {
       return (
         <ConnectedBody
           endpoint={status.endpoint}
+          syncLimit={status.syncLimit}
           lastSyncedAt={status.lastSyncedAt}
           lastError={status.lastError}
         />
@@ -235,15 +239,18 @@ function ConnectingBody(): React.JSX.Element {
 
 function ConnectedBody({
   endpoint,
+  syncLimit,
   lastSyncedAt,
   lastError
 }: {
   endpoint: string
+  syncLimit: number
   lastSyncedAt: string | null
   lastError: string | null
 }): React.JSX.Element {
   const syncNow = useMymeStore((s) => s.syncNow)
   const disconnect = useMymeStore((s) => s.disconnect)
+  const setSyncLimit = useMymeStore((s) => s.setSyncLimit)
   const [busy, setBusy] = useState(false)
   // Re-render once a minute so "5m ago" drifts without a custom hook.
   const [, setNow] = useState(() => Date.now())
@@ -280,6 +287,7 @@ function ConnectedBody({
           Last sync failed: {lastError}
         </p>
       )}
+      <SyncLimitRow value={syncLimit} onCommit={setSyncLimit} disabled={busy} />
       <div className="flex justify-end gap-1.5">
         <button
           type="button"
@@ -303,6 +311,73 @@ function ConnectedBody({
   )
 }
 
+/**
+ * The "push N most-recent" testing knob. Placed inside the connected
+ * card so it's clearly bound to the active integration; 0 means full
+ * sync. Number-only input, persisted on blur (so typing-in-progress
+ * doesn't churn the IPC). Hidden when the card is in any other state.
+ */
+function SyncLimitRow({
+  value,
+  onCommit,
+  disabled
+}: {
+  value: number
+  onCommit: (n: number) => Promise<void>
+  disabled: boolean
+}): React.JSX.Element {
+  // Key the row by the committed value so the input resets to the new
+  // canonical value whenever it changes externally (e.g. disconnect →
+  // reconnect resets back to whatever was persisted). Avoids the
+  // setState-in-effect anti-pattern.
+  return <SyncLimitRowInner key={value} value={value} onCommit={onCommit} disabled={disabled} />
+}
+
+function SyncLimitRowInner({
+  value,
+  onCommit,
+  disabled
+}: {
+  value: number
+  onCommit: (n: number) => Promise<void>
+  disabled: boolean
+}): React.JSX.Element {
+  const [draft, setDraft] = useState(String(value))
+
+  async function commit(): Promise<void> {
+    const n = Number.parseInt(draft, 10)
+    const next = Number.isFinite(n) && n > 0 ? n : 0
+    if (next === value) return
+    await onCommit(next)
+  }
+
+  return (
+    <div className="rounded-md border border-dashed border-border px-3 py-2.5">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[12px] font-medium text-foreground">
+            Push N most recent (testing)
+          </div>
+          <div className="mt-0.5 text-[11.5px] text-muted-foreground">
+            0 syncs the full set. Sessions + disk-delete pass are skipped while a limit is in
+            effect.
+          </div>
+        </div>
+        <input
+          type="number"
+          min="0"
+          inputMode="numeric"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={() => void commit()}
+          disabled={disabled}
+          className="w-20 rounded-md border border-border bg-card px-2 py-1 text-right text-[12.5px] tabular-nums text-foreground focus:border-foreground/30 focus:outline-none disabled:opacity-50"
+        />
+      </div>
+    </div>
+  )
+}
+
 function SyncingBody({
   phase,
   processed,
@@ -312,14 +387,26 @@ function SyncingBody({
   processed: number
   total: number
 }): React.JSX.Element {
+  const cancelSync = useMymeStore((s) => s.cancelSync)
+  const [cancelling, setCancelling] = useState(false)
   const label =
     phase === 'preparing'
       ? 'Preparing…'
       : phase === 'recordings'
         ? 'Syncing recordings'
         : 'Syncing sessions'
+
+  async function doCancel(): Promise<void> {
+    setCancelling(true)
+    try {
+      await cancelSync()
+    } finally {
+      setCancelling(false)
+    }
+  }
+
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <div className="flex items-center justify-between text-[12.5px] text-foreground">
         <span className="inline-flex items-center gap-1.5">
           <RefreshCw className="h-3 w-3 animate-spin" strokeWidth={1.8} />
@@ -330,6 +417,16 @@ function SyncingBody({
             {processed.toLocaleString()} / {total.toLocaleString()}
           </span>
         )}
+      </div>
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={() => void doCancel()}
+          disabled={cancelling}
+          className={CHROME_BUTTON}
+        >
+          {cancelling ? 'Cancelling…' : 'Cancel'}
+        </button>
       </div>
     </div>
   )

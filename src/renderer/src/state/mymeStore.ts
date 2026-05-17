@@ -24,10 +24,12 @@ interface MymeState {
   hydrated: boolean
   hydrate: () => Promise<void>
   setEndpoint: (url: string) => Promise<void>
+  setSyncLimit: (n: number) => Promise<void>
   connect: () => Promise<void>
   submitApiKey: (key: string) => Promise<void>
   disconnect: () => Promise<void>
   syncNow: () => Promise<void>
+  cancelSync: () => Promise<void>
 }
 
 export const useMymeStore = create<MymeState>((set, get) => ({
@@ -49,6 +51,11 @@ export const useMymeStore = create<MymeState>((set, get) => ({
     set({ status: next })
   },
 
+  setSyncLimit: async (n) => {
+    const next = await window.api.myme.setSyncLimit(n)
+    set({ status: next })
+  },
+
   connect: async () => {
     const next = await window.api.myme.connect()
     set({ status: next })
@@ -66,6 +73,11 @@ export const useMymeStore = create<MymeState>((set, get) => ({
 
   syncNow: async () => {
     const next = await window.api.myme.syncNow()
+    set({ status: next })
+  },
+
+  cancelSync: async () => {
+    const next = await window.api.myme.cancelSync()
     set({ status: next })
   }
 }))

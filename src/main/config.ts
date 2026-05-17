@@ -32,7 +32,7 @@ function defaultConfig(): Config {
     demoMode: false,
     autoHideSidebar: true,
     devTools: false,
-    myme: { endpoint: DEFAULT_MYME_ENDPOINT }
+    myme: { endpoint: DEFAULT_MYME_ENDPOINT, syncLimit: 0 }
   }
 }
 
@@ -74,6 +74,10 @@ export function getConfig(): Config {
       typeof parsed.myme?.endpoint === 'string' && parsed.myme.endpoint.length > 0
         ? parsed.myme.endpoint
         : DEFAULT_MYME_ENDPOINT
+    const mymeSyncLimit =
+      typeof parsed.myme?.syncLimit === 'number' && Number.isFinite(parsed.myme.syncLimit)
+        ? Math.max(0, Math.floor(parsed.myme.syncLimit))
+        : 0
     return {
       superwhisperPath: parsed.superwhisperPath ?? null,
       fillerWords,
@@ -84,7 +88,7 @@ export function getConfig(): Config {
       // narrow windows, which matches the plan's UX intent.
       autoHideSidebar: parsed.autoHideSidebar !== false,
       devTools: parsed.devTools === true,
-      myme: { endpoint: mymeEndpoint }
+      myme: { endpoint: mymeEndpoint, syncLimit: mymeSyncLimit }
     }
   } catch (err) {
     console.warn('[config] failed to read config.json, falling back to defaults:', err)

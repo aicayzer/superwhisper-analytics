@@ -44,12 +44,17 @@ const STATUS_CHANNEL = 'myme:status'
 // every launch.
 let currentStatus: MymeStatus | null = null
 
+function configSnapshot(): { endpoint: string; syncLimit: number } {
+  const c = getConfig()
+  return { endpoint: c.myme.endpoint, syncLimit: c.myme.syncLimit }
+}
+
 function buildInitialStatus(): MymeStatus {
-  const endpoint = getConfig().myme.endpoint
+  const { endpoint, syncLimit } = configSnapshot()
   if (credentialExists() && readCredential() !== null) {
-    return { kind: 'connected', endpoint, lastSyncedAt: null, lastError: null }
+    return { kind: 'connected', endpoint, syncLimit, lastSyncedAt: null, lastError: null }
   }
-  return { kind: 'disconnected', endpoint, lastError: null }
+  return { kind: 'disconnected', endpoint, syncLimit, lastError: null }
 }
 
 function ensureStatus(): MymeStatus {
@@ -72,7 +77,8 @@ export function getStatus(): MymeStatus {
 
 export function setEndpoint(url: string): MymeStatus {
   const trimmed = url.trim()
-  setConfig({ myme: { endpoint: trimmed } })
+  const existing = getConfig().myme
+  setConfig({ myme: { ...existing, endpoint: trimmed } })
   invalidateClient()
   // Endpoint only changes the URL the next request will hit; the
   // credential still applies. If the card is currently `connected` but
@@ -82,11 +88,21 @@ export function setEndpoint(url: string): MymeStatus {
   return ensureStatus()
 }
 
+/** Persist the "push N most-recent" testing knob. Reflected on the
+ *  card and threaded through the engine's next `syncRun()`. */
+export function setSyncLimit(value: number): MymeStatus {
+  const clamped = Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0
+  const existing = getConfig().myme
+  setConfig({ myme: { ...existing, syncLimit: clamped } })
+  setStatus({ ...ensureStatus(), syncLimit: clamped } as MymeStatus)
+  return ensureStatus()
+}
+
 /** Transition to `connecting` so the renderer renders the API-key
  *  paste pane. The verification happens via `submitApiKey`. */
 export function connect(): MymeStatus {
-  const endpoint = getConfig().myme.endpoint
-  setStatus({ kind: 'connecting', endpoint })
+  const { endpoint, syncLimit } = configSnapshot()
+  setStatus({ kind: 'connecting', endpoint, syncLimit })
   return ensureStatus()
 }
 
@@ -101,9 +117,14 @@ export function connect(): MymeStatus {
  */
 export async function submitApiKey(key: string): Promise<MymeStatus> {
   const trimmed = key.trim()
-  const endpoint = getConfig().myme.endpoint
+  const { endpoint, syncLimit } = configSnapshot()
   if (!trimmed) {
-    return setStatus({ kind: 'disconnected', endpoint, lastError: 'API key is empty.' })
+    return setStatus({
+      kind: 'disconnected',
+      endpoint,
+      syncLimit,
+      lastError: 'API key is empty.'
+    })
   }
   // Temporarily stage the key so getClient() picks it up; persist only
   // after verification succeeds (so a failed attempt doesn't leave a
@@ -113,6 +134,7 @@ export async function submitApiKey(key: string): Promise<MymeStatus> {
     return setStatus({
       kind: 'disconnected',
       endpoint,
+      syncLimit,
       lastError: 'Could not encrypt credential (safeStorage unavailable).'
     })
   }
@@ -121,12 +143,18 @@ export async function submitApiKey(key: string): Promise<MymeStatus> {
     const client = getClient()
     if (!client) throw new Error('client construction failed')
     await client.items.stats()
-    return setStatus({ kind: 'connected', endpoint, lastSyncedAt: null, lastError: null })
+    return setStatus({
+      kind: 'connected',
+      endpoint,
+      syncLimit,
+      lastSyncedAt: null,
+      lastError: null
+    })
   } catch (err) {
     clearCredential()
     invalidateClient()
     const message = describeAuthError(err)
-    return setStatus({ kind: 'disconnected', endpoint, lastError: message })
+    return setStatus({ kind: 'disconnected', endpoint, syncLimit, lastError: message })
   }
 }
 
@@ -134,7 +162,8 @@ export function disconnect(): MymeStatus {
   clearCredential()
   clearState()
   invalidateClient()
-  setStatus({ kind: 'disconnected', endpoint: getConfig().myme.endpoint, lastError: null })
+  const { endpoint, syncLimit } = configSnapshot()
+  setStatus({ kind: 'disconnected', endpoint, syncLimit, lastError: null })
   return ensureStatus()
 }
 
@@ -148,6 +177,7 @@ export function disconnect(): MymeStatus {
  * Same engine path is reused by the watcher cascade in milestone 5.
  */
 let syncInFlight: Promise<MymeStatus> | null = null
+let activeAbort: AbortController | null = null
 
 export async function syncNow(): Promise<MymeStatus> {
   if (syncInFlight) return syncInFlight
@@ -158,21 +188,42 @@ export async function syncNow(): Promise<MymeStatus> {
     return await syncInFlight
   } finally {
     syncInFlight = null
+    activeAbort = null
   }
 }
 
+/** Abort the in-flight sync, if any. The engine persists whatever's
+ *  already landed and returns; this function flips the status back to
+ *  `connected` with `lastError = "Cancelled"` so the card surfaces the
+ *  outcome. A noop when nothing is in flight. */
+export function cancelSync(): MymeStatus {
+  if (activeAbort) activeAbort.abort()
+  return ensureStatus()
+}
+
 async function runSync(): Promise<MymeStatus> {
-  const endpoint = getConfig().myme.endpoint
+  const { endpoint, syncLimit } = configSnapshot()
   const status = ensureStatus()
   const previousLastSyncedAt = status.kind === 'connected' ? status.lastSyncedAt : null
 
-  setStatus({ kind: 'syncing', endpoint, phase: 'preparing', processed: 0, total: 0 })
+  setStatus({
+    kind: 'syncing',
+    endpoint,
+    syncLimit,
+    phase: 'preparing',
+    processed: 0,
+    total: 0
+  })
 
+  activeAbort = new AbortController()
   const outcome = await syncRun({
+    limit: syncLimit,
+    signal: activeAbort.signal,
     onProgress: (e) => {
       setStatus({
         kind: 'syncing',
         endpoint,
+        syncLimit,
         phase: e.phase,
         processed: e.processed,
         total: e.total
@@ -183,18 +234,24 @@ async function runSync(): Promise<MymeStatus> {
   if (outcome.skipped === 'no-client') {
     // Credential disappeared between status check and engine call —
     // surface as disconnected so the card prompts a reconnect.
-    return setStatus({ kind: 'disconnected', endpoint, lastError: 'No credential available.' })
+    return setStatus({
+      kind: 'disconnected',
+      endpoint,
+      syncLimit,
+      lastError: 'No credential available.'
+    })
   }
 
   if (outcome.error && /Authentication/i.test(outcome.error)) {
     clearCredential()
-    return setStatus({ kind: 'disconnected', endpoint, lastError: outcome.error })
+    return setStatus({ kind: 'disconnected', endpoint, syncLimit, lastError: outcome.error })
   }
 
   const lastSyncedAt = outcome.ok ? outcome.finishedAt : previousLastSyncedAt
   const next = setStatus({
     kind: 'connected',
     endpoint,
+    syncLimit,
     lastSyncedAt,
     lastError: outcome.ok ? null : outcome.error
   })

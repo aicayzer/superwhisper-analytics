@@ -68,6 +68,16 @@ export interface SyncOptions {
   /** Override the recording source. Tests inject a fixed set; production
    *  reads from the in-memory cache. */
   recordingsOverride?: Recording[]
+  /** Cap the sync to the N most-recent recordings (sorted newest-first
+   *  by the scanner). 0 / omit / negative → sync the full set. Used by
+   *  the Settings card's "Push N most recent" testing knob so a smoke
+   *  run hits ~25 recordings instead of 11.7k. The diff still trims
+   *  the cap to recordings that haven't been synced yet. */
+  limit?: number
+  /** Cancellation signal. Checked between every `items.upsert` /
+   *  `items.transition` call. On abort the engine persists any
+   *  successes already landed and returns with `error = "Cancelled"`. */
+  signal?: AbortSignal
 }
 
 /**
@@ -94,7 +104,13 @@ export async function syncRun(opts: SyncOptions = {}): Promise<SyncOutcome> {
   // pushOne / soft-delete closures.
   const client = maybeClient
 
-  const recordings = opts.recordingsOverride ?? hydrate().recordings
+  const fullRecordings = opts.recordingsOverride ?? hydrate().recordings
+  // Apply the "push N most-recent" testing knob. Scanner sorts
+  // newest-first, so a plain `slice(0, n)` is the right shape — keeps
+  // the smoke close to "what would happen if you'd only kept these
+  // recordings". A non-positive limit syncs the full set.
+  const limit = typeof opts.limit === 'number' && opts.limit > 0 ? opts.limit : null
+  const recordings = limit ? fullRecordings.slice(0, limit) : fullRecordings
   const state = loadState()
 
   opts.onProgress?.({ phase: 'preparing', processed: 0, total: recordings.length })
@@ -125,8 +141,13 @@ export async function syncRun(opts: SyncOptions = {}): Promise<SyncOutcome> {
   }
 
   // Soft-delete list: recordings tracked in state but absent from
-  // current. Sessions are intentionally not handled in this pass.
-  const toSoftDelete = Object.keys(state.recordings).filter((id) => !seenSourceIds.has(id))
+  // current. Skip when the testing-knob limit is in effect — every
+  // recording past the cap would be falsely "missing" from the view,
+  // which would trash the whole tail. The unlimited path is the only
+  // one that can authoritatively detect disk-deletes.
+  const toSoftDelete = limit
+    ? []
+    : Object.keys(state.recordings).filter((id) => !seenSourceIds.has(id))
 
   const counts = {
     created: 0,
@@ -136,6 +157,7 @@ export async function syncRun(opts: SyncOptions = {}): Promise<SyncOutcome> {
     errored: 0
   }
   let lastError: string | null = null
+  let cancelled = false
   const successesById = new Map<string, SyncStateEntry>()
 
   // ── Upserts ───────────────────────────────────────────────────────
@@ -150,6 +172,15 @@ export async function syncRun(opts: SyncOptions = {}): Promise<SyncOutcome> {
 
   async function pushOne(item: Item): Promise<void> {
     if (halted) return
+    // Pre-flight cancellation check — once the signal fires, we stop
+    // starting fresh requests. In-flight ones still finish (we can't
+    // abort an `items.upsert` call mid-flight via the public SDK), but
+    // their successes still record so the next sync diff-skips them.
+    if (opts.signal?.aborted) {
+      cancelled = true
+      halted = true
+      return
+    }
     try {
       const { item: stored, created } = await client.items.upsert(item.payload)
       if (created) counts.created += 1
@@ -170,6 +201,16 @@ export async function syncRun(opts: SyncOptions = {}): Promise<SyncOutcome> {
         halted = true
         return
       }
+      // If the user cancelled while this request was in flight,
+      // suppress the resulting timeout / network error — the cancel
+      // outcome is the more honest signal. Without this, the card's
+      // last-error row would surface the transport error rather than
+      // "Cancelled" and the user would be left wondering whether
+      // their click did anything.
+      if (opts.signal?.aborted) {
+        cancelled = true
+        return
+      }
       counts.errored += 1
       lastError = describeError(err)
       console.warn(`[myme] upsert failed for ${item.sourceId}:`, err)
@@ -186,7 +227,10 @@ export async function syncRun(opts: SyncOptions = {}): Promise<SyncOutcome> {
   // requests complete instead of waiting for the slowest in each chunk.
   const inFlight: Set<Promise<void>> = new Set()
   for (const item of toUpsert) {
-    if (halted) break
+    if (halted || opts.signal?.aborted) {
+      if (opts.signal?.aborted) cancelled = true
+      break
+    }
     const p = pushOne(item).finally(() => inFlight.delete(p))
     inFlight.add(p)
     if (inFlight.size >= UPSERT_CONCURRENCY) {
@@ -197,6 +241,10 @@ export async function syncRun(opts: SyncOptions = {}): Promise<SyncOutcome> {
 
   if (authFailed) return failAuth(counts, successesById, state)
   if (validationFailed) return failValidation(validationFailed, counts, successesById, state)
+  // `cancelled` is checked again after the soft-delete pass — the loop
+  // we just exited only sets the flag if the *queue* drained on an
+  // aborted signal, not if a push was actively cancelled. Either way,
+  // the final cancelled branch below sees it.
 
   opts.onProgress?.({
     phase: 'recordings',
@@ -212,6 +260,10 @@ export async function syncRun(opts: SyncOptions = {}): Promise<SyncOutcome> {
   // day.
   const softDeletedSourceIds = new Set<string>()
   for (const sourceId of toSoftDelete) {
+    if (opts.signal?.aborted) {
+      cancelled = true
+      break
+    }
     const prev = state.recordings[sourceId]
     if (!prev) {
       softDeletedSourceIds.add(sourceId)
@@ -237,6 +289,21 @@ export async function syncRun(opts: SyncOptions = {}): Promise<SyncOutcome> {
       console.warn(`[myme] soft-delete failed for ${sourceId}:`, err)
     }
   }
+  if (cancelled) {
+    // Persist what we've got from this run's upserts + soft-deletes so
+    // the next sync's diff sees the correct delta.
+    const partialRecordings: Record<string, SyncStateEntry> = { ...state.recordings }
+    for (const [sourceId, entry] of successesById) partialRecordings[sourceId] = entry
+    for (const sourceId of softDeletedSourceIds) delete partialRecordings[sourceId]
+    saveState({ ...state, recordings: partialRecordings })
+    return {
+      ok: false,
+      finishedAt: null,
+      counts,
+      error: 'Cancelled',
+      skipped: null
+    }
+  }
 
   // Build the next-recordings state up-front so the session pass can
   // resolve recording itemIds (for `core.parent-of` edges) from a
@@ -253,15 +320,30 @@ export async function syncRun(opts: SyncOptions = {}): Promise<SyncOutcome> {
   // ── Sessions ──────────────────────────────────────────────────────
   // Derived from the current recording set, full-replaced every run.
   // Threshold change yields fresh source_ids → fresh items → the
-  // diff naturally trash-and-re-mints.
-  const sessionOutcome = await syncSessions({
-    client,
-    recordings,
-    state,
-    recordingIds: nextRecordings,
-    pushedAt,
-    onProgress: opts.onProgress
-  })
+  // diff naturally trash-and-re-mints. Skipped while a `limit` is in
+  // effect: a partial recording view would mint malformed session
+  // groups (and trash legitimate prior sessions). Sessions are an
+  // all-or-nothing concept.
+  const sessionOutcome = limit
+    ? {
+        created: 0,
+        updated: 0,
+        softDeleted: 0,
+        errored: 0,
+        noop: 0,
+        error: null,
+        authFailed: false,
+        nextSessions: state.sessions
+      }
+    : await syncSessions({
+        client,
+        recordings,
+        state,
+        recordingIds: nextRecordings,
+        pushedAt,
+        onProgress: opts.onProgress,
+        signal: opts.signal
+      })
   counts.created += sessionOutcome.created
   counts.updated += sessionOutcome.updated
   counts.softDeleted += sessionOutcome.softDeleted
@@ -274,6 +356,22 @@ export async function syncRun(opts: SyncOptions = {}): Promise<SyncOutcome> {
       recordings: nextRecordings,
       sessions: sessionOutcome.nextSessions
     })
+  }
+  if (sessionOutcome.cancelled) {
+    // Persist partial progress including the recordings half so we
+    // don't redo work we've already done.
+    saveState({
+      ...state,
+      recordings: nextRecordings,
+      sessions: sessionOutcome.nextSessions
+    })
+    return {
+      ok: false,
+      finishedAt: null,
+      counts,
+      error: 'Cancelled',
+      skipped: null
+    }
   }
 
   // ── Persist new state ─────────────────────────────────────────────
@@ -302,6 +400,7 @@ interface SessionSyncOutcome {
   noop: number
   error: string | null
   authFailed: boolean
+  cancelled?: boolean
   nextSessions: Record<string, SyncStateEntry>
 }
 
@@ -312,8 +411,9 @@ async function syncSessions(opts: {
   recordingIds: Record<string, SyncStateEntry>
   pushedAt: string
   onProgress?: SyncOptions['onProgress']
-}): Promise<SessionSyncOutcome> {
-  const { client, recordings, state, recordingIds, pushedAt, onProgress } = opts
+  signal?: AbortSignal
+}): Promise<SessionSyncOutcome & { cancelled?: boolean }> {
+  const { client, recordings, state, recordingIds, pushedAt, onProgress, signal } = opts
   const out: SessionSyncOutcome = {
     created: 0,
     updated: 0,
@@ -371,6 +471,10 @@ async function syncSessions(opts: {
   // Sessions are far fewer than recordings (typical: dozens) so a
   // serial loop is fine.
   for (let i = 0; i < toUpsert.length; i += 1) {
+    if (signal?.aborted) {
+      out.cancelled = true
+      return out
+    }
     const item = toUpsert[i]
     if (!item) continue
     onProgress?.({ phase: 'sessions', processed: i, total: toUpsert.length })
@@ -396,6 +500,10 @@ async function syncSessions(opts: {
   onProgress?.({ phase: 'sessions', processed: toUpsert.length, total: toUpsert.length })
 
   for (const sourceId of toSoftDelete) {
+    if (signal?.aborted) {
+      out.cancelled = true
+      return out
+    }
     const prev = state.sessions[sourceId]
     if (!prev) {
       delete out.nextSessions[sourceId]
