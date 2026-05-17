@@ -2,7 +2,9 @@ import { MymeError, UnauthorizedError, ValidationError, type CreateItemInput } f
 import type { Recording } from '@shared/types'
 import { hydrate } from '../cache'
 import { getClient, invalidateClient } from './client'
+import { defaultMapping, type MymeMapping } from './mapping'
 import { hashProjection, projectRecording, projectSession } from './projection'
+import { ensureTypesRegistered } from './registration'
 import { DEFAULT_GAP_THRESHOLD_MINUTES, groupIntoSessions } from './sessions'
 import { loadState, saveState, type SyncState, type SyncStateEntry } from './state'
 
@@ -78,6 +80,16 @@ export interface SyncOptions {
    *  `items.transition` call. On abort the engine persists any
    *  successes already landed and returns with `error = "Cancelled"`. */
   signal?: AbortSignal
+  /** Active mapping config — defines what the engine projects
+   *  recordings + sessions into. Defaults to the bundled mapping when
+   *  omitted (used by tests; production threads the persisted mapping
+   *  in from `index.ts`). */
+  mapping?: MymeMapping
+  /** Optional mode filter — only sync recordings whose `modeName` is
+   *  in this set. `null` / omit → no filter. Empty array → no
+   *  recordings sync (degenerate but legal: the renderer's "select all"
+   *  produces a fresh set, not an empty one). */
+  modeFilter?: string[] | null
 }
 
 /**
@@ -104,13 +116,43 @@ export async function syncRun(opts: SyncOptions = {}): Promise<SyncOutcome> {
   // pushOne / soft-delete closures.
   const client = maybeClient
 
+  const mapping = opts.mapping ?? defaultMapping()
+  const modeFilter = opts.modeFilter ?? null
+
+  // Pre-flight: make sure the mapping's target types exist server-side.
+  // Bundled / authored types get registered if missing; existing types
+  // are taken on trust. If registration fails (e.g. server unreachable)
+  // we surface that as the sync error rather than blocking the engine
+  // from running the projection step — the upserts will fail with a
+  // clearer message anyway.
+  try {
+    await ensureTypesRegistered(client, mapping)
+  } catch (err) {
+    if (err instanceof UnauthorizedError) {
+      return failAuth(
+        { created: 0, updated: 0, softDeleted: 0, noop: 0, errored: 0 },
+        new Map(),
+        loadState()
+      )
+    }
+    console.warn('[myme] type registration failed:', err)
+    // Fall through — the upsert will surface the real error.
+  }
+
   const fullRecordings = opts.recordingsOverride ?? hydrate().recordings
+  // Apply the mode filter before the limit so the cap counts post-
+  // filter, not pre — otherwise narrowing to "only command" with a
+  // cap of 100 could return zero results from a recordings tail
+  // dominated by dictation.
+  const filteredRecordings = modeFilter
+    ? fullRecordings.filter((r) => modeFilter.includes(r.modeName))
+    : fullRecordings
   // Apply the "push N most-recent" testing knob. Scanner sorts
   // newest-first, so a plain `slice(0, n)` is the right shape — keeps
   // the smoke close to "what would happen if you'd only kept these
   // recordings". A non-positive limit syncs the full set.
   const limit = typeof opts.limit === 'number' && opts.limit > 0 ? opts.limit : null
-  const recordings = limit ? fullRecordings.slice(0, limit) : fullRecordings
+  const recordings = limit ? filteredRecordings.slice(0, limit) : filteredRecordings
   const state = loadState()
 
   opts.onProgress?.({ phase: 'preparing', processed: 0, total: recordings.length })
@@ -123,7 +165,7 @@ export async function syncRun(opts: SyncOptions = {}): Promise<SyncOutcome> {
   const seenSourceIds = new Set<string>()
 
   for (const r of recordings) {
-    const p = projectRecording(r)
+    const p = projectRecording(r, mapping.recording)
     const hash = hashProjection(p)
     seenSourceIds.add(p.source_id)
     const prev = state.recordings[p.source_id]
@@ -341,6 +383,7 @@ export async function syncRun(opts: SyncOptions = {}): Promise<SyncOutcome> {
         state,
         recordingIds: nextRecordings,
         pushedAt,
+        binding: mapping.session,
         onProgress: opts.onProgress,
         signal: opts.signal
       })
@@ -410,10 +453,11 @@ async function syncSessions(opts: {
   state: SyncState
   recordingIds: Record<string, SyncStateEntry>
   pushedAt: string
+  binding: MymeMapping['session']
   onProgress?: SyncOptions['onProgress']
   signal?: AbortSignal
 }): Promise<SessionSyncOutcome & { cancelled?: boolean }> {
-  const { client, recordings, state, recordingIds, pushedAt, onProgress, signal } = opts
+  const { client, recordings, state, recordingIds, pushedAt, binding, onProgress, signal } = opts
   const out: SessionSyncOutcome = {
     created: 0,
     updated: 0,
@@ -435,7 +479,7 @@ async function syncSessions(opts: {
   const seenSourceIds = new Set<string>()
 
   for (const g of groups) {
-    const projection = projectSession(g)
+    const projection = projectSession(g, binding)
     const hash = hashProjection(projection)
     seenSourceIds.add(projection.source_id)
     const prev = state.sessions[projection.source_id]

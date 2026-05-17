@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import type { Recording } from '@shared/types'
+import {
+  authoredRecordingStarter,
+  bindingFingerprint,
+  defaultBundledRecordingBinding,
+  defaultRecordingFieldMap,
+  type MappingBinding
+} from './mapping'
 import { hashProjection, projectRecording } from './projection'
 
 function makeRecording(over: Partial<Recording> = {}): Recording {
@@ -26,28 +33,30 @@ function makeRecording(over: Partial<Recording> = {}): Recording {
   }
 }
 
-describe('projectRecording', () => {
-  it('maps the Superwhisper recording into the Myme item shape', () => {
-    const p = projectRecording(makeRecording())
+const bundled = defaultBundledRecordingBinding()
+
+describe('projectRecording — bundled mapping', () => {
+  it('maps the Superwhisper recording into the bundled item shape', () => {
+    const p = projectRecording(makeRecording(), bundled)
     expect(p.type).toBe('superwhisper.recording')
     expect(p.source).toBe('superwhisper-analytics')
     expect(p.source_id).toBe('1755164573')
     expect(p.tier).toBe('feed')
     expect(p.properties.body).toBe('Hello world.')
     expect(p.properties.raw_result).toBe('hello world')
-    expect(p.properties.duration_seconds).toBe(4.5) // duration_ms / 1000
+    expect(p.properties.duration_seconds).toBe(4.5)
     expect(p.properties.segments).toEqual([{ start: 0, end: 1.5, text: 'hello' }])
     expect(p.properties.datetime).toBe('2026-05-11T10:00:00')
     expect(p.properties.language).toBe('en')
   })
 
-  it('drops blank language so it doesn’t override the inherited field', () => {
-    const p = projectRecording(makeRecording({ languageSelected: '' }))
+  it('drops blank language so it does not override the inherited field', () => {
+    const p = projectRecording(makeRecording({ languageSelected: '' }), bundled)
     expect(p.properties.language).toBeUndefined()
   })
 
-  it('omits derived analytics fields (filler counts, WPM) from the wire shape', () => {
-    const p = projectRecording(makeRecording())
+  it('omits derived analytics fields from the wire shape', () => {
+    const p = projectRecording(makeRecording(), bundled)
     expect(Object.keys(p.properties).sort()).toEqual(
       [
         'app_version',
@@ -63,20 +72,66 @@ describe('projectRecording', () => {
       ].sort()
     )
   })
+
+  it('uses the bare recording id as source_id when bundled', () => {
+    const p = projectRecording(makeRecording(), bundled)
+    expect(p.source_id).toBe('1755164573')
+    expect(p.source_id).not.toContain('#')
+  })
+})
+
+describe('projectRecording — authored mapping', () => {
+  const authored: MappingBinding = (() => {
+    const schema = authoredRecordingStarter('eval.recording', 'Eval recording')
+    return {
+      mode: 'authored',
+      typeId: schema.id,
+      fieldMap: defaultRecordingFieldMap(schema),
+      authoredSchema: schema
+    }
+  })()
+
+  it('uses the authored type id', () => {
+    const p = projectRecording(makeRecording(), authored)
+    expect(p.type).toBe('eval.recording')
+  })
+
+  it('appends the binding fingerprint to source_id', () => {
+    const p = projectRecording(makeRecording(), authored)
+    const fp = bindingFingerprint(authored)
+    expect(p.source_id).toBe(`1755164573#${fp}`)
+    expect(fp).not.toBe('b')
+    expect(fp).toHaveLength(8)
+  })
+
+  it('emits properties for fields with auto-paired source refs', () => {
+    const p = projectRecording(makeRecording(), authored)
+    // authoredRecordingStarter declares raw_result, duration_seconds,
+    // model, mode, device, datetime; defaultRecordingFieldMap also adds
+    // body/title/language because parent === core.note.
+    expect(p.properties).toMatchObject({
+      raw_result: 'hello world',
+      duration_seconds: 4.5,
+      model: 'medium',
+      mode: 'dictation',
+      device: 'Built-in',
+      datetime: '2026-05-11T10:00:00',
+      body: 'Hello world.',
+      title: 'Hello world.',
+      language: 'en'
+    })
+  })
 })
 
 describe('hashProjection', () => {
   it('produces a stable hash for the same input', () => {
-    const a = projectRecording(makeRecording())
-    const b = projectRecording(makeRecording())
+    const a = projectRecording(makeRecording(), bundled)
+    const b = projectRecording(makeRecording(), bundled)
     expect(hashProjection(a)).toBe(hashProjection(b))
   })
 
   it('is independent of property declaration order', () => {
-    const original = projectRecording(makeRecording())
-    // Re-order top-level keys to simulate a payload coming from a
-    // different code path. The canonical stringify should walk keys
-    // sorted, so the hash matches.
+    const original = projectRecording(makeRecording(), bundled)
     const shuffled = {
       properties: original.properties,
       tier: original.tier,
@@ -88,8 +143,8 @@ describe('hashProjection', () => {
   })
 
   it('changes when a field changes', () => {
-    const a = projectRecording(makeRecording({ result: 'Hello' }))
-    const b = projectRecording(makeRecording({ result: 'Goodbye' }))
+    const a = projectRecording(makeRecording({ result: 'Hello' }), bundled)
+    const b = projectRecording(makeRecording({ result: 'Goodbye' }), bundled)
     expect(hashProjection(a)).not.toBe(hashProjection(b))
   })
 

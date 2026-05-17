@@ -1,12 +1,13 @@
 import { BrowserWindow } from 'electron'
-import { MymeError, UnauthorizedError } from '@mymehq/sdk'
+import { MymeError, UnauthorizedError, type TypeSchema } from '@mymehq/sdk'
 import { startDeviceFlow, OAuthError, InMemoryTokenStorage } from '@mymehq/sdk/auth'
 import type { DeviceFlowHandle, TokenStorage } from '@mymehq/sdk/auth'
-import type { MymeStatus } from '../../preload/api'
+import type { MymeStatus, ProbeResult, TypeSummary } from '../../preload/api'
 import { onReindexed } from '../cache'
 import { getConfig, setConfig } from '../config'
 import { getClient, invalidateClient } from './client'
 import { syncRun } from './engine'
+import { defaultMapping, type MymeMapping } from './mapping'
 import { clearState } from './state'
 import {
   clearCredential,
@@ -148,6 +149,112 @@ export function setSyncLimit(value: number): MymeStatus {
   setConfig({ myme: { ...existing, syncLimit: clamped } })
   setStatus({ ...ensureStatus(), syncLimit: clamped } as MymeStatus)
   return ensureStatus()
+}
+
+/** Read the persisted mapping config. The renderer hydrates this on
+ *  first paint of the Settings card so it can render the current
+ *  binding without round-tripping for every field. */
+export function getMapping(): MymeMapping {
+  return getConfig().myme.mapping ?? defaultMapping()
+}
+
+/** Persist a new mapping. Trash-and-re-mint happens naturally on the
+ *  next sync — fresh fingerprint → fresh source_ids → old items diff
+ *  out and soft-delete. Clears the in-memory sync state so the diff
+ *  starts clean; the old `lastFullSyncAt` is dropped along with it so
+ *  the next sync surfaces as a fresh run on the card.
+ *
+ *  Returns the persisted mapping so the renderer can confirm what
+ *  landed (server-side validation on `register` may rewrite or fail
+ *  later, but the persistence step is fire-and-forget). */
+export function setMapping(mapping: MymeMapping): MymeMapping {
+  const existing = getConfig().myme
+  setConfig({ myme: { ...existing, mapping } })
+  // Reset the sync state so the next pass treats every recording as
+  // new under the fresh fingerprints. Without this the diff would
+  // try to update items at the *old* source_ids (which the new
+  // projection no longer produces).
+  clearState()
+  return mapping
+}
+
+/** Read the persisted mode filter. `null` = no filter. */
+export function getModeFilter(): string[] | null {
+  return getConfig().myme.modeFilter ?? null
+}
+
+/** Persist the Superwhisper-mode filter. `null` clears it. */
+export function setModeFilter(modes: string[] | null): string[] | null {
+  const existing = getConfig().myme
+  const next = modes && modes.length > 0 ? [...new Set(modes)].sort() : null
+  setConfig({ myme: { ...existing, modeFilter: next } })
+  return next
+}
+
+/**
+ * Probe the configured endpoint with the current credential. Returns
+ * a small identity payload on success, or an error string on failure.
+ * Backs the "Test connection" button in the connected card.
+ */
+export async function probeConnection(): Promise<ProbeResult> {
+  const client = getClient()
+  if (!client) {
+    return { ok: false, error: 'No credential available.' }
+  }
+  try {
+    const profile = await client.profile.get()
+    const composed =
+      [profile.first_name, profile.last_name].filter((s): s is string => Boolean(s)).join(' ') ||
+      profile.username ||
+      null
+    return {
+      ok: true,
+      email: profile.email ?? null,
+      displayName: composed
+    }
+  } catch (err) {
+    if (err instanceof UnauthorizedError) {
+      return { ok: false, error: 'Credential rejected — reconnect.' }
+    }
+    if (err instanceof MymeError) return { ok: false, error: err.message }
+    if (err instanceof Error) return { ok: false, error: err.message }
+    return { ok: false, error: 'Connection probe failed.' }
+  }
+}
+
+/** List the types registered on the server. Used by the mapping
+ *  picker's "existing type" mode. Returns null on failure so the UI
+ *  can surface an error state cleanly. */
+export async function listServerTypes(): Promise<TypeSummary[] | null> {
+  const client = getClient()
+  if (!client) return null
+  try {
+    const types = await client.types.list()
+    return types.map((t) => ({
+      id: t.id,
+      label: t.label ?? null,
+      description: t.description ?? null,
+      parent: t.parent ?? null,
+      fields: Object.keys(t.fields ?? {})
+    }))
+  } catch (err) {
+    console.warn('[myme] listServerTypes failed:', err)
+    return null
+  }
+}
+
+/** Register a user-authored type schema against the server. Wraps
+ *  `client.types.register` so the renderer doesn't have to know about
+ *  the SDK. */
+export async function registerType(schema: TypeSchema): Promise<TypeSchema | null> {
+  const client = getClient()
+  if (!client) return null
+  try {
+    return await client.types.register(schema)
+  } catch (err) {
+    console.warn('[myme] registerType failed:', err)
+    return null
+  }
 }
 
 /**
@@ -388,8 +495,11 @@ async function runSync(): Promise<MymeStatus> {
   })
 
   activeAbort = new AbortController()
+  const cfg = getConfig().myme
   const outcome = await syncRun({
     limit: syncLimit,
+    mapping: cfg.mapping,
+    modeFilter: cfg.modeFilter,
     signal: activeAbort.signal,
     onProgress: (e) => {
       setStatus({

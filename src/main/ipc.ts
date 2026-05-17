@@ -14,7 +14,13 @@ import { checkForUpdatesManually, getUpdaterStatus, type UpdaterStatus } from '.
 import { disableWatch, enableWatch } from './watcher'
 import * as myme from './myme'
 import { validBool, validString, validStringArray } from './validators'
-import type { ConfigStatus, MymeStatus } from '../preload/api'
+import type {
+  ConfigStatus,
+  MymeMapping,
+  MymeStatus,
+  ProbeResult,
+  TypeSummary
+} from '../preload/api'
 
 /**
  * Central IPC registration. Called once on app ready.
@@ -179,7 +185,45 @@ export function registerIpcHandlers(): void {
     if (typeof n !== 'number' || !Number.isFinite(n)) return myme.getStatus()
     return myme.setSyncLimit(n)
   })
+  ipcMain.handle('myme:getMapping', (): MymeMapping => myme.getMapping())
+  ipcMain.handle('myme:setMapping', (_, mapping: unknown): MymeMapping => {
+    // Light validation: the structure must have `recording` and
+    // `session` bindings each carrying mode/typeId/fieldMap. Anything
+    // missing means a renderer bug or an injection attempt — return the
+    // current mapping unchanged.
+    if (!isMymeMapping(mapping)) return myme.getMapping()
+    return myme.setMapping(mapping)
+  })
+  ipcMain.handle('myme:getModeFilter', (): string[] | null => myme.getModeFilter())
+  ipcMain.handle('myme:setModeFilter', (_, modes: unknown): string[] | null => {
+    if (modes === null) return myme.setModeFilter(null)
+    if (!validStringArray(modes)) return myme.getModeFilter()
+    return myme.setModeFilter(modes)
+  })
+  ipcMain.handle('myme:probeConnection', (): Promise<ProbeResult> => myme.probeConnection())
+  ipcMain.handle('myme:listTypes', (): Promise<TypeSummary[] | null> => myme.listServerTypes())
+  ipcMain.handle('myme:registerType', (_, schema: unknown): Promise<unknown> => {
+    // The SDK validates the schema shape on register; we just
+    // require it's an object so we don't crash the IPC layer.
+    if (typeof schema !== 'object' || schema === null) return Promise.resolve(null)
+    return myme.registerType(schema as Parameters<typeof myme.registerType>[0])
+  })
 
   // Apply the persisted watch-folder preference on startup.
   syncWatcher()
+}
+
+function isMymeMapping(value: unknown): value is MymeMapping {
+  if (typeof value !== 'object' || value === null) return false
+  const v = value as { recording?: unknown; session?: unknown }
+  return isBinding(v.recording) && isBinding(v.session)
+}
+
+function isBinding(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null) return false
+  const v = value as { mode?: unknown; typeId?: unknown; fieldMap?: unknown }
+  if (v.mode !== 'bundled' && v.mode !== 'existing' && v.mode !== 'authored') return false
+  if (typeof v.typeId !== 'string' || v.typeId.length === 0) return false
+  if (typeof v.fieldMap !== 'object' || v.fieldMap === null) return false
+  return true
 }

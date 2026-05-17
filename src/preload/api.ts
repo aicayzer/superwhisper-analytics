@@ -1,5 +1,8 @@
 import { ipcRenderer } from 'electron'
 import type { HydratePayload } from '@shared/types'
+import type { MymeMapping } from '../main/myme/mapping'
+
+export type { MymeMapping, MappingBinding, FieldMap, SourceFieldRef } from '../main/myme/mapping'
 
 /**
  * Single source of truth for the renderer ↔ main IPC surface.
@@ -52,6 +55,15 @@ export interface Config {
      *  smoke runs against staging where the full corpus is too slow.
      *  Also gates soft-delete + session passes — see engine.ts. */
     syncLimit: number
+    /** Active mapping config — which Myme type each source kind binds
+     *  to, plus the field map for projection. Defaults to the bundled
+     *  superwhisper.* types. Older configs without a `mapping` block
+     *  default to the bundled mapping on first read. */
+    mapping: MymeMapping
+    /** Optional Superwhisper-mode filter — recordings whose `modeName`
+     *  is in this list are the only ones that sync. `null` = no
+     *  filter; empty array is legal but yields zero recordings. */
+    modeFilter: string[] | null
   }
 }
 
@@ -120,6 +132,36 @@ export type UpdaterStatus =
  * `<userData>/myme-credential.enc`.
  */
 export type MymeSyncPhase = 'preparing' | 'recordings' | 'sessions'
+
+/**
+ * Identity payload returned by `myme.probeConnection`. On success, the
+ * card surfaces the user's email + role in the connection header; on
+ * failure, the error string lands inline.
+ */
+export type ProbeResult =
+  | {
+      ok: true
+      /** Email from the profile, when present. */
+      email: string | null
+      /** Display name composed from first + last name (or username
+       *  fallback). */
+      displayName: string | null
+    }
+  | { ok: false; error: string }
+
+/**
+ * Compact summary of a server-side type, returned by
+ * `myme.listTypes()`. Enough to render a picker (id + label +
+ * description) and an auto-pair preview (field names), without pulling
+ * the full SDK `TypeSchema` shape into the renderer.
+ */
+export interface TypeSummary {
+  id: string
+  label: string | null
+  description: string | null
+  parent: string | null
+  fields: string[]
+}
 
 export type MymeStatus =
   | {
@@ -279,6 +321,27 @@ export const api = {
     /** Set the "push N most-recent recordings" testing knob.
      *  `0` disables it (full sync). Persisted to `config.json`. */
     setSyncLimit: (n: number): Promise<MymeStatus> => ipcRenderer.invoke('myme:setSyncLimit', n),
+    /** Read the persisted mapping config. */
+    getMapping: (): Promise<MymeMapping> => ipcRenderer.invoke('myme:getMapping'),
+    /** Persist a new mapping. Resets the sync state so the next pass
+     *  treats every recording as new under the fresh fingerprints. */
+    setMapping: (mapping: MymeMapping): Promise<MymeMapping> =>
+      ipcRenderer.invoke('myme:setMapping', mapping),
+    /** Read the persisted mode filter. `null` = no filter. */
+    getModeFilter: (): Promise<string[] | null> => ipcRenderer.invoke('myme:getModeFilter'),
+    /** Persist the Superwhisper-mode filter. `null` clears it. */
+    setModeFilter: (modes: string[] | null): Promise<string[] | null> =>
+      ipcRenderer.invoke('myme:setModeFilter', modes),
+    /** Probe the configured endpoint with the current credential.
+     *  Backs the "Test connection" button. */
+    probeConnection: (): Promise<ProbeResult> => ipcRenderer.invoke('myme:probeConnection'),
+    /** List the types registered on the server. `null` on failure. */
+    listTypes: (): Promise<TypeSummary[] | null> => ipcRenderer.invoke('myme:listTypes'),
+    /** Register a user-authored type schema. Returns the persisted
+     *  schema on success; `null` on failure (renderer can re-probe via
+     *  `listTypes` to see what happened). */
+    registerType: (schema: unknown): Promise<unknown> =>
+      ipcRenderer.invoke('myme:registerType', schema),
     /** Subscribe to status changes from the sync engine. */
     onStatus: (handler: (status: MymeStatus) => void): Unsubscribe => {
       const listener = (_e: unknown, payload: MymeStatus): void => handler(payload)
