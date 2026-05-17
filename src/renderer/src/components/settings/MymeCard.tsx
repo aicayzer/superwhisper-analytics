@@ -424,8 +424,7 @@ function ConnectedBody({
   }
 
   return (
-    <div className="space-y-4">
-      <ConnectionPanel endpoint={endpoint} busy={busy} />
+    <div className="space-y-5">
       {mapping && <MappingPanel mapping={mapping} disabled={busy} />}
       <SyncControlsPanel
         syncLimit={syncLimit}
@@ -435,6 +434,7 @@ function ConnectedBody({
         onSync={doSync}
         onSyncLimit={setSyncLimit}
       />
+      <ConnectionPanel endpoint={endpoint} busy={busy} />
     </div>
   )
 }

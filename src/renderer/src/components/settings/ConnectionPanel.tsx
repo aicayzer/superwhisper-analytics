@@ -1,16 +1,16 @@
 import { useMymeStore } from '@renderer/state/mymeStore'
-import { Check, CircleAlert, ShieldCheck } from 'lucide-react'
+import { Check, CircleAlert } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { ProbeResult } from '../../../../preload/api'
 
 /**
- * Connection panel — top section of the connected card. Shows the
- * endpoint, who's signed in (resolved on demand via `profile.get`),
- * and offers a Test connection button + a Disconnect action.
+ * Connection panel — compact footer of the connected card. Endpoint
+ * + signed-in account + reachability sit inline; Test connection and
+ * Disconnect are the only buttons.
  *
- * The probe runs on mount and on click. Result lives in local state;
- * no store churn because the value isn't useful elsewhere in the
- * renderer.
+ * The probe runs once on mount and again on click. Result lives in
+ * local state — no store churn because the value isn't useful
+ * elsewhere in the renderer.
  */
 export function ConnectionPanel({
   endpoint,
@@ -61,58 +61,51 @@ export function ConnectionPanel({
   }
 
   return (
-    <div className="space-y-2">
-      <div className="text-[12px] font-medium text-foreground">Connection</div>
-      <div className="rounded-md border border-border divide-y divide-border text-[12.5px]">
-        <Row label="Endpoint" value={endpoint} mono />
-        <Row label="Account" value={describeIdentity(probe, probing)} />
-        <StatusRow probe={probe} probing={probing} />
+    <section className="space-y-2.5">
+      <div className="space-y-0.5">
+        <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+          Connection
+        </h3>
+        <p className="text-[12px] text-muted-foreground">
+          Where the app pushes to, and which account is signed in.
+        </p>
       </div>
-      <div className="flex justify-end gap-1.5">
-        <button
-          type="button"
-          onClick={() => void doDisconnect()}
-          disabled={busy || disconnecting}
-          className="inline-flex h-7 items-center gap-1.5 rounded-md border border-border bg-floating px-3 text-[12px] text-foreground hover:bg-foreground/5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-floating"
-        >
-          Disconnect
-        </button>
-        <button
-          type="button"
-          onClick={() => void runProbe()}
-          disabled={busy || probing}
-          className="inline-flex h-7 items-center gap-1.5 rounded-md border border-border bg-floating px-3 text-[12px] text-foreground hover:bg-foreground/5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-floating"
-        >
-          {probing ? 'Testing…' : 'Test connection'}
-        </button>
+      <div className="rounded-md border border-border bg-card">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5">
+          <div className="min-w-0">
+            <div className="truncate font-mono text-[12px] text-foreground" title={endpoint}>
+              {endpoint}
+            </div>
+            <div className="mt-0.5 truncate text-[11.5px] text-muted-foreground">
+              {describeIdentity(probe, probing)}
+            </div>
+          </div>
+          <StatusPill probe={probe} probing={probing} />
+        </div>
+        <div className="flex justify-end gap-1.5 border-t border-border px-3 py-2">
+          <button
+            type="button"
+            onClick={() => void doDisconnect()}
+            disabled={busy || disconnecting}
+            className="inline-flex h-7 items-center gap-1.5 rounded-md border border-transparent px-2.5 text-[12px] text-muted-foreground hover:bg-foreground/5 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Disconnect
+          </button>
+          <button
+            type="button"
+            onClick={() => void runProbe()}
+            disabled={busy || probing}
+            className="inline-flex h-7 items-center gap-1.5 rounded-md border border-border bg-floating px-3 text-[12px] text-foreground hover:bg-foreground/5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-floating"
+          >
+            {probing ? 'Testing…' : 'Test connection'}
+          </button>
+        </div>
       </div>
-    </div>
+    </section>
   )
 }
 
-function Row({
-  label,
-  value,
-  mono
-}: {
-  label: string
-  value: string
-  mono?: boolean
-}): React.JSX.Element {
-  return (
-    <div className="flex items-center justify-between gap-3 px-3 py-2">
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd
-        className={'truncate text-foreground ' + (mono ? 'font-mono text-[12px]' : '')}
-        title={value}
-      >
-        {value}
-      </dd>
-    </div>
-  )
-}
-
-function StatusRow({
+function StatusPill({
   probe,
   probing
 }: {
@@ -121,48 +114,42 @@ function StatusRow({
 }): React.JSX.Element {
   if (probing && !probe) {
     return (
-      <div className="flex items-center justify-between gap-3 px-3 py-2">
-        <dt className="text-muted-foreground">Status</dt>
-        <dd className="text-muted-foreground">Checking…</dd>
-      </div>
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-floating px-2.5 py-0.5 text-[11.5px] text-muted-foreground">
+        Checking…
+      </span>
     )
   }
   if (!probe) {
     return (
-      <div className="flex items-center justify-between gap-3 px-3 py-2">
-        <dt className="text-muted-foreground">Status</dt>
-        <dd className="text-muted-foreground">—</dd>
-      </div>
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-floating px-2.5 py-0.5 text-[11.5px] text-muted-foreground">
+        Unknown
+      </span>
     )
   }
   if (probe.ok) {
     return (
-      <div className="flex items-center justify-between gap-3 px-3 py-2">
-        <dt className="text-muted-foreground">Status</dt>
-        <dd className="inline-flex items-center gap-1.5 text-accent-green">
-          <Check className="h-3.5 w-3.5" strokeWidth={2} />
-          Reachable
-          <ShieldCheck className="h-3.5 w-3.5" strokeWidth={1.6} />
-        </dd>
-      </div>
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-accent-green/40 bg-accent-green/10 px-2.5 py-0.5 text-[11.5px] text-accent-green">
+        <Check className="h-3 w-3" strokeWidth={2} />
+        Connected
+      </span>
     )
   }
   return (
-    <div className="flex items-center justify-between gap-3 px-3 py-2">
-      <dt className="text-muted-foreground">Status</dt>
-      <dd className="inline-flex items-center gap-1.5 text-accent-orange" title={probe.error}>
-        <CircleAlert className="h-3.5 w-3.5" strokeWidth={1.8} />
-        <span className="truncate">{probe.error}</span>
-      </dd>
-    </div>
+    <span
+      className="inline-flex max-w-[12rem] items-center gap-1.5 rounded-full border border-accent-orange/40 bg-accent-orange/10 px-2.5 py-0.5 text-[11.5px] text-accent-orange"
+      title={probe.error}
+    >
+      <CircleAlert className="h-3 w-3" strokeWidth={1.8} />
+      <span className="truncate">{probe.error}</span>
+    </span>
   )
 }
 
 function describeIdentity(probe: ProbeResult | null, probing: boolean): string {
-  if (probing && !probe) return 'Resolving…'
-  if (!probe) return '—'
-  if (!probe.ok) return '—'
-  if (probe.displayName && probe.email) return `${probe.displayName} (${probe.email})`
+  if (probing && !probe) return 'Resolving account…'
+  if (!probe) return 'Account: —'
+  if (!probe.ok) return 'Account: —'
+  if (probe.displayName && probe.email) return `${probe.displayName} · ${probe.email}`
   if (probe.displayName) return probe.displayName
   if (probe.email) return probe.email
   return 'Signed in'

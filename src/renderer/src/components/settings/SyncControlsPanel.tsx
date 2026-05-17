@@ -34,31 +34,42 @@ export function SyncControlsPanel({
   }, [])
 
   return (
-    <div className="space-y-2">
-      <div className="text-[12px] font-medium text-foreground">Sync</div>
+    <section className="space-y-3">
+      <div className="space-y-0.5">
+        <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+          Sync
+        </h3>
+        <p className="text-[12px] text-muted-foreground">
+          What lands in Myme, and when. Manual triggers run on demand.
+        </p>
+      </div>
       <ModeFilterRow disabled={busy} />
       <SyncLimitRow value={syncLimit} onCommit={onSyncLimit} disabled={busy} />
-      <div className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2 text-[12.5px]">
-        <dt className="text-muted-foreground">Last synced</dt>
-        <dd className="text-foreground">{lastSyncedAt ? formatRelative(lastSyncedAt) : 'Never'}</dd>
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border px-3 py-2 text-[12.5px]">
+        <div>
+          <div className="text-[12px] font-medium text-foreground">Last synced</div>
+          <div className="mt-0.5 text-[11.5px] text-muted-foreground">
+            {lastSyncedAt
+              ? formatRelative(lastSyncedAt)
+              : 'Never — first run will be the baseline.'}
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => void onSync()}
+          disabled={busy}
+          className="inline-flex h-7 items-center gap-1.5 rounded-md border border-foreground/30 bg-foreground/5 px-3 text-[12px] text-foreground transition-colors hover:bg-foreground/10 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <RefreshCw className={cn('h-3 w-3', busy && 'animate-spin')} strokeWidth={1.8} />
+          Sync now
+        </button>
       </div>
       {lastError && (
         <p className="rounded-md border border-accent-orange/40 bg-accent-orange/10 px-3 py-2 text-[12px] text-accent-orange">
           Last sync failed: {lastError}
         </p>
       )}
-      <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={() => void onSync()}
-          disabled={busy}
-          className="inline-flex h-7 items-center gap-1.5 rounded-md border border-border bg-floating px-3 text-[12px] text-foreground hover:bg-foreground/5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-floating"
-        >
-          <RefreshCw className={cn('h-3 w-3', busy && 'animate-spin')} strokeWidth={1.8} />
-          Sync now
-        </button>
-      </div>
-    </div>
+    </section>
   )
 }
 
