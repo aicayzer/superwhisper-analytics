@@ -1,3 +1,4 @@
+import { MappingPanel } from './MappingPanel'
 import { SettingsCard } from './SettingsCard'
 import { cn } from '@renderer/lib/cn'
 import { useConfigStore } from '@renderer/state/configStore'
@@ -410,6 +411,7 @@ function ConnectedBody({
   const syncNow = useMymeStore((s) => s.syncNow)
   const disconnect = useMymeStore((s) => s.disconnect)
   const setSyncLimit = useMymeStore((s) => s.setSyncLimit)
+  const mapping = useMymeStore((s) => s.mapping)
   const [busy, setBusy] = useState(false)
   // Re-render once a minute so "5m ago" drifts without a custom hook.
   const [, setNow] = useState(() => Date.now())
@@ -446,6 +448,7 @@ function ConnectedBody({
           Last sync failed: {lastError}
         </p>
       )}
+      {mapping && <MappingPanel mapping={mapping} disabled={busy} />}
       <SyncLimitRow value={syncLimit} onCommit={setSyncLimit} disabled={busy} />
       <div className="flex justify-end gap-1.5">
         <button
