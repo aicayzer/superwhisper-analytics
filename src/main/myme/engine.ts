@@ -141,10 +141,10 @@ export async function syncRun(opts: SyncOptions = {}): Promise<SyncOutcome> {
   }
 
   // Soft-delete list: recordings tracked in state but absent from
-  // current. Skip when the testing-knob limit is in effect — every
-  // recording past the cap would be falsely "missing" from the view,
-  // which would trash the whole tail. The unlimited path is the only
-  // one that can authoritatively detect disk-deletes.
+  // current. Skipped when a sync cap is in effect — every recording
+  // past the cap would be falsely "missing" from the view, which would
+  // trash the whole tail. Only the uncapped path can authoritatively
+  // detect disk-deletes; the cap surfaces this trade-off in the UI.
   const toSoftDelete = limit
     ? []
     : Object.keys(state.recordings).filter((id) => !seenSourceIds.has(id))
@@ -319,11 +319,11 @@ export async function syncRun(opts: SyncOptions = {}): Promise<SyncOutcome> {
 
   // ── Sessions ──────────────────────────────────────────────────────
   // Derived from the current recording set, full-replaced every run.
-  // Threshold change yields fresh source_ids → fresh items → the
-  // diff naturally trash-and-re-mints. Skipped while a `limit` is in
+  // Threshold change yields fresh source_ids → fresh items → the diff
+  // naturally trash-and-re-mints. Skipped while a sync cap is in
   // effect: a partial recording view would mint malformed session
   // groups (and trash legitimate prior sessions). Sessions are an
-  // all-or-nothing concept.
+  // all-or-nothing concept; the cap-surface UI flags the trade-off.
   const sessionOutcome = limit
     ? {
         created: 0,

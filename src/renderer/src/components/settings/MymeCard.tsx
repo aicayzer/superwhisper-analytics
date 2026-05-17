@@ -15,8 +15,8 @@ import type { MymeStatus } from '../../../../preload/api'
  *                       greyed out; sync engine is inert.
  *   2. `disconnected` — endpoint URL + "Connect to Myme" button.
  *   3. `connecting`   — API-key paste-and-verify pane.
- *   4. `connected`    — last synced time + "Sync now" + a "Push N most
- *                       recent (testing)" knob for smoke runs. If
+ *   4. `connected`    — last synced time + "Sync now" + a sync-cap
+ *                       setting (default 100; 0 = no cap). If
  *                       `lastError` is set, an inline error row appears
  *                       below.
  *   5. `syncing`      — progress text + Cancel button. The signal
@@ -312,10 +312,13 @@ function ConnectedBody({
 }
 
 /**
- * The "push N most-recent" testing knob. Placed inside the connected
- * card so it's clearly bound to the active integration; 0 means full
- * sync. Number-only input, persisted on blur (so typing-in-progress
- * doesn't churn the IPC). Hidden when the card is in any other state.
+ * Sync-cap setting. Placed inside the connected card so it's clearly
+ * bound to the active integration. Default is 100; 0 means no cap.
+ * Capping skips session derivation + disk-delete propagation by
+ * design — surfaced in the copy below so the trade-off is explicit
+ * rather than hidden. Number-only input, persisted on blur (so
+ * typing-in-progress doesn't churn the IPC). Hidden in any other
+ * card state.
  */
 function SyncLimitRow({
   value,
@@ -352,15 +355,15 @@ function SyncLimitRowInner({
   }
 
   return (
-    <div className="rounded-md border border-dashed border-border px-3 py-2.5">
+    <div className="rounded-md border border-border px-3 py-2.5">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="text-[12px] font-medium text-foreground">
-            Push N most recent (testing)
+            Sync most recent N recordings
           </div>
           <div className="mt-0.5 text-[11.5px] text-muted-foreground">
-            0 syncs the full set. Sessions + disk-delete pass are skipped while a limit is in
-            effect.
+            0 = no cap. When capped, session derivation and disk-delete propagation are skipped —
+            turn off the cap to test the full sync surface.
           </div>
         </div>
         <input
