@@ -66,6 +66,8 @@ const CLIENT_NAME = 'SuperWhisper Analytics'
  *  - `superwhisper.recording:*` — the data plane
  *  - `superwhisper.session:*`   — derived sessions
  *  - `metadata.types:write`     — registers the custom types on first sync
+ *  - `edge.parent-of:*`         — session→recording linkage minted in the
+ *                                 sessions pass (engine.ts:464)
  *  - `openid profile email offline_access` — OIDC standards + refresh
  */
 const DEFAULT_SCOPES = [
@@ -74,6 +76,8 @@ const DEFAULT_SCOPES = [
   'superwhisper.session:read',
   'superwhisper.session:write',
   'metadata.types:write',
+  'edge.parent-of:read',
+  'edge.parent-of:write',
   'openid',
   'profile',
   'email',
