@@ -32,7 +32,7 @@ function defaultConfig(): Config {
     demoMode: false,
     autoHideSidebar: true,
     devTools: false,
-    myme: { endpoint: DEFAULT_MYME_ENDPOINT, syncLimit: 0 }
+    myme: { endpoint: DEFAULT_MYME_ENDPOINT, syncLimit: 100 }
   }
 }
 
