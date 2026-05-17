@@ -26,6 +26,8 @@ interface MymeState {
   setEndpoint: (url: string) => Promise<void>
   setSyncLimit: (n: number) => Promise<void>
   connect: () => Promise<void>
+  useApiKey: () => Promise<void>
+  cancelConnect: () => Promise<void>
   submitApiKey: (key: string) => Promise<void>
   disconnect: () => Promise<void>
   syncNow: () => Promise<void>
@@ -58,6 +60,16 @@ export const useMymeStore = create<MymeState>((set, get) => ({
 
   connect: async () => {
     const next = await window.api.myme.connect()
+    set({ status: next })
+  },
+
+  useApiKey: async () => {
+    const next = await window.api.myme.useApiKey()
+    set({ status: next })
+  },
+
+  cancelConnect: async () => {
+    const next = await window.api.myme.cancelConnect()
     set({ status: next })
   },
 

@@ -1,25 +1,35 @@
 import { BrowserWindow } from 'electron'
 import { MymeError, UnauthorizedError } from '@mymehq/sdk'
+import { startDeviceFlow, OAuthError, InMemoryTokenStorage } from '@mymehq/sdk/auth'
+import type { DeviceFlowHandle, TokenStorage } from '@mymehq/sdk/auth'
 import type { MymeStatus } from '../../preload/api'
 import { onReindexed } from '../cache'
 import { getConfig, setConfig } from '../config'
 import { getClient, invalidateClient } from './client'
 import { syncRun } from './engine'
 import { clearState } from './state'
-import { clearCredential, credentialExists, readCredential, writeCredential } from './tokens'
+import {
+  clearCredential,
+  credentialExists,
+  readCredential,
+  writeCredential,
+  type OAuthTokenBundle
+} from './tokens'
 
 /**
  * Public surface of the Myme integration module — used by `ipc.ts`.
  *
  * State machine (mirrors `MymeStatus`):
  *
- *   disconnected ── connect ──────▶ connecting
- *                                       │ submitApiKey
- *                                       ▼  (verify success)
- *   disconnected ◀── disconnect ── connected ◀──┐
- *                                       │       │ (sync complete)
- *                                       ▼       │
- *                                    syncing ───┘
+ *   disconnected ── connect ─────▶ connecting(device) ─poll approve─▶ connected
+ *           │                            │ useApiKey                       ▲
+ *           │                            ▼                                 │
+ *           │                       connecting(api-key) ── submitApiKey ───┤
+ *           │                                                              │
+ *           └──────────────── disconnect ◀──────── connected ◀─┐           │
+ *                                                       │     │ (sync     │
+ *                                                       ▼     │  complete)│
+ *                                                    syncing ─┘           │
  *
  * The `disabled` UX state (demo mode on, or no recordings path) is
  * composed in the renderer from `configStore`; main always reports the
@@ -30,19 +40,35 @@ import { clearCredential, credentialExists, readCredential, writeCredential } fr
  * decryptable, the initial status is `connected` (no last-synced time
  * until the engine actually runs); otherwise it's `disconnected`.
  *
- * v1 uses an API key rather than the device flow the spec mandates —
- * see [[Myme issues — running log]] for why. The state machine here
- * is identical to what device flow would need; the difference is what
- * the user types into the connecting pane.
+ * Default auth is the OAuth device flow: `startDeviceFlow` from the SDK
+ * (`@mymehq/sdk/auth`) initiates `/auth/device`, returns the user-code +
+ * verification URI, and `pollForToken()` blocks until the user approves.
+ * On approval we persist the token bundle through `tokens.ts` and the
+ * existing `connected` terminal state takes over.
+ *
+ * The API-key path stays as a dev/escape hatch — linked from the
+ * device-flow connecting pane. Both terminate at `connected` and share
+ * the rest of the engine.
  */
 
 const STATUS_CHANNEL = 'myme:status'
+
+/** OAuth client metadata used for DCR + device-flow. Stored in the
+ *  credential blob alongside the tokens. */
+const CLIENT_NAME = 'SuperWhisper Analytics'
+const DEFAULT_SCOPES = ['*:read', '*:write']
+
+const DEVICE_CODE_GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:device_code'
 
 // Lazy-initialised so the boot-time probe runs after `app.ready` —
 // `safeStorage.isEncryptionAvailable()` returns false until then on
 // macOS, which would mis-classify a connected user as disconnected on
 // every launch.
 let currentStatus: MymeStatus | null = null
+
+// In-flight device-flow polling — abort signal lets `cancelConnect`
+// short-circuit a long-running poll.
+let activeDeviceFlowAbort: AbortController | null = null
 
 function configSnapshot(): { endpoint: string; syncLimit: number } {
   const c = getConfig()
@@ -98,12 +124,128 @@ export function setSyncLimit(value: number): MymeStatus {
   return ensureStatus()
 }
 
-/** Transition to `connecting` so the renderer renders the API-key
- *  paste pane. The verification happens via `submitApiKey`. */
-export function connect(): MymeStatus {
+/**
+ * Default connect path — initiate the OAuth device flow against the
+ * configured endpoint. Registers a fresh OAuth client via DCR
+ * (`POST /auth/oauth2/register`) so each device has its own client id,
+ * then calls SDK's `startDeviceFlow` and surfaces the resulting
+ * user-code + verification URI on the connecting pane. A background
+ * poll waits for user approval; success transitions to `connected`,
+ * failure to `disconnected` with a sensible `lastError`.
+ */
+export async function connect(): Promise<MymeStatus> {
   const { endpoint, syncLimit } = configSnapshot()
-  setStatus({ kind: 'connecting', endpoint, syncLimit })
-  return ensureStatus()
+  // Optimistic transition so the renderer can show a "preparing…" UX if
+  // it wants; the real device-flow payload arrives a moment later.
+  setStatus({
+    kind: 'connecting',
+    mode: 'device',
+    endpoint,
+    syncLimit,
+    userCode: '',
+    verificationUri: '',
+    verificationUriComplete: null,
+    expiresAt: 0
+  })
+
+  let handle: DeviceFlowHandle
+  let clientId: string
+  // Inject our own storage so we can pull the persisted bundle back out
+  // after `pollForToken` resolves — the SDK persists the bundle as JSON
+  // under a key it owns; we re-read that JSON and write it to our own
+  // safeStorage-backed credential file.
+  const flowStorage = new InMemoryTokenStorage()
+  try {
+    clientId = await registerOAuthClient(endpoint)
+    handle = await startDeviceFlow({
+      issuer: endpoint,
+      clientId,
+      scopes: DEFAULT_SCOPES,
+      storage: flowStorage
+    })
+  } catch (err) {
+    return setStatus({
+      kind: 'disconnected',
+      endpoint,
+      syncLimit,
+      lastError: describeAuthError(err)
+    })
+  }
+
+  setStatus({
+    kind: 'connecting',
+    mode: 'device',
+    endpoint,
+    syncLimit,
+    userCode: handle.user_code,
+    verificationUri: handle.verification_uri,
+    verificationUriComplete: handle.verification_uri_complete || null,
+    expiresAt: Date.now() + handle.expires_in * 1000
+  })
+
+  activeDeviceFlowAbort = new AbortController()
+  const signal = activeDeviceFlowAbort.signal
+
+  try {
+    await handle.pollForToken({ signal })
+    // The SDK persists the bundle as JSON under a key shaped
+    // `myme.auth.tokens:<origin>:<client_id>` in whatever storage we
+    // passed in. Pull it back out, copy across to our safeStorage-backed
+    // credential file, and discard the in-memory copy.
+    await persistTokensFromStorage(flowStorage, endpoint, clientId)
+    invalidateClient()
+
+    // Verify the new credentials against the server before flipping to
+    // `connected` — same probe shape as the API-key path.
+    const client = getClient()
+    if (!client) throw new Error('client construction failed after device-flow approval')
+    await client.items.stats()
+
+    return setStatus({
+      kind: 'connected',
+      endpoint,
+      syncLimit,
+      lastSyncedAt: null,
+      lastError: null
+    })
+  } catch (err) {
+    clearCredential()
+    invalidateClient()
+    return setStatus({
+      kind: 'disconnected',
+      endpoint,
+      syncLimit,
+      lastError: describeAuthError(err)
+    })
+  } finally {
+    activeDeviceFlowAbort = null
+  }
+}
+
+/**
+ * Dev/escape hatch — transition into the API-key paste pane. Linked
+ * from the device-flow connecting pane via "use API key instead".
+ * If a device-flow poll is in flight, cancel it first.
+ */
+export function useApiKey(): MymeStatus {
+  if (activeDeviceFlowAbort) {
+    activeDeviceFlowAbort.abort()
+    activeDeviceFlowAbort = null
+  }
+  const { endpoint, syncLimit } = configSnapshot()
+  return setStatus({ kind: 'connecting', mode: 'api-key', endpoint, syncLimit })
+}
+
+/** Cancel an in-progress connect attempt. Aborts a device-flow poll if
+ *  one is running, then falls back to `disconnected`. Safe to call from
+ *  either connecting variant. */
+export function cancelConnect(): MymeStatus {
+  if (activeDeviceFlowAbort) {
+    activeDeviceFlowAbort.abort()
+    activeDeviceFlowAbort = null
+  }
+  const { endpoint, syncLimit } = configSnapshot()
+  return setStatus({ kind: 'disconnected', endpoint, syncLimit, lastError: null })
 }
 
 /**
@@ -129,7 +271,7 @@ export async function submitApiKey(key: string): Promise<MymeStatus> {
   // Temporarily stage the key so getClient() picks it up; persist only
   // after verification succeeds (so a failed attempt doesn't leave a
   // bad credential on disk).
-  const persisted = writeCredential(trimmed)
+  const persisted = writeCredential({ kind: 'api-key', key: trimmed })
   if (!persisted) {
     return setStatus({
       kind: 'disconnected',
@@ -159,6 +301,10 @@ export async function submitApiKey(key: string): Promise<MymeStatus> {
 }
 
 export function disconnect(): MymeStatus {
+  if (activeDeviceFlowAbort) {
+    activeDeviceFlowAbort.abort()
+    activeDeviceFlowAbort = null
+  }
   clearCredential()
   clearState()
   invalidateClient()
@@ -266,6 +412,21 @@ async function runSync(): Promise<MymeStatus> {
 /** Translate an arbitrary error from the SDK or transport into the
  *  single-line message that surfaces on the card. */
 function describeAuthError(err: unknown): string {
+  if (err instanceof OAuthError) {
+    // RFC 8628 terminal codes — give the user something they can act on.
+    switch (err.code) {
+      case 'access_denied':
+        return 'Connection cancelled in browser.'
+      case 'expired_token':
+        return 'The verification code expired. Try connecting again.'
+      case 'invalid_grant':
+        return 'Device-flow approval was rejected by the server.'
+      case 'invalid_request':
+        return err.message || 'Device-flow request was invalid.'
+      default:
+        return err.message || `OAuth error: ${err.code}`
+    }
+  }
   if (err instanceof UnauthorizedError) {
     return 'Invalid API key. Generate a fresh one in your Myme client and try again.'
   }
@@ -296,4 +457,94 @@ export function registerReindexHook(): void {
     if (config.demoMode || !config.superwhisperPath) return
     void syncNow().catch((err) => console.warn('[myme] reindex-triggered sync failed:', err))
   })
+}
+
+// ---------------------------------------------------------------------------
+// OAuth bootstrap helpers — DCR + token persistence
+// ---------------------------------------------------------------------------
+
+interface DcrResponse {
+  client_id: string
+}
+
+/** Register a fresh OAuth client via Dynamic Client Registration. The
+ *  client_id is persisted alongside the tokens — each install ends up
+ *  with its own client_id, so revoking one device doesn't cascade to
+ *  the others. */
+async function registerOAuthClient(endpoint: string): Promise<string> {
+  const issuer = endpoint.replace(/\/+$/, '')
+  const res = await fetch(`${issuer}/auth/oauth2/register`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      grant_types: [DEVICE_CODE_GRANT_TYPE, 'refresh_token'],
+      client_name: CLIENT_NAME,
+      scope: DEFAULT_SCOPES.join(' ')
+    })
+  })
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: unknown }
+    const code =
+      typeof body.error === 'string'
+        ? body.error
+        : typeof body.error === 'object' && body.error !== null
+          ? ((body.error as { code?: string }).code ?? 'invalid_request')
+          : 'invalid_request'
+    throw new Error(`Client registration failed: ${code} (${res.status})`)
+  }
+  const body = (await res.json()) as DcrResponse
+  if (typeof body.client_id !== 'string' || body.client_id.length === 0) {
+    throw new Error('Client registration returned no client_id')
+  }
+  return body.client_id
+}
+
+/**
+ * Lift the just-issued token bundle out of the SDK's flow storage and
+ * persist through our safeStorage-backed `tokens.ts`. The SDK persists
+ * a JSON `PersistedTokens` blob under a key shaped
+ * `myme.auth.tokens:<origin>:<client_id>` (see `device-flow.ts` in the
+ * SDK); we read that key out of the storage instance we passed in to
+ * `startDeviceFlow`, then write to our own credential file.
+ */
+async function persistTokensFromStorage(
+  storage: TokenStorage,
+  endpoint: string,
+  clientId: string
+): Promise<void> {
+  const origin = new URL(endpoint).origin
+  const storageKey = `myme.auth.tokens:${origin}:${clientId}`
+  const raw = await storage.get(storageKey)
+  if (!raw) {
+    throw new Error('Device-flow tokens were not persisted by the SDK')
+  }
+  let parsed: Partial<OAuthTokenBundle>
+  try {
+    parsed = JSON.parse(raw) as Partial<OAuthTokenBundle>
+  } catch (err) {
+    throw new Error(
+      `Could not parse device-flow tokens: ${err instanceof Error ? err.message : String(err)}`
+    )
+  }
+  if (
+    typeof parsed.access_token !== 'string' ||
+    typeof parsed.refresh_token !== 'string' ||
+    typeof parsed.access_expires_at !== 'number' ||
+    typeof parsed.scope !== 'string'
+  ) {
+    throw new Error('Device-flow tokens are missing required fields')
+  }
+  const ok = writeCredential({
+    kind: 'oauth',
+    clientId,
+    tokens: {
+      access_token: parsed.access_token,
+      refresh_token: parsed.refresh_token,
+      access_expires_at: parsed.access_expires_at,
+      scope: parsed.scope
+    }
+  })
+  if (!ok) {
+    throw new Error('Could not persist tokens (safeStorage unavailable).')
+  }
 }

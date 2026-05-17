@@ -165,7 +165,9 @@ export function registerIpcHandlers(): void {
     if (!/^https?:\/\//i.test(url)) return myme.getStatus()
     return myme.setEndpoint(url)
   })
-  ipcMain.handle('myme:connect', (): MymeStatus => myme.connect())
+  ipcMain.handle('myme:connect', (): Promise<MymeStatus> => myme.connect())
+  ipcMain.handle('myme:useApiKey', (): MymeStatus => myme.useApiKey())
+  ipcMain.handle('myme:cancelConnect', (): MymeStatus => myme.cancelConnect())
   ipcMain.handle('myme:submitApiKey', (_, key: unknown): Promise<MymeStatus> => {
     if (!validString(key)) return Promise.resolve(myme.getStatus())
     return myme.submitApiKey(key)
