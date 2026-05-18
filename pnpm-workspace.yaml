@@ -2,3 +2,10 @@ allowBuilds:
   electron: true
   electron-winstaller: false
   esbuild: true
+
+# pnpm 10+ reads these from pnpm-workspace.yaml (not .npmrc). Required
+# so electron-builder's asar walker finds transitive deps of bundled
+# packages — without this, electron-updater's `debug` dep ships without
+# `ms`, crashing the main process at module load on packaged builds.
+nodeLinker: hoisted
+shamefullyHoist: true
