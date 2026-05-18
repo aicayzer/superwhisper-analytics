@@ -1,6 +1,6 @@
 {
   "name": "superwhisper-analytics",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Local Mac desktop app for visualising SuperWhisper recording history",
   "main": "./out/main/index.js",
   "author": {
