@@ -33,7 +33,7 @@ export const SUPERWHISPER_RECORDING: TypeSchema = {
   parent: 'core.note',
   label: 'Superwhisper recording',
   description: 'A voice recording captured by Superwhisper, with transcript and metadata.',
-  version: 1,
+  version: 2,
   fields: {
     // body / title / language inherited from core.note
     segments: {
@@ -48,7 +48,10 @@ export const SUPERWHISPER_RECORDING: TypeSchema = {
     duration_seconds: { type: 'number', description: 'Recording length in seconds.' },
     model: { type: 'string', description: 'Transcription model used.' },
     mode: { type: 'string', description: 'Superwhisper mode (dictation, command, etc.).' },
-    device: { type: 'string', description: 'Recording device label.' },
+    input_device: {
+      type: 'string',
+      description: 'The audio input device used to capture the recording.'
+    },
     app_version: {
       type: 'string',
       description: 'Superwhisper app version that captured the recording.'

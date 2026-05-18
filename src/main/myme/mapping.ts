@@ -39,7 +39,7 @@ export type RecordingSourceField =
   | 'recording.excerpt'
   | 'recording.mode'
   | 'recording.model'
-  | 'recording.device'
+  | 'recording.input_device'
   | 'recording.appVersion'
   | 'recording.language'
   | 'recording.durationSeconds'
@@ -96,7 +96,7 @@ const BUNDLED_RECORDING_FIELD_MAP: FieldMap = {
   duration_seconds: { kind: 'source', field: 'recording.durationSeconds' },
   model: { kind: 'source', field: 'recording.model' },
   mode: { kind: 'source', field: 'recording.mode' },
-  device: { kind: 'source', field: 'recording.device' },
+  input_device: { kind: 'source', field: 'recording.input_device' },
   app_version: { kind: 'source', field: 'recording.appVersion' },
   datetime: { kind: 'source', field: 'recording.datetime' },
   language: { kind: 'source', field: 'recording.language' }
@@ -189,7 +189,7 @@ const RECORDING_FIELD_ALIASES: Record<string, RecordingSourceField> = {
   duration_sec: 'recording.durationSeconds',
   mode: 'recording.mode',
   model: 'recording.model',
-  device: 'recording.device',
+  device: 'recording.input_device',
   app_version: 'recording.appVersion',
   version: 'recording.appVersion',
   language: 'recording.language',

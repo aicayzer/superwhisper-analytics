@@ -86,7 +86,7 @@ function readRecordingField(r: Recording, ref: SourceFieldRef): unknown {
       return r.modeName
     case 'recording.model':
       return r.modelName
-    case 'recording.device':
+    case 'recording.input_device':
       return r.recordingDevice
     case 'recording.appVersion':
       return r.appVersion

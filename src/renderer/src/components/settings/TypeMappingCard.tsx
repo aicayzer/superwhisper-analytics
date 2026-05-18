@@ -727,7 +727,7 @@ const BUNDLED_RECORDING_MAP: FieldMap = {
   duration_seconds: { kind: 'source', field: 'recording.durationSeconds' },
   model: { kind: 'source', field: 'recording.model' },
   mode: { kind: 'source', field: 'recording.mode' },
-  device: { kind: 'source', field: 'recording.device' },
+  input_device: { kind: 'source', field: 'recording.input_device' },
   app_version: { kind: 'source', field: 'recording.appVersion' },
   datetime: { kind: 'source', field: 'recording.datetime' },
   language: { kind: 'source', field: 'recording.language' }
@@ -754,7 +754,7 @@ function authoredRecordingDefaults(): FieldMap {
     duration_seconds: { kind: 'source', field: 'recording.durationSeconds' },
     model: { kind: 'source', field: 'recording.model' },
     mode: { kind: 'source', field: 'recording.mode' },
-    device: { kind: 'source', field: 'recording.device' },
+    input_device: { kind: 'source', field: 'recording.input_device' },
     datetime: { kind: 'source', field: 'recording.datetime' }
   }
 }

@@ -1,3 +1,4 @@
+import os from 'os'
 import { MymeError, UnauthorizedError, ValidationError, type CreateItemInput } from '@mymehq/sdk'
 import type { Recording } from '@shared/types'
 import { hydrate } from '../cache'
@@ -177,6 +178,7 @@ export async function syncRun(opts: SyncOptions = {}): Promise<SyncOutcome> {
         type: p.type,
         source_id: p.source_id,
         tier: p.tier,
+        device: os.hostname(),
         properties: p.properties
       }
     })
