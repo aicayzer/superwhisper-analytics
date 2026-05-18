@@ -10,6 +10,15 @@ files:
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
   - '!{_tmp,_local}/**'
+# Note on dependency packaging:
+# `debug` and `ms` are declared as direct dependencies in package.json
+# even though they're transitives of electron-updater. This works around
+# electron-builder #9654 — its pnpm-aware dep walker, triggered by the
+# `packageManager` field in package.json, drops `ms` from the asar even
+# when node_modules is hoisted flat. Without the explicit declaration,
+# packaged builds crash on launch with `Cannot find module 'ms'` the
+# moment electron-updater loads. Remove the explicit deps when #9654 is
+# resolved upstream.
 asarUnpack:
   - resources/**
 mac:
