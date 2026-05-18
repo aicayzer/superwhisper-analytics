@@ -56,8 +56,11 @@ jobs:
 
           Download **\`${DMG}\`** below. Open it and drag \`SuperWhisper Analytics.app\` into \`/Applications\`. Signed + notarised — opens without the Gatekeeper warning.
 
-          The other assets (\`.zip\`, \`.blockmap\`, \`latest-mac.yml\`) are auto-update plumbing; you don't need them.
+          The other assets (\`.zip\`, \`.blockmap\`, \`latest-mac.yml\`) are auto-update plumbing; you do not need them.
           EOF
           )
           EXISTING=$(gh release view "$TAG" --json body --jq .body)
           printf '%s%s' "$EXISTING" "$NOTE" | gh release edit "$TAG" --notes-file -
+          # electron-builder creates the release as a draft by default;
+          # promote it to published so it appears on the Releases page.
+          gh release edit "$TAG" --draft=false
