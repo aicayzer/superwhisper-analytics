@@ -141,13 +141,24 @@ export async function syncRun(opts: SyncOptions = {}): Promise<SyncOutcome> {
   }
 
   const fullRecordings = opts.recordingsOverride ?? hydrate().recordings
+  // Drop recordings with no transcript content. Superwhisper writes a
+  // meta.json with an empty `result` for failed captures (mic glitch,
+  // background-noise rejection, user-aborted before transcription).
+  // These have nothing useful to land in Myme, AND they'd fail server-
+  // side validation: the bundled type inherits from `core.note`, where
+  // `body` is `required: true` — projecting `body: ''` drops the entry
+  // in `buildProperties`, leaving a payload that 400s on `/items`. A
+  // single empty recording in the sync window would halt the recordings
+  // pass via the `failValidation` path and surface as "Schema drift" on
+  // the card. Filtering upstream means the user never sees that.
+  const nonEmptyRecordings = fullRecordings.filter((r) => r.result.trim().length > 0)
   // Apply the mode filter before the limit so the cap counts post-
   // filter, not pre — otherwise narrowing to "only command" with a
   // cap of 100 could return zero results from a recordings tail
   // dominated by dictation.
   const filteredRecordings = modeFilter
-    ? fullRecordings.filter((r) => modeFilter.includes(r.modeName))
-    : fullRecordings
+    ? nonEmptyRecordings.filter((r) => modeFilter.includes(r.modeName))
+    : nonEmptyRecordings
   // Apply the "push N most-recent" testing knob. Scanner sorts
   // newest-first, so a plain `slice(0, n)` is the right shape — keeps
   // the smoke close to "what would happen if you'd only kept these

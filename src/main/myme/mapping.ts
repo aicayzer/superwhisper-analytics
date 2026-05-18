@@ -135,6 +135,49 @@ export function defaultMapping(): MymeMapping {
   }
 }
 
+/**
+ * Forward-migrate a persisted mapping after T-204 — the source-field-ref
+ * `'recording.device'` was renamed to `'recording.input_device'`. A
+ * mapping persisted before T-204 references a value that is no longer a
+ * member of `RecordingSourceField`; the projection's switch falls through
+ * to `default` and silently drops the device value. Run on every config
+ * read so existing installs converge on the new shape.
+ *
+ * Bundled bindings are rebuilt from `BUNDLED_RECORDING_FIELD_MAP` —
+ * bundled means "track the canonical schema 1:1", and the target key
+ * also renamed (`device` → `input_device`). Authored / existing bindings
+ * keep their user-defined target keys and only get the stale source-ref
+ * rewritten.
+ *
+ * Idempotent. Returns the input reference unchanged when nothing
+ * needed migrating.
+ */
+export function migrateRecordingMapping(mapping: MymeMapping): MymeMapping {
+  const recording = mapping.recording
+  const hasStaleRef = Object.values(recording.fieldMap).some(
+    (ref) => ref.kind === 'source' && (ref.field as string) === 'recording.device'
+  )
+  if (!hasStaleRef) return mapping
+  if (recording.mode === 'bundled') {
+    return {
+      ...mapping,
+      recording: { ...recording, fieldMap: { ...BUNDLED_RECORDING_FIELD_MAP } }
+    }
+  }
+  const nextFieldMap: FieldMap = {}
+  for (const [target, ref] of Object.entries(recording.fieldMap)) {
+    if (ref.kind === 'source' && (ref.field as string) === 'recording.device') {
+      nextFieldMap[target] = { kind: 'source', field: 'recording.input_device' }
+    } else {
+      nextFieldMap[target] = ref
+    }
+  }
+  return {
+    ...mapping,
+    recording: { ...recording, fieldMap: nextFieldMap }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Fingerprinting
 // ---------------------------------------------------------------------------
@@ -190,6 +233,7 @@ const RECORDING_FIELD_ALIASES: Record<string, RecordingSourceField> = {
   mode: 'recording.mode',
   model: 'recording.model',
   device: 'recording.input_device',
+  input_device: 'recording.input_device',
   app_version: 'recording.appVersion',
   version: 'recording.appVersion',
   language: 'recording.language',
@@ -292,7 +336,10 @@ export function authoredRecordingStarter(typeId: string, label?: string): TypeSc
       duration_seconds: { type: 'number', description: 'Recording length in seconds.' },
       model: { type: 'string', description: 'Transcription model used.' },
       mode: { type: 'string', description: 'Superwhisper mode.' },
-      device: { type: 'string', description: 'Recording device label.' },
+      input_device: {
+        type: 'string',
+        description: 'The audio input device used to capture the recording.'
+      },
       datetime: { type: 'datetime', description: 'Recording start time.' }
     }
   }

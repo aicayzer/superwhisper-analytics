@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { homedir } from 'os'
 import { dirname, join } from 'path'
 import { DEFAULT_FILLER_PHRASES, normalisePhrases } from '@shared/text-metrics'
-import { defaultMapping, type MymeMapping } from './myme/mapping'
+import { defaultMapping, migrateRecordingMapping, type MymeMapping } from './myme/mapping'
 import type { Config } from '../preload/api'
 
 /**
@@ -82,8 +82,13 @@ export function getConfig(): Config {
     // Additive migration: configs pre-dating the mapping work have no
     // `mapping` block. Drop in the bundled default so the engine has a
     // working mapping to project against from the very first sync.
+    //
+    // T-204 migration: rewrite the renamed source-field-ref
+    // `recording.device` → `recording.input_device` so installs from
+    // before the rename project the device value into the new shape
+    // instead of silently dropping it.
     const mymeMapping = isPlainObject(parsed.myme?.mapping)
-      ? (parsed.myme.mapping as MymeMapping)
+      ? migrateRecordingMapping(parsed.myme.mapping as MymeMapping)
       : defaultMapping()
     const rawModeFilter: unknown = parsed.myme?.modeFilter
     const mymeModeFilter: string[] | null = Array.isArray(rawModeFilter)

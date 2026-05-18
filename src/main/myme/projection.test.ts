@@ -107,14 +107,14 @@ describe('projectRecording — authored mapping', () => {
   it('emits properties for fields with auto-paired source refs', () => {
     const p = projectRecording(makeRecording(), authored)
     // authoredRecordingStarter declares raw_result, duration_seconds,
-    // model, mode, device, datetime; defaultRecordingFieldMap also adds
-    // body/title/language because parent === core.note.
+    // model, mode, input_device, datetime; defaultRecordingFieldMap also
+    // adds body/title/language because parent === core.note.
     expect(p.properties).toMatchObject({
       raw_result: 'hello world',
       duration_seconds: 4.5,
       model: 'medium',
       mode: 'dictation',
-      device: 'Built-in',
+      input_device: 'Built-in',
       datetime: '2026-05-11T10:00:00',
       body: 'Hello world.',
       title: 'Hello world.',

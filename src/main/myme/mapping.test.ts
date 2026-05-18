@@ -7,7 +7,9 @@ import {
   defaultMapping,
   defaultRecordingFieldMap,
   defaultSessionFieldMap,
-  type MappingBinding
+  migrateRecordingMapping,
+  type MappingBinding,
+  type MymeMapping
 } from './mapping'
 import { SUPERWHISPER_RECORDING, SUPERWHISPER_SESSION } from './schemas'
 
@@ -188,6 +190,82 @@ describe('defaultSessionFieldMap', () => {
   })
 })
 
+describe('migrateRecordingMapping (T-204)', () => {
+  // Persisted shape from before the rename. `recording.device` is no
+  // longer a member of `RecordingSourceField` but persisted configs
+  // still hold the string. The cast is the whole point of the test.
+  const STALE_REF = { kind: 'source', field: 'recording.device' as unknown as never } as const
+
+  it('replaces a bundled fieldMap wholesale when it contains the stale ref', () => {
+    const stale: MymeMapping = {
+      recording: {
+        mode: 'bundled',
+        typeId: SUPERWHISPER_RECORDING.id,
+        fieldMap: {
+          body: { kind: 'source', field: 'recording.transcript' },
+          device: STALE_REF
+        }
+      },
+      session: defaultBundledSessionBinding()
+    }
+    const next = migrateRecordingMapping(stale)
+    expect(next.recording.fieldMap).toEqual(defaultBundledRecordingBinding().fieldMap)
+    expect(next.recording.fieldMap.device).toBeUndefined()
+    expect(next.recording.fieldMap.input_device).toEqual({
+      kind: 'source',
+      field: 'recording.input_device'
+    })
+  })
+
+  it('rewrites only the stale source-ref on authored bindings, preserving the target key', () => {
+    const userKey = 'mic'
+    const stale: MymeMapping = {
+      recording: {
+        mode: 'authored',
+        typeId: 'eval.recording',
+        fieldMap: {
+          body: { kind: 'source', field: 'recording.transcript' },
+          [userKey]: STALE_REF
+        },
+        authoredSchema: authoredRecordingStarter('eval.recording')
+      },
+      session: defaultBundledSessionBinding()
+    }
+    const next = migrateRecordingMapping(stale)
+    expect(next.recording.fieldMap[userKey]).toEqual({
+      kind: 'source',
+      field: 'recording.input_device'
+    })
+    expect(next.recording.fieldMap.body).toEqual({
+      kind: 'source',
+      field: 'recording.transcript'
+    })
+  })
+
+  it('returns the input unchanged when no stale ref is present', () => {
+    const clean = defaultMapping()
+    const next = migrateRecordingMapping(clean)
+    expect(next).toBe(clean)
+  })
+
+  it('is idempotent', () => {
+    const stale: MymeMapping = {
+      recording: {
+        mode: 'bundled',
+        typeId: SUPERWHISPER_RECORDING.id,
+        fieldMap: {
+          body: { kind: 'source', field: 'recording.transcript' },
+          device: STALE_REF
+        }
+      },
+      session: defaultBundledSessionBinding()
+    }
+    const once = migrateRecordingMapping(stale)
+    const twice = migrateRecordingMapping(once)
+    expect(twice).toBe(once)
+  })
+})
+
 describe('authoredRecordingStarter', () => {
   it('seeds a sensible default field set for a user-authored type', () => {
     const schema = authoredRecordingStarter('eval.recording', 'My recording')
@@ -201,7 +279,7 @@ describe('authoredRecordingStarter', () => {
         'duration_seconds',
         'mode',
         'model',
-        'device',
+        'input_device',
         'datetime'
       ])
     )

@@ -4,20 +4,28 @@ import { SUPERWHISPER_RECORDING, SUPERWHISPER_SESSION } from './schemas'
 
 /**
  * Ensure the type ids referenced by the active mapping exist on the
- * server side. Runs on connect and before each sync. Idempotent —
+ * server side AND that the server is at-least the local schema version.
+ * Runs on connect and before each sync. Idempotent —
  * `client.types.list()` once per call, then `register()` only for ids
- * that aren't present and need registering.
+ * that are absent or where the local schema is a higher version than
+ * what the server has.
  *
  * Three binding modes get different treatment:
  *
- *   - `bundled`  — register from the canonical schemas in `schemas.ts`
- *     if not yet on the server.
- *   - `authored` — register from `binding.authoredSchema` if not yet on
- *     the server. The schema is carried in config; the user supplied it
- *     once at binding time.
+ *   - `bundled`  — register from the canonical schemas in `schemas.ts`.
+ *     A version bump in the bundle (e.g. T-204's v1 → v2 rename) is
+ *     pushed to the server on the next sync so the server's validation
+ *     stays in lockstep with what the projection produces.
+ *   - `authored` — register from `binding.authoredSchema`. Same
+ *     versioning rule: if the user bumps the version in config, the
+ *     bumped schema is pushed.
  *   - `existing` — taken on trust. If it's missing the user picked
  *     wrongly and the next upsert will surface the failure with a
  *     clearer error than this function could synthesise.
+ *
+ * The server's `version_bump_mismatch` check is the source of truth on
+ * what's an acceptable bump — we let the server decide and log the
+ * rejection rather than implementing the rules client-side.
  *
  * Auth failures bubble up — the engine's caller knows how to flip the
  * card to `disconnected`. Other failures are swallowed with a console
@@ -58,10 +66,9 @@ export async function ensureTypesRegistered(
     console.warn('[myme] types.list failed during registration probe:', err)
     return
   }
-  const presentIds = new Set(existing.map((t) => t.id))
+  const presentById = new Map(existing.map((t) => [t.id, t]))
 
   for (const { binding, fallback } of candidates) {
-    if (presentIds.has(binding.typeId)) continue
     const schema = resolveSchema(binding, fallback)
     if (!schema) {
       console.warn(
@@ -69,6 +76,15 @@ export async function ensureTypesRegistered(
       )
       continue
     }
+    const serverType = presentById.get(binding.typeId)
+    const serverVersion = serverType?.version ?? 0
+    const localVersion = schema.version ?? 1
+    // Register when the type is missing or when our local schema is at
+    // a higher version. The server adjudicates whether the bump itself
+    // is legal (`version_bump_mismatch`) — if it rejects, we surface
+    // that as a warning and the next `items.upsert` will fail with a
+    // clearer message.
+    if (serverType && localVersion <= serverVersion) continue
     try {
       await client.types.register(schema)
     } catch (err) {
