@@ -2,7 +2,20 @@ import { ipcRenderer } from 'electron'
 import type { HydratePayload } from '@shared/types'
 import type { MymeMapping } from '../main/myme/mapping'
 
-export type { MymeMapping, MappingBinding, FieldMap, SourceFieldRef } from '../main/myme/mapping'
+export type {
+  MymeMapping,
+  MappingBinding,
+  FieldMap,
+  SourceFieldRef,
+  RecordingSourceField,
+  SessionSourceField,
+  SourceKind
+} from '../main/myme/mapping'
+// Runtime helpers for plain-English source-field labels live in
+// `@shared/myme-labels` (renderer-safe — no electron/SDK imports). Type
+// `SourceFieldLabel` is re-exported here from the same module so a
+// caller can grab the type alongside the preload contract.
+export type { SourceFieldLabel } from '@shared/myme-labels'
 
 /**
  * Single source of truth for the renderer ↔ main IPC surface.
@@ -45,6 +58,13 @@ export interface Config {
   autoHideSidebar: boolean
   /** When true, DevTools open on launch. Equivalent to Cmd+Option+I. */
   devTools: boolean
+  /** Gap (in minutes) that defines a session boundary at sync time.
+   *  Two recordings whose `datetime` values are within this window
+   *  group into the same `superwhisper.session` Myme item; a gap
+   *  larger than this starts a new session. Default 30 mirrors the
+   *  long-standing engine default. Local-only; reading code is
+   *  `src/main/myme/engine.ts`. */
+  sessionGapThresholdMinutes: number
   /** Optional Myme integration settings. The endpoint URL is plain
    *  config; OAuth tokens live in encrypted storage via Electron's
    *  safeStorage, sync state in its own JSON file. */
@@ -59,6 +79,14 @@ export interface Config {
      *  is in this list are the only ones that sync. `null` = no
      *  filter; empty array is legal but yields zero recordings. */
     modeFilter: string[] | null
+    /** When false, the recordings pipeline is suppressed at sync time:
+     *  no upserts, no soft-deletes. Existing items on the server are
+     *  left untouched. Default true. */
+    recordingPipelineEnabled: boolean
+    /** When false, the sessions pipeline is suppressed at sync time:
+     *  no upserts, no soft-deletes. Existing items on the server are
+     *  left untouched. Default true. */
+    sessionPipelineEnabled: boolean
   }
 }
 
@@ -86,6 +114,12 @@ export interface ConfigStatus {
   demoMode: boolean
   autoHideSidebar: boolean
   devTools: boolean
+  /** See Config.sessionGapThresholdMinutes. */
+  sessionGapThresholdMinutes: number
+  /** See Config.myme.recordingPipelineEnabled. */
+  recordingPipelineEnabled: boolean
+  /** See Config.myme.sessionPipelineEnabled. */
+  sessionPipelineEnabled: boolean
 }
 
 /** Wire callback type for main → renderer push when the indexed dataset
@@ -233,7 +267,18 @@ export const api = {
      *  folder, demo flag, custom filler dictionary, etc. The renderer
      *  follows up by triggering a fresh hydrate so the dataStore picks
      *  up the cleared state. Used by Settings → About → Reset app. */
-    reset: (): Promise<ConfigStatus> => ipcRenderer.invoke('config:reset')
+    reset: (): Promise<ConfigStatus> => ipcRenderer.invoke('config:reset'),
+    /** Toggle the Recordings sync pipeline on/off. When off, the sync
+     *  engine performs no upserts or soft-deletes for recording items. */
+    setRecordingPipelineEnabled: (enabled: boolean): Promise<ConfigStatus> =>
+      ipcRenderer.invoke('config:setRecordingPipelineEnabled', enabled),
+    /** Toggle the Sessions sync pipeline on/off. */
+    setSessionPipelineEnabled: (enabled: boolean): Promise<ConfigStatus> =>
+      ipcRenderer.invoke('config:setSessionPipelineEnabled', enabled),
+    /** Persist the gap (in minutes) that defines a session boundary
+     *  at sync time. Read by the engine's `groupIntoSessions` call. */
+    setSessionGapThresholdMinutes: (minutes: number): Promise<ConfigStatus> =>
+      ipcRenderer.invoke('config:setSessionGapThresholdMinutes', minutes)
   },
   data: {
     hydrate: (): Promise<HydratePayload> => ipcRenderer.invoke('data:hydrate'),

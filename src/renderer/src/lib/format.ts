@@ -123,3 +123,26 @@ export function formatTrendTick(raw: unknown): string {
   }
   return v
 }
+
+/**
+ * Render an ISO timestamp as a relative time string ("just now",
+ * "5m ago", "2h ago", "3d ago"). Returns the empty string for an
+ * unparseable input — callers usually display a dash in that case.
+ *
+ * Lives here so the Settings cards (Recordings folder, Sync action bar,
+ * Connection card) can share the same wording.
+ */
+export function relativeTime(iso: string | null | undefined): string {
+  if (!iso) return ''
+  const t = new Date(iso).getTime()
+  if (isNaN(t)) return ''
+  const diffSec = Math.max(0, Math.floor((Date.now() - t) / 1000))
+  if (diffSec < 30) return 'just now'
+  if (diffSec < 60) return `${diffSec}s ago`
+  const diffMin = Math.floor(diffSec / 60)
+  if (diffMin < 60) return `${diffMin}m ago`
+  const diffHr = Math.floor(diffMin / 60)
+  if (diffHr < 24) return `${diffHr}h ago`
+  const diffD = Math.floor(diffHr / 24)
+  return `${diffD}d ago`
+}

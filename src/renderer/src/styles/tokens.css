@@ -69,6 +69,15 @@
   --accent-orange: #c2410c;
   --accent-orange-bg: #fef3e7;
 
+  /* Accent green — used by the StatusPill in settings ("Connected") and
+     other healthy-state indicators. Narrow palette use only. */
+  --accent-green: #15803d;
+  --accent-green-bg: #ecfdf3;
+
+  /* A stronger border for emphasised affordances (steppers, radio rings).
+     Sits one shade darker than --border. */
+  --border-strong: #d4d4d4;
+
   /* Elevation — used only by floating overlays (sidebar, palette). Cards
      get their lift from a brighter --card colour, not shadow. */
   --shadow-float: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px -4px rgba(0, 0, 0, 0.08);
@@ -112,6 +121,14 @@
   --accent-orange: #fb923c;
   --accent-orange-bg: #2a1f12;
 
+  /* Lighter green in dark mode for legibility on deeper surfaces. */
+  --accent-green: #4ade80;
+  --accent-green-bg: rgba(74, 222, 128, 0.1);
+
+  /* Stronger border in dark mode — mid-grey, sits between --border and
+     the chart-5 stop. */
+  --border-strong: #4a4a4a;
+
   /* Pulled right back in dark mode — the brighter --card and --floating
      colours carry the elevation cue. Just enough to avoid a hard outline. */
   --shadow-float: 0 1px 2px rgba(0, 0, 0, 0.4);
@@ -149,6 +166,9 @@
   --color-accent-blue-bg: var(--accent-blue-bg);
   --color-accent-orange: var(--accent-orange);
   --color-accent-orange-bg: var(--accent-orange-bg);
+  --color-accent-green: var(--accent-green);
+  --color-accent-green-bg: var(--accent-green-bg);
+  --color-border-strong: var(--border-strong);
 
   /* Foundation aliases (kept so layout primitives still compile) */
   --color-window: var(--window);

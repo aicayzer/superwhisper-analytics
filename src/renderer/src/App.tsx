@@ -4,6 +4,7 @@ import { LoadingOverlay } from './components/LoadingOverlay'
 import { router } from './routes'
 import { useConfigStore } from './state/configStore'
 import { useDataStore } from './state/dataStore'
+import { useMymeStore } from './state/mymeStore'
 import { useThemeStore } from './state/themeStore'
 
 /**
@@ -19,6 +20,7 @@ function App(): React.JSX.Element {
   const hydrateData = useDataStore((s) => s.hydrate)
   const clearData = useDataStore((s) => s.clearData)
   const dataLoading = useDataStore((s) => s.loading)
+  const hydrateMyme = useMymeStore((s) => s.hydrate)
 
   useEffect(() => {
     const mq =
@@ -42,6 +44,14 @@ function App(): React.JSX.Element {
   useEffect(() => {
     void hydrateConfig()
   }, [hydrateConfig])
+
+  // Pull Myme integration state once on mount — the store's `hydrated`
+  // flag makes this a no-op if it's already run. Without this, every
+  // Sync-tab consumer (ConnectionCard, PipelineCard, SyncActionBar)
+  // sees `status: null` indefinitely and renders its loading state.
+  useEffect(() => {
+    void hydrateMyme()
+  }, [hydrateMyme])
 
   // Once config is hydrated, ask main for data. Main decides what to
   // serve:

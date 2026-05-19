@@ -177,3 +177,65 @@ describe('isPathInsideHome', () => {
     expect(isPathInsideHome(undefined)).toBe(true)
   })
 })
+
+describe('settings-redesign migrations', () => {
+  it('defaults sessionGapThresholdMinutes + pipeline flags when absent', () => {
+    // Config from before the redesign — no session-gap, no pipeline toggles.
+    writeFileSync(
+      configFile(),
+      JSON.stringify({
+        superwhisperPath: '/tmp/x',
+        myme: { endpoint: 'https://staging.myme.so' }
+      }),
+      'utf-8'
+    )
+    const config = getConfig()
+    expect(config.sessionGapThresholdMinutes).toBe(30)
+    expect(config.myme.recordingPipelineEnabled).toBe(true)
+    expect(config.myme.sessionPipelineEnabled).toBe(true)
+  })
+
+  it('preserves persisted pipeline-disabled flags across reloads', () => {
+    writeFileSync(
+      configFile(),
+      JSON.stringify({
+        myme: {
+          endpoint: 'https://staging.myme.so',
+          recordingPipelineEnabled: false,
+          sessionPipelineEnabled: false
+        }
+      }),
+      'utf-8'
+    )
+    const config = getConfig()
+    expect(config.myme.recordingPipelineEnabled).toBe(false)
+    expect(config.myme.sessionPipelineEnabled).toBe(false)
+  })
+
+  it('clamps a stored session-gap to the [1, 120] range', () => {
+    writeFileSync(configFile(), JSON.stringify({ sessionGapThresholdMinutes: 9999 }), 'utf-8')
+    expect(getConfig().sessionGapThresholdMinutes).toBe(120)
+
+    writeFileSync(configFile(), JSON.stringify({ sessionGapThresholdMinutes: -5 }), 'utf-8')
+    expect(getConfig().sessionGapThresholdMinutes).toBe(1)
+  })
+
+  it('rounds a fractional session-gap', () => {
+    writeFileSync(configFile(), JSON.stringify({ sessionGapThresholdMinutes: 17.7 }), 'utf-8')
+    expect(getConfig().sessionGapThresholdMinutes).toBe(18)
+  })
+
+  it('persists a round-trip set via setConfig', () => {
+    setConfig({ sessionGapThresholdMinutes: 45 })
+    setConfig({
+      myme: {
+        ...getConfig().myme,
+        recordingPipelineEnabled: false
+      }
+    })
+    const reloaded = getConfig()
+    expect(reloaded.sessionGapThresholdMinutes).toBe(45)
+    expect(reloaded.myme.recordingPipelineEnabled).toBe(false)
+    expect(reloaded.myme.sessionPipelineEnabled).toBe(true)
+  })
+})

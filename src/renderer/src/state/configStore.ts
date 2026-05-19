@@ -37,6 +37,14 @@ interface ConfigState {
   autoHideSidebar: boolean
   /** When true, DevTools are open. Persisted across restarts. */
   devTools: boolean
+  /** Gap in minutes that defines a session boundary at Myme sync time.
+   *  Surfaced in Settings → Sync → Sessions pipeline. */
+  sessionGapThresholdMinutes: number
+  /** When false, the Recordings sync pipeline is paused — no upserts,
+   *  no soft-deletes. Existing items on the server are left alone. */
+  recordingPipelineEnabled: boolean
+  /** When false, the Sessions sync pipeline is paused. */
+  sessionPipelineEnabled: boolean
   /** Has the initial round-trip completed? Gates the first-run modal. */
   hydrated: boolean
   /** Transient flag — when true, force the welcome modal regardless
@@ -64,6 +72,13 @@ interface ConfigState {
   setAutoHideSidebar: (enabled: boolean) => Promise<void>
   /** Toggle DevTools open/close. Persists across restarts. */
   setDevTools: (enabled: boolean) => Promise<void>
+  /** Persist the session-gap threshold (minutes). Clamped to [1, 120]
+   *  by main. */
+  setSessionGapThresholdMinutes: (minutes: number) => Promise<void>
+  /** Toggle the Recordings sync pipeline. */
+  setRecordingPipelineEnabled: (enabled: boolean) => Promise<void>
+  /** Toggle the Sessions sync pipeline. */
+  setSessionPipelineEnabled: (enabled: boolean) => Promise<void>
   /** Wipe the persisted config back to defaults and force the welcome
    *  modal to re-appear. Used by Settings → About → Reset app. */
   resetApp: () => Promise<void>
@@ -84,6 +99,9 @@ function applyStatus(status: ConfigStatus): Partial<ConfigState> {
     demoMode: status.demoMode,
     autoHideSidebar: status.autoHideSidebar,
     devTools: status.devTools,
+    sessionGapThresholdMinutes: status.sessionGapThresholdMinutes,
+    recordingPipelineEnabled: status.recordingPipelineEnabled,
+    sessionPipelineEnabled: status.sessionPipelineEnabled,
     hydrated: true
   }
 }
@@ -99,6 +117,9 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
   demoMode: false,
   autoHideSidebar: true,
   devTools: false,
+  sessionGapThresholdMinutes: 30,
+  recordingPipelineEnabled: true,
+  sessionPipelineEnabled: true,
   hydrated: false,
   welcomeForceShow: false,
 
@@ -169,6 +190,27 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
   setDevTools: async (enabled) => {
     set({ devTools: enabled })
     const updated = await window.api.config.setDevTools(enabled)
+    set(applyStatus(updated))
+  },
+
+  setSessionGapThresholdMinutes: async (minutes) => {
+    // Optimistic — the renderer's stepper updates instantly; main
+    // clamps and persists, and we replace with the canonical value on
+    // round-trip in case the clamp engaged.
+    set({ sessionGapThresholdMinutes: minutes })
+    const updated = await window.api.config.setSessionGapThresholdMinutes(minutes)
+    set(applyStatus(updated))
+  },
+
+  setRecordingPipelineEnabled: async (enabled) => {
+    set({ recordingPipelineEnabled: enabled })
+    const updated = await window.api.config.setRecordingPipelineEnabled(enabled)
+    set(applyStatus(updated))
+  },
+
+  setSessionPipelineEnabled: async (enabled) => {
+    set({ sessionPipelineEnabled: enabled })
+    const updated = await window.api.config.setSessionPipelineEnabled(enabled)
     set(applyStatus(updated))
   },
 

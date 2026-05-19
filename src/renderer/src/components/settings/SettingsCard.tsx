@@ -43,7 +43,7 @@ export function SettingsCard({
         className
       )}
     >
-      <header className="flex items-start gap-3 px-5 py-4">
+      <header className="flex items-center gap-3 px-5 py-4">
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-foreground/[0.05]">
           <Icon className="h-4 w-4 text-foreground" strokeWidth={1.7} />
         </div>

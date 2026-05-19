@@ -2,11 +2,12 @@ import os from 'os'
 import { MymeError, UnauthorizedError, ValidationError, type CreateItemInput } from '@mymehq/sdk'
 import type { Recording } from '@shared/types'
 import { hydrate } from '../cache'
+import { getConfig } from '../config'
 import { getClient, invalidateClient } from './client'
 import { defaultMapping, type MymeMapping } from './mapping'
 import { hashProjection, projectRecording, projectSession } from './projection'
 import { ensureTypesRegistered } from './registration'
-import { DEFAULT_GAP_THRESHOLD_MINUTES, groupIntoSessions } from './sessions'
+import { groupIntoSessions } from './sessions'
 import { loadState, saveState, type SyncState, type SyncStateEntry } from './state'
 
 /**
@@ -119,6 +120,14 @@ export async function syncRun(opts: SyncOptions = {}): Promise<SyncOutcome> {
 
   const mapping = opts.mapping ?? defaultMapping()
   const modeFilter = opts.modeFilter ?? null
+  // Read pipeline gates + session-gap once per run. The gates suppress
+  // the relevant projection / upsert / soft-delete sub-pass; importantly
+  // they DON'T trash previously-synced items — flipping a pipeline off
+  // is "no further activity", not "regress".
+  const appConfig = getConfig()
+  const recordingPipelineEnabled = appConfig.myme.recordingPipelineEnabled
+  const sessionPipelineEnabled = appConfig.myme.sessionPipelineEnabled
+  const sessionGapMinutes = appConfig.sessionGapThresholdMinutes
 
   // Pre-flight: make sure the mapping's target types exist server-side.
   // Bundled / authored types get registered if missing; existing types
@@ -140,7 +149,14 @@ export async function syncRun(opts: SyncOptions = {}): Promise<SyncOutcome> {
     // Fall through — the upsert will surface the real error.
   }
 
-  const fullRecordings = opts.recordingsOverride ?? hydrate().recordings
+  // Suppress the entire recordings pass when the Recordings pipeline is
+  // disabled — empty `recordings` produces an empty `toUpsert`, and the
+  // soft-delete computation below sees an empty `seenSourceIds` but we
+  // override `toSoftDelete` to [] so previously-synced items are left
+  // alone. State preserved for clean resume on re-enable.
+  const fullRecordings = recordingPipelineEnabled
+    ? (opts.recordingsOverride ?? hydrate().recordings)
+    : []
   // Drop recordings with no transcript content. Superwhisper writes a
   // meta.json with an empty `result` for failed captures (mic glitch,
   // background-noise rejection, user-aborted before transcription).
@@ -198,11 +214,13 @@ export async function syncRun(opts: SyncOptions = {}): Promise<SyncOutcome> {
   // Soft-delete list: recordings tracked in state but absent from
   // current. Skipped when a sync cap is in effect — every recording
   // past the cap would be falsely "missing" from the view, which would
-  // trash the whole tail. Only the uncapped path can authoritatively
-  // detect disk-deletes; the cap surfaces this trade-off in the UI.
-  const toSoftDelete = limit
-    ? []
-    : Object.keys(state.recordings).filter((id) => !seenSourceIds.has(id))
+  // trash the whole tail. Also skipped when the Recordings pipeline is
+  // off — turning the pipeline off should NOT trash already-synced
+  // items; it should be a no-op until re-enabled.
+  const toSoftDelete =
+    limit || !recordingPipelineEnabled
+      ? []
+      : Object.keys(state.recordings).filter((id) => !seenSourceIds.has(id))
 
   const counts = {
     created: 0,
@@ -379,7 +397,12 @@ export async function syncRun(opts: SyncOptions = {}): Promise<SyncOutcome> {
   // effect: a partial recording view would mint malformed session
   // groups (and trash legitimate prior sessions). Sessions are an
   // all-or-nothing concept; the cap-surface UI flags the trade-off.
-  const sessionOutcome = limit
+  // Also skipped when the Sessions pipeline is off — same no-trash
+  // semantics as the Recordings gate above. And skipped when the
+  // Recordings pipeline is off, because we have no recordings to
+  // group.
+  const sessionsSkipped = limit || !sessionPipelineEnabled || !recordingPipelineEnabled
+  const sessionOutcome = sessionsSkipped
     ? {
         created: 0,
         updated: 0,
@@ -397,6 +420,7 @@ export async function syncRun(opts: SyncOptions = {}): Promise<SyncOutcome> {
         recordingIds: nextRecordings,
         pushedAt,
         binding: mapping.session,
+        sessionGapMinutes,
         onProgress: opts.onProgress,
         signal: opts.signal
       })
@@ -467,10 +491,24 @@ async function syncSessions(opts: {
   recordingIds: Record<string, SyncStateEntry>
   pushedAt: string
   binding: MymeMapping['session']
+  /** Gap (minutes) that defines a session boundary. Threaded in from
+   *  `syncRun` so the engine reads it once per run and the test path
+   *  can pass it explicitly without going through electron config. */
+  sessionGapMinutes: number
   onProgress?: SyncOptions['onProgress']
   signal?: AbortSignal
 }): Promise<SessionSyncOutcome & { cancelled?: boolean }> {
-  const { client, recordings, state, recordingIds, pushedAt, binding, onProgress, signal } = opts
+  const {
+    client,
+    recordings,
+    state,
+    recordingIds,
+    pushedAt,
+    binding,
+    sessionGapMinutes,
+    onProgress,
+    signal
+  } = opts
   const out: SessionSyncOutcome = {
     created: 0,
     updated: 0,
@@ -482,7 +520,7 @@ async function syncSessions(opts: {
     nextSessions: { ...state.sessions }
   }
 
-  const groups = groupIntoSessions(recordings, DEFAULT_GAP_THRESHOLD_MINUTES)
+  const groups = groupIntoSessions(recordings, sessionGapMinutes)
   type SessionItem = {
     sourceId: string
     hash: string

@@ -48,7 +48,10 @@ function buildStatus(): ConfigStatus {
     transcriptsOnly: config.transcriptsOnly,
     demoMode: config.demoMode,
     autoHideSidebar: config.autoHideSidebar,
-    devTools: config.devTools
+    devTools: config.devTools,
+    sessionGapThresholdMinutes: config.sessionGapThresholdMinutes,
+    recordingPipelineEnabled: config.myme.recordingPipelineEnabled,
+    sessionPipelineEnabled: config.myme.sessionPipelineEnabled
   }
 }
 
@@ -129,6 +132,34 @@ export function registerIpcHandlers(): void {
     // Watch is keyed off path, which is now null — kill any active
     // watcher so we don't leak a handle pointing at the old folder.
     disableWatch()
+    return buildStatus()
+  })
+
+  // Pipeline toggles — read by `syncRun` in engine.ts to decide whether
+  // to project + upsert the corresponding kind. The engine also skips
+  // soft-deletes for a disabled pipeline so flipping off doesn't trash
+  // previously-synced items on the server.
+  ipcMain.handle('config:setRecordingPipelineEnabled', (_, enabled: unknown): ConfigStatus => {
+    if (!validBool(enabled)) return buildStatus()
+    const existing = getConfig().myme
+    setConfig({ myme: { ...existing, recordingPipelineEnabled: enabled } })
+    return buildStatus()
+  })
+
+  ipcMain.handle('config:setSessionPipelineEnabled', (_, enabled: unknown): ConfigStatus => {
+    if (!validBool(enabled)) return buildStatus()
+    const existing = getConfig().myme
+    setConfig({ myme: { ...existing, sessionPipelineEnabled: enabled } })
+    return buildStatus()
+  })
+
+  // Session-gap threshold — minute count between recordings before they
+  // start a new session. Read by `groupIntoSessions` in engine.ts.
+  // Clamp to [1, 120] so the renderer can't push us into a silly state.
+  ipcMain.handle('config:setSessionGapThresholdMinutes', (_, minutes: unknown): ConfigStatus => {
+    if (typeof minutes !== 'number' || !Number.isFinite(minutes)) return buildStatus()
+    const clamped = Math.min(120, Math.max(1, Math.round(minutes)))
+    setConfig({ sessionGapThresholdMinutes: clamped })
     return buildStatus()
   })
 

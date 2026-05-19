@@ -85,6 +85,17 @@ export interface MymeMapping {
 /** Source kind a binding describes. */
 export type SourceKind = 'recording' | 'session'
 
+// Plain-English label helpers live in `@shared/myme-labels` so the
+// renderer can import them without dragging main-process code into
+// its bundle. Re-export here so main-process callers can grab them
+// in one stop.
+export {
+  getSourceFieldLabel,
+  listRecordingSourceLabels,
+  listSessionSourceLabels,
+  type SourceFieldLabel
+} from '@shared/myme-labels'
+
 // ---------------------------------------------------------------------------
 // Bundled defaults
 // ---------------------------------------------------------------------------

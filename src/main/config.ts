@@ -4,6 +4,7 @@ import { homedir } from 'os'
 import { dirname, join } from 'path'
 import { DEFAULT_FILLER_PHRASES, normalisePhrases } from '@shared/text-metrics'
 import { defaultMapping, migrateRecordingMapping, type MymeMapping } from './myme/mapping'
+import { DEFAULT_GAP_THRESHOLD_MINUTES } from './myme/sessions'
 import type { Config } from '../preload/api'
 
 /**
@@ -33,10 +34,13 @@ function defaultConfig(): Config {
     demoMode: false,
     autoHideSidebar: true,
     devTools: false,
+    sessionGapThresholdMinutes: DEFAULT_GAP_THRESHOLD_MINUTES,
     myme: {
       endpoint: DEFAULT_MYME_ENDPOINT,
       mapping: defaultMapping(),
-      modeFilter: null
+      modeFilter: null,
+      recordingPipelineEnabled: true,
+      sessionPipelineEnabled: true
     }
   }
 }
@@ -94,6 +98,19 @@ export function getConfig(): Config {
     const mymeModeFilter: string[] | null = Array.isArray(rawModeFilter)
       ? rawModeFilter.filter((s: unknown): s is string => typeof s === 'string')
       : null
+    // Additive migration: pipeline toggles default to true for installs
+    // that pre-date the per-pipeline setting. Reading `=== false` rather
+    // than `!== true` so the absence path (`undefined`) lands on `true`.
+    const recordingPipelineEnabled = parsed.myme?.recordingPipelineEnabled !== false
+    const sessionPipelineEnabled = parsed.myme?.sessionPipelineEnabled !== false
+    // Additive migration: session-gap threshold default mirrors the
+    // engine's long-standing default. Range-clamped to keep the
+    // settings UI's stepper in a sensible bracket.
+    const sessionGap =
+      typeof parsed.sessionGapThresholdMinutes === 'number' &&
+      Number.isFinite(parsed.sessionGapThresholdMinutes)
+        ? Math.min(120, Math.max(1, Math.round(parsed.sessionGapThresholdMinutes)))
+        : DEFAULT_GAP_THRESHOLD_MINUTES
     return {
       superwhisperPath: parsed.superwhisperPath ?? null,
       fillerWords,
@@ -104,10 +121,13 @@ export function getConfig(): Config {
       // narrow windows, which matches the plan's UX intent.
       autoHideSidebar: parsed.autoHideSidebar !== false,
       devTools: parsed.devTools === true,
+      sessionGapThresholdMinutes: sessionGap,
       myme: {
         endpoint: mymeEndpoint,
         mapping: mymeMapping,
-        modeFilter: mymeModeFilter
+        modeFilter: mymeModeFilter,
+        recordingPipelineEnabled,
+        sessionPipelineEnabled
       }
     }
   } catch (err) {
