@@ -58,11 +58,11 @@ export function RecordingsFolderCard(): React.JSX.Element {
   const busy = loading || reindexing
   const hours = formatNearestHours(totalDurationSec)
   const recordings = formatNearestK(count)
-  const indexedSuffix = (() => {
-    if (loading) return ' · scanning…'
-    if (reindexing) return ' · reindexing…'
-    if (!indexedAt) return ' · not yet indexed'
-    return ` · indexed ${relativeTime(indexedAt)}`
+  const indexedRight = (() => {
+    if (loading) return 'Scanning…'
+    if (reindexing) return 'Reindexing…'
+    if (!indexedAt) return 'Not yet indexed'
+    return `Indexed ${relativeTime(indexedAt)}`
   })()
 
   const headerExtra = (
@@ -91,11 +91,13 @@ export function RecordingsFolderCard(): React.JSX.Element {
     >
       <div className="space-y-1.5">
         <PathBar path={path} onChoose={() => void choose()} chooseLabel="Change folder" />
-        <p className="px-1 text-[12px] text-muted-foreground">
-          <span className="font-medium text-foreground">{recordings}</span> recordings ·{' '}
-          <span className="font-medium text-foreground">{hours}</span> of audio
-          {indexedSuffix}
-        </p>
+        <div className="flex items-center justify-between gap-3 px-1 text-[12px] text-muted-foreground">
+          <p>
+            <span className="font-medium text-foreground">{recordings}</span> recordings ·{' '}
+            <span className="font-medium text-foreground">{hours}</span> of audio
+          </p>
+          <p className="shrink-0">{indexedRight}</p>
+        </div>
         {error && (
           <p className="pt-1 text-[12px] text-accent-orange" role="alert">
             {error}

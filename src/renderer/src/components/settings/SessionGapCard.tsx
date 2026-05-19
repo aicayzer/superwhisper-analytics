@@ -1,33 +1,25 @@
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '@renderer/components/ui/select'
+import { SegmentedTabs } from '@renderer/components/ui/SegmentedTabs'
 import { useConfigStore } from '@renderer/state/configStore'
 import { Layers } from 'lucide-react'
 import { SettingsCard } from './SettingsCard'
 
-const GAP_OPTIONS: ReadonlyArray<{ value: number; label: string }> = [
-  { value: 15, label: '15 minutes' },
-  { value: 30, label: '30 minutes' },
-  { value: 60, label: '60 minutes' },
-  { value: 120, label: '120 minutes' }
+type GapMinutes = 15 | 30 | 60 | 120
+
+const GAP_OPTIONS: ReadonlyArray<{ id: `${GapMinutes}`; label: string }> = [
+  { id: '15', label: '15m' },
+  { id: '30', label: '30m' },
+  { id: '60', label: '60m' },
+  { id: '120', label: '120m' }
 ]
 
 /**
- * Analysis → Sessions. The canonical home for the session-gap value —
- * the threshold that decides "this recording belongs to the same
- * session as the previous one".
+ * Analysis → Sessions. Canonical home for the session-gap threshold —
+ * the value that decides "this recording belongs to the same session
+ * as the previous one".
  *
- * Lives on Analysis because it's a definition of what counts as a
- * session, not a Sync setting. The Myme Sessions pipeline reads from
- * the same config field; the Sessions PipelineCard surfaces a
- * read-only mirror of this value with a link back here.
- *
- * Backend unification (renderer Usage view + sync engine reading the
- * same value) is the follow-up. The dropdown UI lands now.
+ * Picker is a SegmentedTabs control, not a dropdown — visually rhymes
+ * with the Settings tab strip and the navbar range pill, so the chrome
+ * stays consistent across the app.
  */
 export function SessionGapCard(): React.JSX.Element {
   const value = useConfigStore((s) => s.sessionGapThresholdMinutes)
@@ -36,7 +28,7 @@ export function SessionGapCard(): React.JSX.Element {
   // Map the persisted value to the nearest dropdown option so a
   // freshly migrated config with a weird value still highlights
   // something sensible.
-  const selected = GAP_OPTIONS.find((o) => o.value === value)?.value ?? 30
+  const selected: `${GapMinutes}` = GAP_OPTIONS.find((o) => Number(o.id) === value)?.id ?? '30'
 
   return (
     <SettingsCard
@@ -51,18 +43,13 @@ export function SessionGapCard(): React.JSX.Element {
             Recordings within this gap count as the same session.
           </div>
         </div>
-        <Select value={String(selected)} onValueChange={(v) => void setValue(Number(v))}>
-          <SelectTrigger size="sm" className="w-[140px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {GAP_OPTIONS.map((o) => (
-              <SelectItem key={o.value} value={String(o.value)}>
-                {o.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <SegmentedTabs<`${GapMinutes}`>
+          value={selected}
+          onChange={(next) => void setValue(Number(next))}
+          options={GAP_OPTIONS}
+          ariaLabel="Session gap in minutes"
+          className="self-center"
+        />
       </div>
     </SettingsCard>
   )
