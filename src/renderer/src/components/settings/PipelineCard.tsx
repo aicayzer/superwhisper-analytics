@@ -9,7 +9,6 @@ import type { MappingBinding, SourceKind } from '../../../../preload/api'
 import { MappingRoot } from './MappingRoot'
 import { SettingsCard } from './SettingsCard'
 import { Group } from './parts/Group'
-import { Stepper } from './parts/Stepper'
 
 interface PipelineCardProps {
   kind: SourceKind
@@ -21,8 +20,8 @@ interface PipelineCardProps {
  * `engine.ts`). The body is dim + non-interactive when off.
  *
  * Body composition:
- *   • Sessions only: Session-gap stepper row (Recordings has no
- *     gap concept).
+ *   • Sessions only: a read-only "Session gap" line that mirrors the
+ *     canonical value from the Analysis tab.
  *   • Mapping editor (`MappingRoot`).
  *   • Recordings only: Modes section (per-mode toggles for which
  *     SuperWhisper modes get synced).
@@ -77,7 +76,7 @@ export function PipelineCard({ kind }: PipelineCardProps): React.JSX.Element {
         )}
         aria-hidden={!enabled}
       >
-        {kind === 'session' && <SessionGapRow />}
+        {kind === 'session' && <SessionGapInheritedRow />}
         {binding ? (
           <MappingRoot kind={kind} binding={binding} onChange={updateBinding} />
         ) : (
@@ -89,9 +88,13 @@ export function PipelineCard({ kind }: PipelineCardProps): React.JSX.Element {
   )
 }
 
-function SessionGapRow(): React.JSX.Element {
+/**
+ * Read-only mirror of the canonical session-gap value from the Analysis
+ * tab. Edits live there; this row just confirms what's currently in
+ * effect so the user doesn't have to flip tabs to check.
+ */
+function SessionGapInheritedRow(): React.JSX.Element {
   const value = useConfigStore((s) => s.sessionGapThresholdMinutes)
-  const setValue = useConfigStore((s) => s.setSessionGapThresholdMinutes)
   return (
     <div className="mb-4 flex items-center justify-between gap-4 rounded-lg border border-border bg-card px-4 py-3">
       <div className="min-w-0">
@@ -100,14 +103,9 @@ function SessionGapRow(): React.JSX.Element {
           Recordings within this gap count as the same session.
         </div>
       </div>
-      <Stepper
-        value={value}
-        onChange={(next) => void setValue(next)}
-        min={1}
-        max={120}
-        unit="min"
-        width={68}
-      />
+      <span className="shrink-0 text-[12px] text-muted-foreground">
+        <span className="font-medium text-foreground">{value} min</span> · from Analysis
+      </span>
     </div>
   )
 }
@@ -166,7 +164,7 @@ function ModesSection(): React.JSX.Element {
             <button
               type="button"
               onClick={toggleAll}
-              className="text-accent-blue transition-colors hover:underline"
+              className="text-muted-foreground transition-colors hover:text-foreground"
             >
               {allOn ? 'Disable all' : 'Enable all'}
             </button>
@@ -194,7 +192,7 @@ function ModesSection(): React.JSX.Element {
           <button
             type="button"
             onClick={() => setExpanded((v) => !v)}
-            className="block w-full border-t border-border bg-foreground/[0.02] py-2 text-[12px] text-accent-blue transition-colors hover:bg-foreground/[0.04]"
+            className="block w-full border-t border-border bg-foreground/[0.02] py-2 text-[12px] text-muted-foreground transition-colors hover:bg-foreground/[0.04] hover:text-foreground"
           >
             {expanded
               ? 'Show top 8 only'

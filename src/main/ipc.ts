@@ -220,6 +220,12 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('myme:syncNow', (): Promise<MymeStatus> => myme.syncNow())
   ipcMain.handle('myme:cancelSync', (): MymeStatus => myme.cancelSync())
   ipcMain.handle('myme:testSync', (): Promise<MymeStatus> => myme.testSync())
+  ipcMain.handle(
+    'myme:purgeAllData',
+    (): Promise<
+      { ok: true; recordings: number; sessions: number } | { ok: false; error: string }
+    > => myme.purgeAllData()
+  )
   ipcMain.handle('myme:getMapping', (): MymeMapping => myme.getMapping())
   ipcMain.handle('myme:setMapping', (_, mapping: unknown): MymeMapping => {
     // Light validation: the structure must have `recording` and

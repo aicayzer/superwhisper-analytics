@@ -41,6 +41,9 @@ interface MymeState {
   syncNow: () => Promise<void>
   testSync: () => Promise<void>
   cancelSync: () => Promise<void>
+  purgeAllData: () => Promise<
+    { ok: true; recordings: number; sessions: number } | { ok: false; error: string }
+  >
   refreshMapping: () => Promise<void>
   setMapping: (mapping: MymeMapping) => Promise<void>
   refreshModeFilter: () => Promise<void>
@@ -115,6 +118,10 @@ export const useMymeStore = create<MymeState>((set, get) => ({
   cancelSync: async () => {
     const next = await window.api.myme.cancelSync()
     set({ status: next })
+  },
+
+  purgeAllData: async () => {
+    return await window.api.myme.purgeAllData()
   },
 
   refreshMapping: async () => {

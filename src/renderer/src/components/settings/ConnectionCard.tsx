@@ -1,7 +1,8 @@
 import { useMymeStore } from '@renderer/state/mymeStore'
 import { useDataStore } from '@renderer/state/dataStore'
 import { relativeTime } from '@renderer/lib/format'
-import { Cloud, ExternalLink, MoreHorizontal } from 'lucide-react'
+import { toastError, toastSuccess } from '@renderer/lib/toast'
+import { ChevronDown, Cloud, ExternalLink, UploadCloud } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { ProbeResult, MymeStatus } from '../../../../preload/api'
 import { CHROME_BUTTON, CHROME_BUTTON_PRIMARY } from './parts/chromeButton'
@@ -11,29 +12,33 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@renderer/components/ui/dropdown-menu'
 
 /**
  * Sync → Connection.
  *
- * Six visual states, all in one card:
+ *   disconnected (fresh / error) → Endpoint row + "Sign in" primary
+ *   connecting (device)          → User code + "Open verification page"
+ *   connected (never synced)     → Identity + "Ready to sync" hero +
+ *                                  SplitButton(Start sync)
+ *   connected (idle)             → Identity + last-synced caption +
+ *                                  SplitButton(Sync now)
+ *   connected (failed)           → Identity + small failure caption +
+ *                                  SplitButton(Retry)
+ *   syncing                      → Identity + progress + Cancel
  *
- *   disconnected (fresh) → endpoint row + "Sign in" primary
- *   disconnected (error) → same, with the previous error surfaced
- *   connecting (device)  → user code + "Open verification page" primary
- *   connected (never)    → identity rows + "Ready to sync · N recordings"
- *                          hero + "Start sync" primary
- *   connected (idle)     → identity rows + "Last synced X · auto-syncing"
- *                          + "Sync now" ghost
- *   connected (failed)   → identity rows + error line + "Retry" primary
- *   syncing              → identity rows + progress line + "Cancel" ghost
+ * The action chrome is a single `SyncSplitButton` component — outlined
+ * (not the dark "primary" face), face + thin pipe + chevron-down
+ * trigger in one unit. Same shape across idle / first-sync / failed,
+ * different labels — so the failed-state retry doesn't visually fight
+ * the steady-state "Sync now".
  *
- * Disconnect / Test connection live in an overflow menu on the connected
- * states — they're rare actions and don't belong in primary chrome.
- *
- * The user only ever sees a single primary action per state. No bottom
- * sync bar.
+ * StatusPill in the header reflects the *connection* state only.
+ * `lastError` from a failed sync surfaces inside the body as a muted
+ * caption; the pill stays "Connected". Wipe-all-data lives on the
+ * Developer tab where the rest of the testing affordances sit.
  */
 export function ConnectionCard(): React.JSX.Element {
   const status = useMymeStore((s) => s.status)
@@ -42,6 +47,7 @@ export function ConnectionCard(): React.JSX.Element {
   const connect = useMymeStore((s) => s.connect)
   const cancelConnect = useMymeStore((s) => s.cancelConnect)
   const syncNow = useMymeStore((s) => s.syncNow)
+  const testSync = useMymeStore((s) => s.testSync)
   const cancelSync = useMymeStore((s) => s.cancelSync)
   const recordingCount = useDataStore((s) => s.recordings.length)
 
@@ -58,8 +64,9 @@ export function ConnectionCard(): React.JSX.Element {
     return () => window.clearInterval(t)
   }, [])
 
-  // Probe identity once connected. Clear async on disconnect so the
-  // sync-setState-in-effect heuristic stays happy.
+  // Background probe runs on every transition into connected/syncing.
+  // Result is used to display the account row — explicit Test connection
+  // is a separate flow that surfaces via toast.
   useEffect(() => {
     if (status?.kind !== 'connected' && status?.kind !== 'syncing') {
       const t = window.setTimeout(() => setProbe(null), 0)
@@ -80,12 +87,16 @@ export function ConnectionCard(): React.JSX.Element {
     }
   }, [status?.kind, probeConnection])
 
-  async function run(action: 'connect' | 'disconnect' | 'sync' | 'cancel'): Promise<void> {
-    setBusyAction(action)
+  async function run(
+    action: 'connect' | 'disconnect' | 'sync' | 'test-sync' | 'cancel'
+  ): Promise<void> {
+    // `test-sync` shares the sync busy lane engine-side.
+    setBusyAction(action === 'test-sync' ? 'sync' : action)
     try {
       if (action === 'connect') await connect()
       else if (action === 'disconnect') await disconnect()
       else if (action === 'sync') await syncNow()
+      else if (action === 'test-sync') await testSync()
       else if (action === 'cancel') {
         if (status?.kind === 'connecting') await cancelConnect()
         else if (status?.kind === 'syncing') await cancelSync()
@@ -95,11 +106,16 @@ export function ConnectionCard(): React.JSX.Element {
     }
   }
 
-  async function runProbe(): Promise<void> {
+  async function onTestConnection(): Promise<void> {
     setProbing(true)
     try {
       const result = await probeConnection()
       setProbe(result)
+      if (result.ok) {
+        toastSuccess({ message: 'Connection OK.' })
+      } else {
+        toastError({ message: `Connection failed: ${result.error}` })
+      }
     } finally {
       setProbing(false)
     }
@@ -112,7 +128,7 @@ export function ConnectionCard(): React.JSX.Element {
       icon={Cloud}
       title="Myme"
       subtitle="Push your recordings and sessions into Myme."
-      headerExtra={<StatusPill tone={tone} label={label} title={title} />}
+      headerExtra={<StatusPill tone={tone} label={label} title={title} hideIcon />}
     >
       {renderBody({
         status,
@@ -122,10 +138,11 @@ export function ConnectionCard(): React.JSX.Element {
         onConnect: () => void run('connect'),
         onCancel: () => void run('cancel'),
         onStartSync: () => void run('sync'),
+        onTestSync: () => void run('test-sync'),
         onSyncNow: () => void run('sync'),
         onRetry: () => void run('sync'),
         onDisconnect: () => void run('disconnect'),
-        onTest: () => void runProbe()
+        onTestConnection: () => void onTestConnection()
       })}
     </SettingsCard>
   )
@@ -143,20 +160,18 @@ interface BodyProps {
   onConnect: () => void
   onCancel: () => void
   onStartSync: () => void
+  onTestSync: () => void
   onSyncNow: () => void
   onRetry: () => void
   onDisconnect: () => void
-  onTest: () => void
+  onTestConnection: () => void
 }
 
 function renderBody(p: BodyProps): React.JSX.Element {
-  if (!p.status) {
-    return <p className="text-[12.5px] text-muted-foreground">Loading…</p>
-  }
+  if (!p.status) return <p className="text-[12.5px] text-muted-foreground">Loading…</p>
   if (p.status.kind === 'disconnected') return <DisconnectedBody {...p} status={p.status} />
   if (p.status.kind === 'connecting') return <ConnectingBody {...p} status={p.status} />
   if (p.status.kind === 'syncing') return <SyncingBody {...p} status={p.status} />
-  // connected
   return <ConnectedBody {...p} status={p.status} />
 }
 
@@ -170,10 +185,8 @@ function DisconnectedBody({
   onConnect
 }: BodyProps & { status: Extract<MymeStatus, { kind: 'disconnected' }> }): React.JSX.Element {
   return (
-    <div className="space-y-3">
-      <dl className="divide-y divide-border text-[13px]">
-        <Row label="Endpoint" value={status.endpoint || 'Not configured'} />
-      </dl>
+    <div className="space-y-4">
+      <IdentityBlock probe={null} endpoint={status.endpoint || 'Not configured'} />
       {status.lastError && <p className="text-[12px] text-accent-orange">{status.lastError}</p>}
       <div className="flex justify-end">
         <button
@@ -198,7 +211,6 @@ function ConnectingBody({
   busyAction,
   onCancel
 }: BodyProps & { status: Extract<MymeStatus, { kind: 'connecting' }> }): React.JSX.Element {
-  // API-key paste path — minimal until/unless we wire a real input here.
   if (status.mode === 'api-key') {
     return (
       <div className="space-y-3">
@@ -214,7 +226,6 @@ function ConnectingBody({
     )
   }
 
-  // Device flow — waiting for the user code + verification URI.
   if (!status.userCode) {
     return (
       <div className="space-y-3">
@@ -263,7 +274,9 @@ function ConnectingBody({
 }
 
 // ──────────────────────────────────────────────────────────────────────
-// Connected — three sub-states share an identity-rows + actions shape
+// Connected — three sub-states share an identity-block + caption +
+// SplitButton shape. Caption text varies; button label varies; chrome
+// is constant.
 // ──────────────────────────────────────────────────────────────────────
 
 function ConnectedBody({
@@ -272,87 +285,132 @@ function ConnectedBody({
   recordingCount,
   busyAction,
   onStartSync,
+  onTestSync,
   onSyncNow,
   onRetry,
   onDisconnect,
-  onTest
+  onTestConnection
 }: BodyProps & { status: Extract<MymeStatus, { kind: 'connected' }> }): React.JSX.Element {
-  const account = describeIdentity(probe)
   const neverSynced = status.lastSyncedAt === null && !status.lastError
   const failed = !!status.lastError
 
+  // Single-source the menu — same items regardless of sub-state, so
+  // the dropdown doesn't grow / shrink between renders.
+  const menuItems = (
+    <>
+      <DropdownMenuItem onSelect={onTestSync} disabled={busyAction === 'sync'}>
+        Test sync (5 recordings)
+      </DropdownMenuItem>
+      <DropdownMenuItem onSelect={onTestConnection}>Test connection</DropdownMenuItem>
+      <DropdownMenuSeparator />
+      <DropdownMenuItem variant="destructive" onSelect={onDisconnect}>
+        Disconnect
+      </DropdownMenuItem>
+    </>
+  )
+
+  const cancelled = failed && status.lastSyncCancelled
+
+  // Primary label + busy label for each sub-state. Cancelled gets
+  // "Resume" — the engine persists partial progress, so the next sync
+  // picks up where it left off rather than starting over.
+  let primaryLabel = 'Sync now'
+  let busyLabel = 'Syncing…'
+  let onPrimary = onSyncNow
+  if (neverSynced) {
+    primaryLabel = 'Start sync'
+    busyLabel = 'Starting…'
+    onPrimary = onStartSync
+  } else if (cancelled) {
+    primaryLabel = 'Resume'
+    busyLabel = 'Resuming…'
+    onPrimary = onRetry
+  } else if (failed) {
+    primaryLabel = 'Retry'
+    busyLabel = 'Retrying…'
+    onPrimary = onRetry
+  }
+
   return (
-    <div className="space-y-3">
-      <dl className="divide-y divide-border text-[13px]">
-        <Row label="Account" value={account} />
-        <Row label="Endpoint" value={status.endpoint} />
-      </dl>
+    <div className="space-y-4">
+      <IdentityBlock probe={probe} endpoint={status.endpoint} />
 
-      {neverSynced && (
-        <div className="flex items-center justify-between rounded-lg bg-foreground/[0.025] px-4 py-3">
-          <div>
-            <p className="text-[13px] font-medium text-foreground">Ready to sync</p>
-            <p className="text-[12px] text-muted-foreground">
-              {recordingCount.toLocaleString()} recording
-              {recordingCount === 1 ? '' : 's'} will be pushed on the first sync.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onStartSync}
-            disabled={busyAction === 'sync'}
-            className={CHROME_BUTTON_PRIMARY}
-          >
-            {busyAction === 'sync' ? 'Starting…' : 'Start sync'}
-          </button>
-        </div>
-      )}
-
-      {!neverSynced && !failed && (
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-[12.5px] text-muted-foreground">
-            Synced {relativeTime(status.lastSyncedAt!)} · new recordings push automatically.
+      {neverSynced ? (
+        // First-sync hero — slight wash, count of what's about to push,
+        // SplitButton with "Start sync" label.
+        <div className="rounded-lg bg-foreground/[0.025] px-4 py-3">
+          <p className="text-[13px] font-medium text-foreground">Ready to sync</p>
+          <p className="mt-0.5 text-[12px] text-muted-foreground">
+            {recordingCount.toLocaleString()} recording
+            {recordingCount === 1 ? '' : 's'} will be pushed to Myme on the first sync.
           </p>
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={onSyncNow}
-              disabled={busyAction === 'sync'}
-              className={CHROME_BUTTON}
-            >
-              {busyAction === 'sync' ? 'Syncing…' : 'Sync now'}
-            </button>
-            <OverflowMenu onDisconnect={onDisconnect} onTest={onTest} />
+          <div className="mt-3 flex justify-end">
+            <SyncSplitButton
+              label={primaryLabel}
+              busyLabel={busyLabel}
+              busy={busyAction === 'sync'}
+              onClick={onPrimary}
+              menuItems={menuItems}
+            />
           </div>
         </div>
-      )}
-
-      {failed && (
-        <div className="flex items-center justify-between gap-3 rounded-lg border border-accent-orange/30 bg-accent-orange-bg px-4 py-3">
-          <div className="min-w-0">
-            <p className="text-[13px] font-medium text-accent-orange">Last sync failed</p>
-            <p className="truncate text-[12px] text-accent-orange/90" title={status.lastError!}>
-              {status.lastError}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onRetry}
-            disabled={busyAction === 'sync'}
-            className={CHROME_BUTTON_PRIMARY}
-          >
-            {busyAction === 'sync' ? 'Retrying…' : 'Retry'}
-          </button>
-        </div>
-      )}
-
-      {neverSynced && (
-        <div className="flex justify-end">
-          <OverflowMenu onDisconnect={onDisconnect} onTest={onTest} />
+      ) : (
+        <div className="flex items-center justify-between gap-3">
+          <p className="min-w-0 truncate text-[12.5px] text-muted-foreground">
+            {buildCaption({
+              recordingCount,
+              syncedRecordings: status.syncedRecordings,
+              lastSyncedAt: status.lastSyncedAt,
+              lastError: status.lastError,
+              cancelled
+            })}
+          </p>
+          <SyncSplitButton
+            label={primaryLabel}
+            busyLabel={busyLabel}
+            busy={busyAction === 'sync'}
+            onClick={onPrimary}
+            menuItems={menuItems}
+          />
         </div>
       )}
     </div>
   )
+}
+
+/**
+ * Build the one-line muted caption beneath the identity rows.
+ *
+ * Three shapes, all anchored on the same "X of Y" synced count so the
+ * user can see at a glance how far the engine has got:
+ *
+ *   idle      — "X of Y recordings synced · Z ago"
+ *   cancelled — "Sync cancelled · X of Y recordings synced"
+ *   failed    — "Sync failed: <reason> · X of Y recordings synced"
+ *
+ * "X of Y" uses local total (`recordingCount`) as Y. Mode-filter
+ * exclusions can drive X < Y even after a successful run; the user
+ * reads that as "not everything is pushing" and can check the Modes
+ * section if they care.
+ */
+function buildCaption({
+  recordingCount,
+  syncedRecordings,
+  lastSyncedAt,
+  lastError,
+  cancelled
+}: {
+  recordingCount: number
+  syncedRecordings: number
+  lastSyncedAt: string | null
+  lastError: string | null
+  cancelled: boolean
+}): string {
+  const synced = `${syncedRecordings.toLocaleString()} of ${recordingCount.toLocaleString()} recording${recordingCount === 1 ? '' : 's'} synced`
+  if (cancelled) return `Sync cancelled · ${synced}`
+  if (lastError) return `Sync failed: ${lastError} · ${synced}`
+  const when = lastSyncedAt ? `${relativeTime(lastSyncedAt)}` : 'just now'
+  return `${synced} · ${when}`
 }
 
 // ──────────────────────────────────────────────────────────────────────
@@ -365,18 +423,14 @@ function SyncingBody({
   busyAction,
   onCancel
 }: BodyProps & { status: Extract<MymeStatus, { kind: 'syncing' }> }): React.JSX.Element {
-  const account = describeIdentity(probe)
   const pct = status.total > 0 ? Math.round((status.processed / status.total) * 100) : 0
   return (
-    <div className="space-y-3">
-      <dl className="divide-y divide-border text-[13px]">
-        <Row label="Account" value={account} />
-        <Row label="Endpoint" value={status.endpoint} />
-      </dl>
+    <div className="space-y-4">
+      <IdentityBlock probe={probe} endpoint={status.endpoint} />
       <div className="space-y-2 rounded-lg bg-foreground/[0.025] px-4 py-3">
         <div className="flex items-center justify-between">
           <p className="text-[13px] font-medium text-foreground">{describePhase(status.phase)}</p>
-          <p className="text-[12px] text-muted-foreground">
+          <p className="text-[12px] tabular-nums text-muted-foreground">
             {status.processed.toLocaleString()} / {status.total.toLocaleString()}
           </p>
         </div>
@@ -402,6 +456,69 @@ function SyncingBody({
 }
 
 // ──────────────────────────────────────────────────────────────────────
+// SyncSplitButton — one shape, three labels
+// ──────────────────────────────────────────────────────────────────────
+
+/**
+ * Outlined split-button used across the connected sub-states. The
+ * face triggers the primary action; the chevron cell opens the menu.
+ * Sized to match `CHROME_BUTTON` so the chrome sits flush with the
+ * rest of the app.
+ *
+ * `min-w-[5.25rem]` on the face keeps the divider from jiggling
+ * between "Sync now" and "Syncing…".
+ */
+function SyncSplitButton({
+  label,
+  busyLabel,
+  busy,
+  onClick,
+  menuItems
+}: {
+  label: string
+  busyLabel: string
+  busy: boolean
+  onClick: () => void
+  menuItems: React.ReactNode
+}): React.JSX.Element {
+  // Visual rhythm matches `CHROME_BUTTON` — same border, radius, bg
+  // and hover treatment as the Check-now button on About. No shadow,
+  // no font-medium, no white-on-dark face. The chevron cell shares the
+  // outer chrome and is separated by a single-px border-coloured pipe.
+  return (
+    <div className="inline-flex h-7 items-stretch overflow-hidden rounded-md border border-border bg-floating">
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={busy}
+        className="inline-flex min-w-[5.25rem] items-center justify-center gap-1.5 px-3 text-[12px] text-foreground transition-colors hover:bg-foreground/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-floating"
+      >
+        <UploadCloud className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.8} />
+        {busy ? busyLabel : label}
+      </button>
+      <div className="w-px self-stretch bg-border" />
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            aria-label="More sync actions"
+            className="inline-flex items-center justify-center px-1.5 text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+          >
+            <ChevronDown className="h-3.5 w-3.5" strokeWidth={1.8} />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="end"
+          className="min-w-[11rem] [&_[data-slot=dropdown-menu-item]]:text-[12px]"
+        >
+          {menuItems}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  )
+}
+
+// ──────────────────────────────────────────────────────────────────────
 // Helpers
 // ──────────────────────────────────────────────────────────────────────
 
@@ -418,19 +535,34 @@ function computePill(
       : { tone: 'neutral', label: 'Not connected' }
   }
   if (status.kind === 'syncing') return { tone: 'busy', label: 'Syncing…' }
-  // connected
+  // Connected — the pill reflects the *connection* only. Sync errors
+  // don't flip it; that detail lives in the body caption.
   if (probing && !probe) return { tone: 'busy', label: 'Checking…' }
   if (probe && !probe.ok) return { tone: 'error', label: probe.error }
-  if (status.lastError) return { tone: 'error', label: 'Sync error', title: status.lastError }
   return { tone: 'ok', label: 'Connected' }
 }
 
-function describeIdentity(probe: ProbeResult | null): string {
-  if (!probe) return '—'
-  if (!probe.ok) return '—'
-  if (probe.displayName && probe.email) return `${probe.displayName} · ${probe.email}`
-  if (probe.displayName) return probe.displayName
-  if (probe.email) return probe.email
+function IdentityBlock({
+  probe,
+  endpoint
+}: {
+  probe: ProbeResult | null
+  endpoint: string
+}): React.JSX.Element {
+  return (
+    <dl className="divide-y divide-border text-[13px]">
+      <Row label="Account" value={describeAccount(probe)} />
+      <Row label="Endpoint" value={endpoint} />
+    </dl>
+  )
+}
+
+function describeAccount(probe: ProbeResult | null): string {
+  if (!probe?.ok) return '—'
+  const { displayName, email } = probe
+  if (displayName && email) return `${displayName} (${email})`
+  if (displayName) return displayName
+  if (email) return email
   return 'Signed in'
 }
 
@@ -455,31 +587,5 @@ function Row({ label, value }: { label: string; value: string }): React.JSX.Elem
         {value}
       </dd>
     </div>
-  )
-}
-
-function OverflowMenu({
-  onDisconnect,
-  onTest
-}: {
-  onDisconnect: () => void
-  onTest: () => void
-}): React.JSX.Element {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          aria-label="More options"
-          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground"
-        >
-          <MoreHorizontal className="h-3.5 w-3.5" strokeWidth={1.8} />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-[10rem] text-[12.5px]">
-        <DropdownMenuItem onSelect={onTest}>Test connection</DropdownMenuItem>
-        <DropdownMenuItem onSelect={onDisconnect}>Disconnect</DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
   )
 }

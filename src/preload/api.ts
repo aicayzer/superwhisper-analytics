@@ -230,6 +230,17 @@ export type MymeStatus =
       lastSyncedAt: string | null
       /** Set after a failed sync; cleared on the next success. */
       lastError: string | null
+      /** Number of recordings tracked in local sync state — i.e. how
+       *  many have been successfully pushed to Myme. Equal to the
+       *  size of `state.recordings` in the engine. */
+      syncedRecordings: number
+      /** Same shape, for sessions. */
+      syncedSessions: number
+      /** True when the previous sync attempt was aborted via
+       *  `cancelSync()` rather than failing for a genuine reason.
+       *  Lets the card render "Sync cancelled" instead of "Sync
+       *  failed". `lastError` is `'Cancelled'` in this case. */
+      lastSyncCancelled: boolean
     }
   | {
       kind: 'syncing'
@@ -358,6 +369,13 @@ export const api = {
      *  full corpus. Skips soft-delete and session derivation while the
      *  cap is in effect. */
     testSync: (): Promise<MymeStatus> => ipcRenderer.invoke('myme:testSync'),
+    /** Developer affordance — wipe all `superwhisper.*` items from the
+     *  connected tenant and clear the local sync state so the next sync
+     *  re-mints everything. No confirmation dialog at this layer; the
+     *  caller (Settings → Developer) renders the user-facing prompt. */
+    purgeAllData: (): Promise<
+      { ok: true; recordings: number; sessions: number } | { ok: false; error: string }
+    > => ipcRenderer.invoke('myme:purgeAllData'),
     /** Read the persisted mapping config. */
     getMapping: (): Promise<MymeMapping> => ipcRenderer.invoke('myme:getMapping'),
     /** Persist a new mapping. Resets the sync state so the next pass

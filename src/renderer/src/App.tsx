@@ -1,6 +1,8 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { RouterProvider } from 'react-router-dom'
 import { LoadingOverlay } from './components/LoadingOverlay'
+import { Toaster } from './components/ui/sonner'
+import { toastError } from './lib/toast'
 import { router } from './routes'
 import { useConfigStore } from './state/configStore'
 import { useDataStore } from './state/dataStore'
@@ -21,6 +23,37 @@ function App(): React.JSX.Element {
   const clearData = useDataStore((s) => s.clearData)
   const dataLoading = useDataStore((s) => s.loading)
   const hydrateMyme = useMymeStore((s) => s.hydrate)
+  const mymeStatus = useMymeStore((s) => s.status)
+  // Track the most-recent error string we've already surfaced so we
+  // only toast on transitions, not on every render. A null entry means
+  // the next non-null error is a fresh transition worth toasting.
+  const lastToastedErrorRef = useRef<string | null>(null)
+
+  // Surface auth + sync errors via a system-level toast in addition to
+  // the inline state on the ConnectionCard. The card carries the full
+  // explanation; the toast is the one-shot heads-up so a background
+  // failure can't go unnoticed when the user is on another screen.
+  //
+  // Only fires when the error *string* changes — re-renders that
+  // re-emit the same error are coalesced. Cleared whenever the error
+  // goes away so the next occurrence triggers again.
+  useEffect(() => {
+    if (!mymeStatus) return
+    const error =
+      mymeStatus.kind === 'disconnected' || mymeStatus.kind === 'connected'
+        ? (mymeStatus.lastError ?? null)
+        : null
+
+    if (error === null) {
+      lastToastedErrorRef.current = null
+      return
+    }
+    if (lastToastedErrorRef.current === error) return
+    lastToastedErrorRef.current = error
+
+    const message = mymeStatus.kind === 'disconnected' ? 'Sign-in failed' : 'Last sync failed'
+    toastError({ message, copyText: error })
+  }, [mymeStatus])
 
   useEffect(() => {
     const mq =
@@ -47,7 +80,7 @@ function App(): React.JSX.Element {
 
   // Pull Myme integration state once on mount — the store's `hydrated`
   // flag makes this a no-op if it's already run. Without this, every
-  // Sync-tab consumer (ConnectionCard, PipelineCard, SyncActionBar)
+  // Sync-tab consumer (ConnectionCard, PipelineCard)
   // sees `status: null` indefinitely and renders its loading state.
   useEffect(() => {
     void hydrateMyme()
@@ -95,6 +128,7 @@ function App(): React.JSX.Element {
           data behind the welcome modal — no need for a loading curtain
           there too. */}
       {configValid && dataLoading && <LoadingOverlay />}
+      <Toaster />
     </>
   )
 }

@@ -37,6 +37,28 @@ export default defineConfig(
       'react/prop-types': 'off'
     }
   },
+  // Funnel every `sonner` consumer through `@renderer/lib/toast`. The
+  // wrapper and the Toaster component are the only files allowed to
+  // import sonner directly; everywhere else uses `toastError` /
+  // `toastInfo` so behaviour stays centralised.
+  {
+    files: ['src/renderer/**/*.{ts,tsx}'],
+    ignores: ['src/renderer/src/lib/toast.ts', 'src/renderer/src/components/ui/sonner.tsx'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'sonner',
+              message:
+                'Import `toastError` / `toastInfo` from `@renderer/lib/toast` instead — the wrapper is the only sonner consumer.'
+            }
+          ]
+        }
+      ]
+    }
+  },
   // Recharts wrappers — TS prop types are sufficient; the plugin can't see
   // them through Recharts' content-render-prop call signatures.
   {

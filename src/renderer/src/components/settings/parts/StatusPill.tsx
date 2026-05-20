@@ -9,6 +9,10 @@ interface StatusPillProps {
   /** Optional title text shown on hover — useful for error tones where
    *  the label is truncated. */
   title?: string
+  /** Omit the per-tone icon — opt-in for callers that don't want the
+   *  tick / cross / spinner glyph (e.g. the Connection card, where the
+   *  label is already self-explanatory). */
+  hideIcon?: boolean
   className?: string
 }
 
@@ -19,7 +23,13 @@ interface StatusPillProps {
  * The pill carries an icon by tone so colour alone doesn't carry the
  * meaning.
  */
-export function StatusPill({ tone, label, title, className }: StatusPillProps): React.JSX.Element {
+export function StatusPill({
+  tone,
+  label,
+  title,
+  hideIcon,
+  className
+}: StatusPillProps): React.JSX.Element {
   const palette = {
     ok: {
       bg: 'bg-accent-green-bg',
@@ -57,7 +67,7 @@ export function StatusPill({ tone, label, title, className }: StatusPillProps): 
         className
       )}
     >
-      {palette.icon}
+      {!hideIcon && palette.icon}
       <span className="truncate">{label}</span>
     </span>
   )

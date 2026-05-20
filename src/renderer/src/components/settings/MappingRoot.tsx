@@ -14,15 +14,17 @@ interface MappingRootProps {
 }
 
 /**
- * The inline mapping editor that lives inside each PipelineCard body.
- * Two sections: destination (single row showing the bound type, opens
- * `DestinationPickerSheet`) and fields (one row per mapped field, click
- * opens `FieldSourcePickerSheet`). Both pickers are Sheets — keeps the
- * card layout calm and gives them proper width.
+ * Inline mapping editor inside the PipelineCard body. Two groups:
+ *   • Goes to — destination row showing the bound type and field count.
+ *   • Fields — one row per mapped field, click opens the field-source
+ *     picker.
  *
- * No per-field toggle. The current FieldMap shape doesn't carry an
- * enabled flag and adding one is a wider schema change than this PR's
- * scope. Removal lives inside the field-source picker.
+ * Both groups use plain sans-serif throughout — no mono. The type id
+ * and field names are identifiers but display as regular text so the
+ * card doesn't read like a config file.
+ *
+ * Removal lives inside the field-source picker (footer right) rather
+ * than as a per-row × on the field list.
  */
 export function MappingRoot({ kind, binding, onChange }: MappingRootProps): React.JSX.Element {
   const [destOpen, setDestOpen] = useState(false)
@@ -39,9 +41,9 @@ export function MappingRoot({ kind, binding, onChange }: MappingRootProps): Reac
           className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-foreground/[0.04]"
         >
           <span className="min-w-0 flex-1">
-            <code className="block truncate font-mono text-[12.5px] font-medium text-foreground">
+            <span className="block truncate text-[13px] font-medium text-foreground">
               {binding.typeId}
-            </code>
+            </span>
             <span className="mt-0.5 block text-[12px] text-muted-foreground">
               {describeMode(binding)} · {fieldEntries.length} field
               {fieldEntries.length === 1 ? '' : 's'}
@@ -124,8 +126,8 @@ interface FieldRowProps {
 }
 
 function FieldRow({ targetField, sourceRef, first, onOpen }: FieldRowProps): React.JSX.Element {
-  // Surface the plain-English source label as the secondary line so
-  // the user can scan the mapping at a glance without drilling in.
+  // Plain-English source label so the row reads at a glance — the ref
+  // itself (recording.transcript etc.) lives inside the picker.
   const sourceLabel =
     sourceRef.kind === 'source' ? getSourceFieldLabel(sourceRef.field).label : 'Fixed value'
   return (
@@ -138,9 +140,9 @@ function FieldRow({ targetField, sourceRef, first, onOpen }: FieldRowProps): Rea
       )}
     >
       <span className="min-w-0 flex-1">
-        <code className="block truncate font-mono text-[12.5px] font-medium text-foreground">
+        <span className="block truncate text-[13px] font-medium text-foreground">
           {targetField}
-        </code>
+        </span>
         <span className="mt-0.5 block truncate text-[11.5px] text-muted-foreground">
           {sourceLabel}
         </span>

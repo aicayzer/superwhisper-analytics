@@ -51,7 +51,7 @@
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
-    "@mymehq/sdk": "^5.7.1",
+    "@mymehq/sdk": "^5.8.0",
     "@radix-ui/react-slot": "^1.2.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -63,6 +63,7 @@
     "react-day-picker": "^10.0.0",
     "react-router-dom": "^7.1.5",
     "recharts": "^3.2.1",
+    "sonner": "^2.0.7",
     "tailwind-merge": "^3.6.0",
     "zustand": "^5.0.13"
   },

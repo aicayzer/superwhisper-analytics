@@ -8,8 +8,7 @@ import {
 import { useMymeStore } from '@renderer/state/mymeStore'
 import { useEffect, useMemo, useState } from 'react'
 import type { MappingBinding, SourceKind, TypeSummary } from '../../../../preload/api'
-import { Group } from './parts/Group'
-import { PickRow } from './parts/PickRow'
+import { PickTile } from './parts/PickTile'
 
 interface DestinationPickerSheetProps {
   open: boolean
@@ -20,16 +19,16 @@ interface DestinationPickerSheetProps {
 }
 
 /**
- * Sheet for picking the destination Myme type. Three groups:
+ * Sheet for picking the destination Myme type.
  *
  *   • Default — the bundled `superwhisper.recording` / `.session` type.
- *     Single radio. Sensible starting point; what 95% of users use.
- *   • Your custom types — pulled from the user's tenant via the
- *     `listServerTypes` endpoint. Hidden when there are none.
+ *     Single tile. Sensible starting point; what most users use.
+ *   • Your custom types — pulled from the user's tenant via
+ *     `listServerTypes`. Search input above the grid; tiles for each
+ *     custom type. Hidden when the user has no custom types.
  *
- * Picking commits + closes. The "Create a new type" affordance lives in
- * the existing TypeMappingCard's authored flow; we don't ship that in
- * v1 of the redesign (cited as future scope in the plan).
+ * Picking commits + closes. Plain sans-serif throughout — no mono on
+ * the type IDs. Monochrome selection (dark grey border + faint tint).
  */
 export function DestinationPickerSheet({
   open,
@@ -75,6 +74,8 @@ export function DestinationPickerSheet({
     onPick({ ...binding, mode: 'existing', typeId: type.id })
   }
 
+  const showCustomGroup = tenantTypes.length > 0 || typeListLoading
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -85,63 +86,65 @@ export function DestinationPickerSheet({
             if you&rsquo;ve authored one in your tenant.
           </p>
         </DialogHeader>
-        <DialogBody className="space-y-4">
-          <Group label="Default">
-            <PickRow
+        <DialogBody className="space-y-5">
+          <section className="space-y-2">
+            <SectionLabel>Default</SectionLabel>
+            <PickTile
               picked={binding.mode === 'bundled' && binding.typeId === defaultTypeId}
-              first
-              onClick={pickDefault}
-              title={
-                <code className="font-mono text-[12.5px] font-medium text-foreground">
-                  {defaultTypeId}
-                </code>
-              }
+              label={defaultTypeId}
               subtitle="Ships with the app."
+              onClick={pickDefault}
             />
-          </Group>
+          </section>
 
-          {(tenantTypes.length > 0 || typeListLoading) && (
-            <Group
-              label="Your custom types"
-              hint={typeListLoading ? 'Loading…' : `${tenantTypes.length} available`}
-            >
-              <div className="border-b border-border px-3 py-2">
-                <input
-                  type="text"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search your types…"
-                  className="h-7 w-full bg-transparent text-[12.5px] text-foreground outline-none placeholder:text-muted-foreground"
-                />
+          {showCustomGroup && (
+            <section className="space-y-2">
+              <div className="flex items-baseline justify-between gap-2">
+                <SectionLabel>Your custom types</SectionLabel>
+                <span className="text-[11px] text-muted-foreground">
+                  {typeListLoading ? 'Loading…' : `${tenantTypes.length} available`}
+                </span>
               </div>
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search your types…"
+                className="h-7 w-full rounded-md border border-border bg-card px-2.5 text-[12.5px] text-foreground outline-none placeholder:text-muted-foreground focus:border-foreground/40"
+              />
               {filtered.length === 0 ? (
-                <div className="px-4 py-3 text-[12px] text-muted-foreground">
+                <p className="px-1 py-2 text-[12px] text-muted-foreground">
                   {query ? `No types match "${query}".` : 'No types in your tenant yet.'}
-                </div>
+                </p>
               ) : (
-                filtered.map((t, i) => (
-                  <PickRow
-                    key={t.id}
-                    picked={binding.mode === 'existing' && binding.typeId === t.id}
-                    first={i === 0}
-                    onClick={() => pickTenant(t)}
-                    title={
-                      <code className="font-mono text-[12.5px] font-medium text-foreground">
-                        {t.id}
-                      </code>
-                    }
-                    subtitle={
-                      t.label
-                        ? `${t.label} · ${t.fields.length} field${t.fields.length === 1 ? '' : 's'}`
-                        : `${t.fields.length} field${t.fields.length === 1 ? '' : 's'}`
-                    }
-                  />
-                ))
+                <div className="grid grid-cols-2 gap-2">
+                  {filtered.map((t) => (
+                    <PickTile
+                      key={t.id}
+                      picked={binding.mode === 'existing' && binding.typeId === t.id}
+                      label={t.label || t.id}
+                      subtitle={
+                        t.label
+                          ? `${t.id} · ${t.fields.length} field${t.fields.length === 1 ? '' : 's'}`
+                          : `${t.fields.length} field${t.fields.length === 1 ? '' : 's'}`
+                      }
+                      onClick={() => pickTenant(t)}
+                    />
+                  ))}
+                </div>
               )}
-            </Group>
+            </section>
           )}
         </DialogBody>
       </DialogContent>
     </Dialog>
+  )
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }): React.JSX.Element {
+  return (
+    <h3 className="text-[10.5px] font-medium uppercase tracking-wide text-muted-foreground">
+      {children}
+    </h3>
   )
 }

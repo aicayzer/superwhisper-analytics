@@ -1,21 +1,16 @@
 import { BrowserWindow } from 'electron'
 import { MymeError, UnauthorizedError, type TypeSchema } from '@mymehq/sdk'
-import { startDeviceFlow, OAuthError, InMemoryTokenStorage } from '@mymehq/sdk/auth'
-import type { DeviceFlowHandle, TokenStorage } from '@mymehq/sdk/auth'
+import { startDeviceFlow, OAuthError } from '@mymehq/sdk/auth'
+import type { DeviceFlowHandle } from '@mymehq/sdk/auth'
 import type { MymeStatus, ProbeResult, TypeSummary } from '../../preload/api'
 import { onReindexed } from '../cache'
 import { getConfig, setConfig } from '../config'
 import { getClient, invalidateClient } from './client'
 import { syncRun } from './engine'
 import { defaultMapping, type MymeMapping } from './mapping'
-import { clearState } from './state'
-import {
-  clearCredential,
-  credentialExists,
-  readCredential,
-  writeCredential,
-  type OAuthTokenBundle
-} from './tokens'
+import { clearState, loadState } from './state'
+import { SafeStorageTokenStorage } from './token-storage'
+import { clearCredential, credentialExists, readCredential, writeCredential } from './tokens'
 
 /**
  * Public surface of the Myme integration module — used by `ipc.ts`.
@@ -59,21 +54,28 @@ const STATUS_CHANNEL = 'myme:status'
 const CLIENT_NAME = 'SuperWhisper Analytics'
 /**
  * Scopes the test app actually needs. Must be a subset of the server's
- * allowlist (`TYPE_REGISTRY.keys() + EDGE_TYPE_REGISTRY.keys()` + OIDC
- * standards). Bare wildcards like `*:read` / `*:write` are NOT in the
- * allowlist and produce `invalid_scope` at DCR time — the prior set was
- * a placeholder, replaced here with the genuine surface:
+ * OAuth allowlist (which mirrors top-level `TYPE_REGISTRY` ids +
+ * `EDGE_TYPE_REGISTRY` ids + OIDC standards).
  *
- *  - `superwhisper.recording:*` — the data plane
- *  - `superwhisper.session:*`   — derived sessions
- *  - `metadata.types:write`     — registers the custom types on first sync
- *  - `edge.parent-of:*`         — session→recording linkage minted in the
- *                                 sessions pass (engine.ts:464)
+ * Subtype gotcha: `superwhisper.recording` was re-registered as a
+ * subtype of `core.note` (parent: core.note). Subtype scopes are NOT
+ * published in the OAuth allowlist — DCR rejects them with
+ * `invalid_scope: cannot request scope superwhisper.recording:read`.
+ * The right scope for a `core.note` subtype is `core.note:*` on the
+ * parent. Verified against `/.well-known/oauth-authorization-server`
+ * `scopes_supported`. `superwhisper.session` is a top-level type, so
+ * its own `:read/write` scopes remain valid.
+ *
+ *  - `core.note:*`             — recording data plane (via the subtype parent)
+ *  - `superwhisper.session:*`  — derived sessions (top-level type)
+ *  - `metadata.types:write`    — registers the custom types on first sync
+ *  - `edge.parent-of:*`        — session→recording linkage minted in the
+ *                                sessions pass (engine.ts:464)
  *  - `openid profile email offline_access` — OIDC standards + refresh
  */
 const DEFAULT_SCOPES = [
-  'superwhisper.recording:read',
-  'superwhisper.recording:write',
+  'core.note:read',
+  'core.note:write',
   'superwhisper.session:read',
   'superwhisper.session:write',
   'metadata.types:write',
@@ -108,10 +110,38 @@ function endpointSnapshot(): string {
   return getConfig().myme.endpoint
 }
 
+/**
+ * Snapshot the engine state for inclusion in a `connected` status —
+ * synced counts + the persisted last-full-sync timestamp. Reading
+ * `loadState()` is cheap (sub-ms for typical sizes) and keeps the
+ * status payload honest across app restarts.
+ */
+function syncedSnapshot(): {
+  syncedRecordings: number
+  syncedSessions: number
+  lastFullSyncAt: string | null
+} {
+  const state = loadState()
+  return {
+    syncedRecordings: Object.keys(state.recordings).length,
+    syncedSessions: Object.keys(state.sessions).length,
+    lastFullSyncAt: state.lastFullSyncAt
+  }
+}
+
 function buildInitialStatus(): MymeStatus {
   const endpoint = endpointSnapshot()
   if (credentialExists() && readCredential() !== null) {
-    return { kind: 'connected', endpoint, lastSyncedAt: null, lastError: null }
+    const snap = syncedSnapshot()
+    return {
+      kind: 'connected',
+      endpoint,
+      lastSyncedAt: snap.lastFullSyncAt,
+      lastError: null,
+      syncedRecordings: snap.syncedRecordings,
+      syncedSessions: snap.syncedSessions,
+      lastSyncCancelled: false
+    }
   }
   return { kind: 'disconnected', endpoint, lastError: null }
 }
@@ -297,18 +327,17 @@ export async function connect(): Promise<MymeStatus> {
 
   let handle: DeviceFlowHandle
   let clientId: string
-  // Inject our own storage so we can pull the persisted bundle back out
-  // after `pollForToken` resolves — the SDK persists the bundle as JSON
-  // under a key it owns; we re-read that JSON and write it to our own
-  // safeStorage-backed credential file.
-  const flowStorage = new InMemoryTokenStorage()
   try {
     clientId = await registerOAuthClient(endpoint)
+    // SafeStorageTokenStorage adapts the SDK's `TokenStorage` interface
+    // to our `safeStorage`-backed credential file. The SDK writes
+    // directly through it when the user approves the device-flow code,
+    // so there's no post-hoc lift step.
     handle = await startDeviceFlow({
       issuer: endpoint,
       clientId,
       scopes: DEFAULT_SCOPES,
-      storage: flowStorage
+      storage: new SafeStorageTokenStorage(clientId)
     })
   } catch (err) {
     return setStatus({
@@ -335,11 +364,10 @@ export async function connect(): Promise<MymeStatus> {
 
   try {
     await handle.pollForToken({ signal })
-    // The SDK persists the bundle as JSON under a key shaped
-    // `myme.auth.tokens:<origin>:<client_id>` in whatever storage we
-    // passed in. Pull it back out, copy across to our safeStorage-backed
-    // credential file, and discard the in-memory copy.
-    await persistTokensFromStorage(flowStorage, endpoint, clientId)
+    // SafeStorageTokenStorage wrote the credential to disk during the
+    // SDK's `provider.persist()` call inside `pollForToken`, so nothing
+    // more to do here — just drop the cached client so the next
+    // `getClient()` rebuilds against the freshly-stored credential.
     invalidateClient()
 
     // Verify the new credentials against the server before flipping to
@@ -348,13 +376,7 @@ export async function connect(): Promise<MymeStatus> {
     if (!client) throw new Error('client construction failed after device-flow approval')
     await client.items.stats()
 
-    return setStatus({
-      kind: 'connected',
-      endpoint,
-
-      lastSyncedAt: null,
-      lastError: null
-    })
+    return setStatus(connectedStatus(endpoint))
   } catch (err) {
     clearCredential()
     invalidateClient()
@@ -366,6 +388,28 @@ export async function connect(): Promise<MymeStatus> {
     })
   } finally {
     activeDeviceFlowAbort = null
+  }
+}
+
+/**
+ * Build a fresh `connected` status from the persisted engine state.
+ * Used wherever we transition to connected (device-flow success,
+ * API-key success, sync completion). Centralised so the synced-count
+ * + last-sync-cancelled fields don't drift between call sites.
+ */
+function connectedStatus(
+  endpoint: string,
+  opts?: { lastError?: string | null; lastSyncCancelled?: boolean; lastSyncedAt?: string | null }
+): Extract<MymeStatus, { kind: 'connected' }> {
+  const snap = syncedSnapshot()
+  return {
+    kind: 'connected',
+    endpoint,
+    lastSyncedAt: opts?.lastSyncedAt ?? snap.lastFullSyncAt,
+    lastError: opts?.lastError ?? null,
+    syncedRecordings: snap.syncedRecordings,
+    syncedSessions: snap.syncedSessions,
+    lastSyncCancelled: opts?.lastSyncCancelled ?? false
   }
 }
 
@@ -432,13 +476,7 @@ export async function submitApiKey(key: string): Promise<MymeStatus> {
     const client = getClient()
     if (!client) throw new Error('client construction failed')
     await client.items.stats()
-    return setStatus({
-      kind: 'connected',
-      endpoint,
-
-      lastSyncedAt: null,
-      lastError: null
-    })
+    return setStatus(connectedStatus(endpoint))
   } catch (err) {
     clearCredential()
     invalidateClient()
@@ -458,6 +496,51 @@ export function disconnect(): MymeStatus {
   const endpoint = endpointSnapshot()
   setStatus({ kind: 'disconnected', endpoint, lastError: null })
   return ensureStatus()
+}
+
+/**
+ * Wipe all SuperWhisper-typed items from the connected Myme tenant.
+ * Bulk-purges `superwhisper.recording` + `superwhisper.session` via
+ * `client.items.bulkAction`, then clears the local sync state so the
+ * next sync re-mints everything from scratch.
+ *
+ * Developer-tab affordance — fast way to reset staging for testing.
+ * No confirmation dialog yet (the confirmation pattern lands with the
+ * toast system, not this ticket); callers should make sure the user
+ * knows what they're triggering.
+ */
+export async function purgeAllData(): Promise<
+  { ok: true; recordings: number; sessions: number } | { ok: false; error: string }
+> {
+  const client = getClient()
+  if (!client) return { ok: false, error: 'Not connected.' }
+  try {
+    const [recRes, sesRes] = await Promise.all([
+      client.items.bulkAction({
+        action: 'purge',
+        confirm: 'PURGE',
+        filter: { type: 'superwhisper.recording', state: 'active' },
+        max_items: 50000
+      }),
+      client.items.bulkAction({
+        action: 'purge',
+        confirm: 'PURGE',
+        filter: { type: 'superwhisper.session', state: 'active' },
+        max_items: 50000
+      })
+    ])
+    // Local sync state is now stale — clearing it forces the next sync
+    // to treat every recording as fresh and re-mint, instead of seeing
+    // server-side ghosts via stored itemIds that no longer exist.
+    clearState()
+    return {
+      ok: true,
+      recordings: recRes.succeeded,
+      sessions: sesRes.succeeded
+    }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
 }
 
 /**
@@ -539,13 +622,18 @@ async function runSync(opts: { limit?: number } = {}): Promise<MymeStatus> {
   }
 
   const lastSyncedAt = outcome.ok ? outcome.finishedAt : previousLastSyncedAt
-  const next = setStatus({
-    kind: 'connected',
-    endpoint,
-
-    lastSyncedAt,
-    lastError: outcome.ok ? null : outcome.error
-  })
+  // Distinguish user-cancelled from a genuine failure. The engine
+  // returns `error: 'Cancelled'` for the abort path; that becomes
+  // `lastSyncCancelled: true` here so the renderer can render "Sync
+  // cancelled" instead of "Sync failed".
+  const cancelled = !outcome.ok && outcome.error === 'Cancelled'
+  const next = setStatus(
+    connectedStatus(endpoint, {
+      lastSyncedAt,
+      lastError: outcome.ok ? null : outcome.error,
+      lastSyncCancelled: cancelled
+    })
+  )
   console.log(
     `[myme] sync completed: created=${outcome.counts.created} updated=${outcome.counts.updated} ` +
       `soft-deleted=${outcome.counts.softDeleted} no-op=${outcome.counts.noop} ` +
@@ -642,54 +730,4 @@ async function registerOAuthClient(endpoint: string): Promise<string> {
     throw new Error('Client registration returned no client_id')
   }
   return body.client_id
-}
-
-/**
- * Lift the just-issued token bundle out of the SDK's flow storage and
- * persist through our safeStorage-backed `tokens.ts`. The SDK persists
- * a JSON `PersistedTokens` blob under a key shaped
- * `myme.auth.tokens:<origin>:<client_id>` (see `device-flow.ts` in the
- * SDK); we read that key out of the storage instance we passed in to
- * `startDeviceFlow`, then write to our own credential file.
- */
-async function persistTokensFromStorage(
-  storage: TokenStorage,
-  endpoint: string,
-  clientId: string
-): Promise<void> {
-  const origin = new URL(endpoint).origin
-  const storageKey = `myme.auth.tokens:${origin}:${clientId}`
-  const raw = await storage.get(storageKey)
-  if (!raw) {
-    throw new Error('Device-flow tokens were not persisted by the SDK')
-  }
-  let parsed: Partial<OAuthTokenBundle>
-  try {
-    parsed = JSON.parse(raw) as Partial<OAuthTokenBundle>
-  } catch (err) {
-    throw new Error(
-      `Could not parse device-flow tokens: ${err instanceof Error ? err.message : String(err)}`
-    )
-  }
-  if (
-    typeof parsed.access_token !== 'string' ||
-    typeof parsed.refresh_token !== 'string' ||
-    typeof parsed.access_expires_at !== 'number' ||
-    typeof parsed.scope !== 'string'
-  ) {
-    throw new Error('Device-flow tokens are missing required fields')
-  }
-  const ok = writeCredential({
-    kind: 'oauth',
-    clientId,
-    tokens: {
-      access_token: parsed.access_token,
-      refresh_token: parsed.refresh_token,
-      access_expires_at: parsed.access_expires_at,
-      scope: parsed.scope
-    }
-  })
-  if (!ok) {
-    throw new Error('Could not persist tokens (safeStorage unavailable).')
-  }
 }

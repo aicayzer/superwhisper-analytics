@@ -6,7 +6,6 @@ import {
   DialogHeader,
   DialogTitle
 } from '@renderer/components/ui/dialog'
-import { useDataStore } from '@renderer/state/dataStore'
 import { useMemo } from 'react'
 import { listRecordingSourceLabels, listSessionSourceLabels } from '@shared/myme-labels'
 import type {
@@ -16,8 +15,7 @@ import type {
   SourceKind
 } from '../../../../preload/api'
 import { CHROME_BUTTON_WARN } from './parts/chromeButton'
-import { Group } from './parts/Group'
-import { PickRow } from './parts/PickRow'
+import { PickTile } from './parts/PickTile'
 
 interface FieldSourcePickerSheetProps {
   open: boolean
@@ -31,14 +29,15 @@ interface FieldSourcePickerSheetProps {
 }
 
 /**
- * Sheet for picking the source ref for a target field. Three lines per
- * option: plain-English label (primary), canonical ref (dimmed mono,
- * secondary), and a sample value from the head recording (italic,
- * tertiary). The user reads English, the power user reads the ref,
- * everyone sees what the value looks like in practice.
+ * Sheet for picking the source ref for a target field. Each source is
+ * rendered as a compact tile in a two-column grid: plain-English label
+ * + the canonical ref underneath as small muted text. No preview value,
+ * no type tag, no radio icon — selection is conveyed by the tile's
+ * border + background.
  *
- * "Remove this field" lives in the footer — destructive, accent-orange
- * tinted, removes + closes in one click.
+ * "Remove this field" lives in the footer on the right (the action),
+ * with a small muted caption on the left explaining what it does. Reads
+ * left-to-right: what happens → button.
  */
 export function FieldSourcePickerSheet({
   open,
@@ -49,8 +48,6 @@ export function FieldSourcePickerSheet({
   onChange,
   onRemove
 }: FieldSourcePickerSheetProps): React.JSX.Element {
-  const headRecording = useDataStore((s) => s.recordings[0])
-
   const sourceOptions = useMemo(
     () => (kind === 'recording' ? listRecordingSourceLabels() : listSessionSourceLabels()),
     [kind]
@@ -61,12 +58,9 @@ export function FieldSourcePickerSheet({
 
   function pick(field: string): void {
     if (!targetField) return
-    // Cast: the source list is hand-mirrored from the canonical
-    // `RecordingSourceField` / `SessionSourceField` union. Picker
-    // options are only ever the keys of `@shared/myme-labels`, so the
-    // narrowing is safe by construction. Keeping the function signature
-    // in `string` here keeps the renderer free of the union import
-    // dance.
+    // The source list is hand-mirrored from the canonical
+    // `RecordingSourceField` / `SessionSourceField` union, so the cast
+    // at the boundary is safe by construction.
     onChange({
       ...binding,
       fieldMap: {
@@ -86,7 +80,7 @@ export function FieldSourcePickerSheet({
           <DialogTitle>
             <span className="inline-flex items-baseline gap-2">
               <span className="text-muted-foreground">Source for</span>
-              <code className="font-mono text-[13px] text-foreground">{targetField}</code>
+              <span className="text-[13px] text-foreground">{targetField}</span>
             </span>
           </DialogTitle>
           <p className="text-[12px] text-muted-foreground">
@@ -94,85 +88,27 @@ export function FieldSourcePickerSheet({
           </p>
         </DialogHeader>
         <DialogBody>
-          <Group label="Source">
-            {sourceOptions.map(({ field, label }, i) => (
-              <PickRow
+          <div className="grid grid-cols-2 gap-2">
+            {sourceOptions.map(({ field, label }) => (
+              <PickTile
                 key={field}
                 picked={field === currentField}
-                first={i === 0}
+                label={label.label}
+                subtitle={field}
                 onClick={() => pick(field)}
-                title={
-                  <span className="inline-flex items-baseline gap-2">
-                    <span>{label.label}</span>
-                    <span className="text-[10.5px] uppercase tracking-wide text-muted-foreground/70">
-                      {label.type}
-                    </span>
-                  </span>
-                }
-                subtitle={
-                  <code className="font-mono text-[11px] text-muted-foreground/80">{field}</code>
-                }
-                preview={kind === 'recording' ? previewFor(field, headRecording) : undefined}
               />
             ))}
-          </Group>
+          </div>
         </DialogBody>
         <DialogFooter>
-          <button type="button" onClick={onRemove} className={CHROME_BUTTON_WARN}>
-            Remove this field
-          </button>
           <span className="text-[11.5px] text-muted-foreground">
             Drops it from the mapping on the next sync.
           </span>
+          <button type="button" onClick={onRemove} className={CHROME_BUTTON_WARN}>
+            Remove this field
+          </button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   )
-}
-
-/** Best-effort preview value from the head recording. Truncated.
- *  Returns undefined when nothing useful can be shown — `PickRow`
- *  hides the row when preview is undefined.
- *  `field` is loosely typed as `string` so the renderer doesn't have
- *  to import the canonical union; the switch handles the recording-side
- *  cases and falls back to `undefined` for anything else (sessions, or
- *  a hand-rolled custom ref). */
-function previewFor(
-  field: string,
-  head: ReturnType<typeof useDataStore.getState>['recordings'][number] | undefined
-): string | undefined {
-  if (!head) return undefined
-  const v = ((): unknown => {
-    switch (field) {
-      case 'recording.transcript':
-        return head.result
-      case 'recording.rawTranscript':
-        return head.rawResult
-      case 'recording.excerpt':
-        return head.excerpt
-      case 'recording.datetime':
-        return head.datetime
-      case 'recording.mode':
-        return head.modeName
-      case 'recording.model':
-        return head.modelName
-      case 'recording.input_device':
-        return head.recordingDevice
-      case 'recording.appVersion':
-        return head.appVersion
-      case 'recording.language':
-        return head.languageSelected
-      case 'recording.durationSeconds':
-        return head.duration ? (head.duration / 1000).toFixed(1) + 's' : undefined
-      case 'recording.wordCount':
-        return head.wordCount
-      case 'recording.wordsPerMinute':
-        return head.wordsPerMinute
-      default:
-        return undefined
-    }
-  })()
-  if (v == null || v === '') return undefined
-  const s = String(v)
-  return s.length > 80 ? s.slice(0, 77) + '…' : s
 }

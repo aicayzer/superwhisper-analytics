@@ -8,7 +8,6 @@ import { IndexingCard } from '@renderer/components/settings/IndexingCard'
 import { PipelineCard } from '@renderer/components/settings/PipelineCard'
 import { RecordingsFolderCard } from '@renderer/components/settings/RecordingsFolderCard'
 import { SessionGapCard } from '@renderer/components/settings/SessionGapCard'
-import { SyncActionBar } from '@renderer/components/settings/SyncActionBar'
 import { TranscriptsCard } from '@renderer/components/settings/TranscriptsCard'
 import { SegmentedTabs } from '@renderer/components/ui/SegmentedTabs'
 import { useState } from 'react'
@@ -34,8 +33,7 @@ const SETTINGS_TABS: ReadonlyArray<{ id: SettingsTab; label: string }> = [
  *
  *   General    → Recordings folder · Appearance · Transcripts
  *   Analysis   → Indexing · Filler dictionary
- *   Sync       → Connection · Recordings pipeline · Sessions pipeline ·
- *                Action bar
+ *   Sync       → Connection · Recordings pipeline · Sessions pipeline
  *   Developer  → Developer (demo data + devtools) · App data (reset)
  *   About      → About
  *
@@ -72,7 +70,6 @@ export function Settings(): React.JSX.Element {
           <ConnectionCard />
           <PipelineCard kind="recording" />
           <PipelineCard kind="session" />
-          <SyncActionBar />
         </>
       )}
       {tab === 'developer' && (
